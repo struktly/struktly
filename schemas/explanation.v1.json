@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "struktly/explanation/v1",
+  "type": "object",
+  "properties": {
+    "schema": { "const": "struktly/explanation/v1" },
+    "path": { "type": "string" },
+    "decision": { "type": "string" },
+    "reason": { "type": "string" },
+    "detail": { "type": "string" }
+  },
+  "required": ["schema", "path", "decision", "reason"],
+  "additionalProperties": true
+}

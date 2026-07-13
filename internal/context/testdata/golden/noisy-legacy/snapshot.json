@@ -1,0 +1,167 @@
+{
+  "schema": "struktly/snapshot/v1",
+  "generated_at": "2026-07-11T12:00:00Z",
+  "repository": {
+    "name": "noisy-legacy",
+    "root": "."
+  },
+  "top_dirs": [
+    {
+      "value": "_legacy",
+      "provenance": [
+        {
+          "source": "_legacy",
+          "method": "dir-listing",
+          "confidence": "detected"
+        }
+      ]
+    },
+    {
+      "value": "archive",
+      "provenance": [
+        {
+          "source": "archive",
+          "method": "dir-listing",
+          "confidence": "detected"
+        }
+      ]
+    },
+    {
+      "value": "docs",
+      "provenance": [
+        {
+          "source": "docs",
+          "method": "dir-listing",
+          "confidence": "detected"
+        }
+      ]
+    },
+    {
+      "value": "legacy",
+      "provenance": [
+        {
+          "source": "legacy",
+          "method": "dir-listing",
+          "confidence": "detected"
+        }
+      ]
+    },
+    {
+      "value": "testdata",
+      "provenance": [
+        {
+          "source": "testdata",
+          "method": "dir-listing",
+          "confidence": "detected"
+        }
+      ]
+    }
+  ],
+  "languages": [
+    {
+      "value": "Go",
+      "provenance": [
+        {
+          "source": "go.mod",
+          "method": "go-mod",
+          "confidence": "detected"
+        }
+      ]
+    }
+  ],
+  "commands": [
+    {
+      "value": "go build ./...",
+      "kind": "build",
+      "provenance": [
+        {
+          "source": "go.mod",
+          "method": "go-mod",
+          "confidence": "detected"
+        }
+      ]
+    },
+    {
+      "value": "go test ./...",
+      "kind": "test",
+      "provenance": [
+        {
+          "source": "go.mod",
+          "method": "go-mod",
+          "confidence": "detected"
+        }
+      ]
+    },
+    {
+      "value": "go vet ./...",
+      "kind": "check",
+      "provenance": [
+        {
+          "source": "go.mod",
+          "method": "go-mod",
+          "confidence": "detected"
+        }
+      ]
+    },
+    {
+      "value": "make test",
+      "kind": "test",
+      "provenance": [
+        {
+          "source": "Makefile",
+          "location": "target:test",
+          "method": "makefile-target",
+          "confidence": "detected"
+        }
+      ]
+    }
+  ],
+  "docs": [
+    {
+      "value": "README.md",
+      "provenance": [
+        {
+          "source": "README.md",
+          "method": "doc-path",
+          "confidence": "detected"
+        }
+      ]
+    },
+    {
+      "value": "docs/current.md",
+      "provenance": [
+        {
+          "source": "docs/current.md",
+          "method": "doc-path",
+          "confidence": "detected"
+        }
+      ]
+    }
+  ],
+  "adrs": [],
+  "instruction_files": [],
+  "deprioritized": [
+    "_legacy",
+    "archive",
+    "legacy",
+    "testdata"
+  ],
+  "open_questions": [
+    "Missing `.struktly/direction.md`; add one to anchor product direction for agent sessions.",
+    "No ADR or decision docs found.",
+    "No `.struktly/constraints.md` file found; add one to pin constraints and non-goals for agent sessions.",
+    "No `.struktly/decisions.md` ledger found yet.",
+    "No `.struktly/evidence.md` ledger found yet.",
+    "No agent instruction files found (`AGENTS.md`, `CLAUDE.md`, Cursor rules, or Copilot instructions)."
+  ],
+  "source_refs": [
+    "Makefile",
+    "README.md",
+    "docs/current.md",
+    "go.mod"
+  ],
+  "stats": {
+    "files_scanned": 4,
+    "duration_ms": 0
+  }
+}

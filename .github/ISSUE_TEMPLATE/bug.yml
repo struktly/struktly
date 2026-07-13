@@ -1,0 +1,30 @@
+name: Bug report
+description: Report incorrect CLI behavior or a regression.
+title: "bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include credentials, private repository contents, or security vulnerabilities.
+  - type: input
+    id: version
+    attributes:
+      label: Struktly version
+      description: Paste the output of `struktly version`.
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command and output
+      description: Include a minimal command, expected behavior, actual behavior, and any error output.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Go version, and Git version.
+    validations:
+      required: true

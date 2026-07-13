@@ -1,0 +1,96 @@
+{
+  "schema": "struktly/snapshot/v1",
+  "generated_at": "2026-07-11T12:00:00Z",
+  "repository": {
+    "name": "flat-package",
+    "root": "."
+  },
+  "top_dirs": [],
+  "languages": [
+    {
+      "value": "Go",
+      "provenance": [
+        {
+          "source": "config.go",
+          "method": "file-extension",
+          "confidence": "inferred"
+        },
+        {
+          "source": "go.mod",
+          "method": "go-mod",
+          "confidence": "detected"
+        },
+        {
+          "source": "parser.go",
+          "method": "file-extension",
+          "confidence": "inferred"
+        }
+      ]
+    }
+  ],
+  "commands": [
+    {
+      "value": "go build ./...",
+      "kind": "build",
+      "provenance": [
+        {
+          "source": "go.mod",
+          "method": "go-mod",
+          "confidence": "detected"
+        }
+      ]
+    },
+    {
+      "value": "go test ./...",
+      "kind": "test",
+      "provenance": [
+        {
+          "source": "go.mod",
+          "method": "go-mod",
+          "confidence": "detected"
+        }
+      ]
+    },
+    {
+      "value": "go vet ./...",
+      "kind": "check",
+      "provenance": [
+        {
+          "source": "go.mod",
+          "method": "go-mod",
+          "confidence": "detected"
+        }
+      ]
+    }
+  ],
+  "docs": [
+    {
+      "value": "README.md",
+      "provenance": [
+        {
+          "source": "README.md",
+          "method": "doc-path",
+          "confidence": "detected"
+        }
+      ]
+    }
+  ],
+  "adrs": [],
+  "instruction_files": [],
+  "open_questions": [
+    "Missing `.struktly/direction.md`; add one to anchor product direction for agent sessions.",
+    "No ADR or decision docs found.",
+    "No `.struktly/constraints.md` file found; add one to pin constraints and non-goals for agent sessions.",
+    "No `.struktly/decisions.md` ledger found yet.",
+    "No `.struktly/evidence.md` ledger found yet.",
+    "No agent instruction files found (`AGENTS.md`, `CLAUDE.md`, Cursor rules, or Copilot instructions)."
+  ],
+  "source_refs": [
+    "README.md",
+    "go.mod"
+  ],
+  "stats": {
+    "files_scanned": 5,
+    "duration_ms": 0
+  }
+}

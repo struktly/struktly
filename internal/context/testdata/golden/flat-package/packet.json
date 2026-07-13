@@ -1,0 +1,86 @@
+{
+  "schema": "struktly/packet/v1",
+  "generated_at": "2026-07-11T12:00:00Z",
+  "metadata": {
+    "generated_at": "2026-07-11T12:00:00Z",
+    "absolute_git_root": "."
+  },
+  "repository": {
+    "name": "flat-package",
+    "identity": "git:50ff9c6ec8993640250492a702ea5d95fecd1c6618ddd1a4c081a4b9b05fac7f",
+    "vcs": "git",
+    "root": ".",
+    "branch": "main",
+    "head_revision": "f4ed13fef8ff5c7ed12651deab192943050374a1",
+    "base_revision": "f4ed13fef8ff5c7ed12651deab192943050374a1"
+  },
+  "items": [
+    {
+      "kind": "documentation",
+      "path": "README.md",
+      "content": "# Flat Package\n\nA single-package Go library used as a Struktly scan fixture.\n",
+      "content_hash": "sha256:83eb3a94491330305fed1b9d3c6a685badd3d1c048ca6ff5a6d8633727232448",
+      "provenance": {
+        "source": "README.md",
+        "revision": "f4ed13fef8ff5c7ed12651deab192943050374a1",
+        "method": "selection_rule",
+        "confidence": "detected"
+      },
+      "reason": "selection_rule",
+      "original_bytes": 77,
+      "included_bytes": 77,
+      "truncated": false
+    },
+    {
+      "kind": "manifest",
+      "path": "go.mod",
+      "content": "module example.com/flat-package\n\ngo 1.24.0\n",
+      "content_hash": "sha256:15b2b89daf9164da22b3482de849e764901a65d2052b4466b38e70ad43035372",
+      "provenance": {
+        "source": "go.mod",
+        "revision": "f4ed13fef8ff5c7ed12651deab192943050374a1",
+        "method": "selection_rule",
+        "confidence": "detected"
+      },
+      "reason": "selection_rule",
+      "original_bytes": 43,
+      "included_bytes": 43,
+      "truncated": false
+    }
+  ],
+  "required_checks": [],
+  "suggested_checks": [
+    "go build ./...",
+    "go test ./...",
+    "go vet ./..."
+  ],
+  "exclusions": [],
+  "truncations": [],
+  "limits": {
+    "max_items": 40,
+    "max_file_bytes": 65536,
+    "max_total_bytes": 524288
+  },
+  "packet_hash": "sha256:463887e2ad66e2b8ffc1670945eeb610860589d2f9f695639c8c500e7518e955",
+  "task": "add request timeout middleware",
+  "verification_commands": [
+    "go build ./...",
+    "go test ./...",
+    "go vet ./..."
+  ],
+  "docs": [
+    "README.md"
+  ],
+  "suggested_files": [
+    "README.md"
+  ],
+  "missing_context": [
+    "`.struktly/direction.md` — product direction and non-goals that bound agent work",
+    "`.struktly/constraints.md` — hard constraints excerpted into every packet",
+    "approved memory under `.struktly/memory/approved/` — durable, human-approved learnings"
+  ],
+  "source_refs": [
+    "README.md",
+    "go.mod"
+  ]
+}

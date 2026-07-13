@@ -1,0 +1,191 @@
+{
+  "schema": "struktly/snapshot/v1",
+  "generated_at": "2026-07-11T12:00:00Z",
+  "repository": {
+    "name": "go-service",
+    "root": "."
+  },
+  "top_dirs": [
+    {
+      "value": ".struktly",
+      "provenance": [
+        {
+          "source": ".struktly",
+          "method": "dir-listing",
+          "confidence": "detected"
+        }
+      ]
+    },
+    {
+      "value": "docs",
+      "provenance": [
+        {
+          "source": "docs",
+          "method": "dir-listing",
+          "confidence": "detected"
+        }
+      ]
+    },
+    {
+      "value": "middleware",
+      "provenance": [
+        {
+          "source": "middleware",
+          "method": "dir-listing",
+          "confidence": "detected"
+        }
+      ]
+    }
+  ],
+  "languages": [
+    {
+      "value": "Go",
+      "provenance": [
+        {
+          "source": "go.mod",
+          "method": "go-mod",
+          "confidence": "detected"
+        },
+        {
+          "source": "middleware/logger.go",
+          "method": "file-extension",
+          "confidence": "inferred"
+        },
+        {
+          "source": "middleware/timeout.go",
+          "method": "file-extension",
+          "confidence": "inferred"
+        }
+      ]
+    }
+  ],
+  "commands": [
+    {
+      "value": "go build ./...",
+      "kind": "build",
+      "provenance": [
+        {
+          "source": "go.mod",
+          "method": "go-mod",
+          "confidence": "detected"
+        }
+      ]
+    },
+    {
+      "value": "go test ./...",
+      "kind": "test",
+      "provenance": [
+        {
+          "source": "go.mod",
+          "method": "go-mod",
+          "confidence": "detected"
+        }
+      ]
+    },
+    {
+      "value": "go vet ./...",
+      "kind": "check",
+      "provenance": [
+        {
+          "source": "go.mod",
+          "method": "go-mod",
+          "confidence": "detected"
+        }
+      ]
+    },
+    {
+      "value": "make build",
+      "kind": "build",
+      "provenance": [
+        {
+          "source": "Makefile",
+          "location": "target:build",
+          "method": "makefile-target",
+          "confidence": "detected"
+        }
+      ]
+    },
+    {
+      "value": "make test",
+      "kind": "test",
+      "provenance": [
+        {
+          "source": "Makefile",
+          "location": "target:test",
+          "method": "makefile-target",
+          "confidence": "detected"
+        }
+      ]
+    }
+  ],
+  "docs": [
+    {
+      "value": "README.md",
+      "provenance": [
+        {
+          "source": "README.md",
+          "method": "doc-path",
+          "confidence": "detected"
+        }
+      ]
+    },
+    {
+      "value": "docs/adr/0001-record.md",
+      "provenance": [
+        {
+          "source": "docs/adr/0001-record.md",
+          "method": "doc-path",
+          "confidence": "detected"
+        }
+      ]
+    },
+    {
+      "value": "docs/architecture.md",
+      "provenance": [
+        {
+          "source": "docs/architecture.md",
+          "method": "doc-path",
+          "confidence": "detected"
+        }
+      ]
+    }
+  ],
+  "adrs": [
+    {
+      "value": "docs/adr/0001-record.md",
+      "provenance": [
+        {
+          "source": "docs/adr/0001-record.md",
+          "method": "adr-path",
+          "confidence": "detected"
+        }
+      ]
+    }
+  ],
+  "instruction_files": [],
+  "direction": {
+    "excerpt": "# Direction\n\nShip a reliable payments API with strict timeouts on every outbound call.\n\n## Non-goals\n\n- No new public endpoints until the middleware chain is hardened.",
+    "provenance": {
+      "source": ".struktly/direction.md",
+      "location": "# Direction",
+      "method": "user-file",
+      "confidence": "detected"
+    }
+  },
+  "open_questions": [
+    "No `.struktly/decisions.md` ledger found yet.",
+    "No `.struktly/evidence.md` ledger found yet.",
+    "No agent instruction files found (`AGENTS.md`, `CLAUDE.md`, Cursor rules, or Copilot instructions)."
+  ],
+  "source_refs": [
+    "Makefile",
+    "README.md",
+    "docs/adr/0001-record.md",
+    "docs/architecture.md",
+    "go.mod"
+  ],
+  "stats": {
+    "files_scanned": 9,
+    "duration_ms": 0
+  }
+}

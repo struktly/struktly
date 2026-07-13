@@ -1,0 +1,7 @@
+/struktly
+coverage.out
+.struktly/runs/
+.struktly/memory/candidates/
+.struktly/context-packets/
+.DS_Store
+.struktly/scans/

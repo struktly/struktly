@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "struktly/error/v1",
+  "type": "object",
+  "properties": {
+    "schema": { "const": "struktly/error/v1" },
+    "error": { "$ref": "#/$defs/error" }
+  },
+  "required": ["schema", "error"],
+  "additionalProperties": true,
+  "$defs": {
+    "error": {
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string" }
+      },
+      "required": ["code", "message"],
+      "additionalProperties": true
+    }
+  }
+}
