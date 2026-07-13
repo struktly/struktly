@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "struktly/validation/v1",
+  "type": "object",
+  "properties": {
+    "schema": { "const": "struktly/validation/v1" },
+    "valid": { "type": "boolean" },
+    "repository": { "$ref": "#/$defs/repository" },
+    "config_declared": { "type": "boolean" },
+    "config": { "$ref": "#/$defs/config" },
+    "tasks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/task" }
+    }
+  },
+  "required": ["schema", "valid", "repository", "config_declared", "config"],
+  "additionalProperties": true,
+  "$defs": {
+    "strings": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "repository": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "identity": { "type": "string" },
+        "vcs": { "type": "string" },
+        "root": { "type": "string" },
+        "branch": { "type": "string" },
+        "head_revision": { "type": "string" },
+        "base_revision": { "type": "string" }
+      },
+      "required": ["name", "identity", "vcs", "root", "head_revision"],
+      "additionalProperties": true
+    },
+    "context": {
+      "type": "object",
+      "properties": {
+        "include": { "$ref": "#/$defs/strings" },
+        "exclude": { "$ref": "#/$defs/strings" }
+      },
+      "additionalProperties": true
+    },
+    "checks": {
+      "type": "object",
+      "properties": {
+        "required": { "$ref": "#/$defs/strings" },
+        "suggested": { "$ref": "#/$defs/strings" }
+      },
+      "additionalProperties": true
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "schema": { "const": "struktly/config/v1" },
+        "context": { "$ref": "#/$defs/context" },
+        "checks": { "$ref": "#/$defs/checks" }
+      },
+      "required": ["schema", "context", "checks"],
+      "additionalProperties": true
+    },
+    "task": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string" },
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "status": { "enum": ["draft", "ready", "in-progress", "blocked", "done", "canceled"] },
+        "priority": { "enum": ["low", "normal", "high", "critical"] },
+        "created": { "type": "string", "format": "date" },
+        "updated": { "type": "string", "format": "date" },
+        "agent": { "type": "string" },
+        "agent_model": { "type": "string" },
+        "reasoning_effort": { "type": "string" },
+        "agent_session": { "type": "string" },
+        "resume_command": { "type": "string" }
+      },
+      "required": ["path", "id", "title", "status", "priority", "created", "agent"],
+      "additionalProperties": true
+    }
+  }
+}

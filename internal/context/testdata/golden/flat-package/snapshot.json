@@ -1,0 +1,88 @@
+{
+  "schema": "struktly/snapshot/v1",
+  "generated_at": "2026-07-11T12:00:00Z",
+  "repository": {
+    "name": "flat-package",
+    "root": "."
+  },
+  "top_dirs": [],
+  "languages": [
+    {
+      "value": "Go",
+      "provenance": [
+        {
+          "source": "config.go",
+          "method": "file-extension",
+          "confidence": "inferred"
+        },
+        {
+          "source": "go.mod",
+          "method": "go-mod",
+          "confidence": "detected"
+        },
+        {
+          "source": "parser.go",
+          "method": "file-extension",
+          "confidence": "inferred"
+        }
+      ]
+    }
+  ],
+  "commands": [
+    {
+      "value": "go build ./...",
+      "kind": "build",
+      "provenance": [
+        {
+          "source": "go.mod",
+          "method": "go-mod",
+          "confidence": "detected"
+        }
+      ]
+    },
+    {
+      "value": "go test ./...",
+      "kind": "test",
+      "provenance": [
+        {
+          "source": "go.mod",
+          "method": "go-mod",
+          "confidence": "detected"
+        }
+      ]
+    },
+    {
+      "value": "go vet ./...",
+      "kind": "check",
+      "provenance": [
+        {
+          "source": "go.mod",
+          "method": "go-mod",
+          "confidence": "detected"
+        }
+      ]
+    }
+  ],
+  "docs": [
+    {
+      "value": "README.md",
+      "provenance": [
+        {
+          "source": "README.md",
+          "method": "doc-path",
+          "confidence": "detected"
+        }
+      ]
+    }
+  ],
+  "adrs": [],
+  "instruction_files": [],
+  "source_refs": [
+    "README.md",
+    "go.mod"
+  ],
+  "stats": {
+    "files_scanned": 5,
+    "duration_ms": 0
+  }
+}

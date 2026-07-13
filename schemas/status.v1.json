@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "struktly/status/v1",
+  "type": "object",
+  "properties": {
+    "schema": { "const": "struktly/status/v1" },
+    "repository": { "$ref": "#/$defs/repository" },
+    "config_declared": { "type": "boolean" },
+    "config_path": { "type": "string" },
+    "portable_files": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/file_status" }
+    },
+    "latest_snapshot": { "$ref": "#/$defs/file_status" },
+    "warnings": { "$ref": "#/$defs/strings" }
+  },
+  "required": [
+    "schema",
+    "repository",
+    "config_declared",
+    "config_path",
+    "portable_files",
+    "latest_snapshot",
+    "warnings"
+  ],
+  "additionalProperties": true,
+  "$defs": {
+    "strings": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "repository": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "identity": { "type": "string" },
+        "vcs": { "type": "string" },
+        "root": { "type": "string" },
+        "branch": { "type": "string" },
+        "head_revision": { "type": "string" },
+        "base_revision": { "type": "string" }
+      },
+      "required": ["name", "identity", "vcs", "root", "head_revision"],
+      "additionalProperties": true
+    },
+    "file_status": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["path", "status"],
+      "additionalProperties": true
+    }
+  }
+}

@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "struktly/packet/v1",
+  "type": "object",
+  "properties": {
+    "schema": { "const": "struktly/packet/v1" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "metadata": { "$ref": "#/$defs/metadata" },
+    "repository": { "$ref": "#/$defs/repository" },
+    "items": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/item" }
+    },
+    "instruction_files": { "$ref": "#/$defs/strings" },
+    "required_checks": { "$ref": "#/$defs/strings" },
+    "suggested_checks": { "$ref": "#/$defs/strings" },
+    "exclusions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/decision" }
+    },
+    "truncations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/decision" }
+    },
+    "limits": { "$ref": "#/$defs/limits" },
+    "packet_hash": { "$ref": "#/$defs/hash" },
+    "task": { "type": "string" },
+    "direction": { "type": "string" },
+    "constraints": { "type": "string" },
+    "decisions": { "type": "string" },
+    "evidence": { "type": "string" },
+    "approved_memory": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/memory" }
+    },
+    "verification_commands": { "$ref": "#/$defs/strings" },
+    "docs": { "$ref": "#/$defs/strings" },
+    "suggested_files": { "$ref": "#/$defs/strings" },
+    "missing_context": { "$ref": "#/$defs/strings" },
+    "read_warnings": { "$ref": "#/$defs/strings" },
+    "source_refs": { "$ref": "#/$defs/strings" }
+  },
+  "required": [
+    "schema",
+    "generated_at",
+    "metadata",
+    "repository",
+    "items",
+    "required_checks",
+    "suggested_checks",
+    "exclusions",
+    "truncations",
+    "limits",
+    "packet_hash",
+    "task",
+    "verification_commands",
+    "suggested_files",
+    "source_refs"
+  ],
+  "additionalProperties": true,
+  "$defs": {
+    "strings": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "source": { "type": "string" },
+        "revision": { "type": "string" },
+        "location": { "type": "string" },
+        "method": { "type": "string" },
+        "confidence": { "enum": ["detected", "inferred", "uncertain"] }
+      },
+      "required": ["source", "method", "confidence"],
+      "additionalProperties": true
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "generated_at": { "type": "string", "format": "date-time" },
+        "absolute_git_root": { "type": "string" }
+      },
+      "required": ["generated_at", "absolute_git_root"],
+      "additionalProperties": true
+    },
+    "repository": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "identity": { "type": "string" },
+        "vcs": { "type": "string" },
+        "root": { "type": "string" },
+        "branch": { "type": "string" },
+        "head_revision": { "type": "string" },
+        "base_revision": { "type": "string" }
+      },
+      "required": ["name", "identity", "vcs", "root", "head_revision"],
+      "additionalProperties": true
+    },
+    "item": {
+      "type": "object",
+      "properties": {
+        "kind": { "type": "string" },
+        "path": { "type": "string" },
+        "content": { "type": "string" },
+        "content_hash": { "$ref": "#/$defs/hash" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "reason": { "type": "string" },
+        "original_bytes": { "type": "integer", "minimum": 0 },
+        "included_bytes": { "type": "integer", "minimum": 0 },
+        "truncated": { "type": "boolean" }
+      },
+      "required": [
+        "kind",
+        "path",
+        "content",
+        "content_hash",
+        "provenance",
+        "reason",
+        "original_bytes",
+        "included_bytes",
+        "truncated"
+      ],
+      "additionalProperties": true
+    },
+    "decision": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string" },
+        "reason": { "type": "string" },
+        "detail": { "type": "string" }
+      },
+      "required": ["path", "reason"],
+      "additionalProperties": true
+    },
+    "limits": {
+      "type": "object",
+      "properties": {
+        "max_items": { "type": "integer", "minimum": 0 },
+        "max_file_bytes": { "type": "integer", "minimum": 0 },
+        "max_total_bytes": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["max_items", "max_file_bytes", "max_total_bytes"],
+      "additionalProperties": true
+    },
+    "memory": {
+      "type": "object",
+      "properties": {
+        "content": { "type": "string" },
+        "scope": { "type": "string" },
+        "source_run_id": { "type": "string" },
+        "source_artifact": { "type": "string" },
+        "tags": { "$ref": "#/$defs/strings" }
+      },
+      "required": ["content"],
+      "additionalProperties": true
+    }
+  }
+}

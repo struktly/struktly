@@ -1,0 +1,30 @@
+name: Context quality report
+description: Report a scan or brief selection, ranking, or exclusion problem.
+title: "context: "
+labels: [context-quality]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include secrets, private source, or credentials. Prefer a minimal public reproduction.
+  - type: input
+    id: version
+    attributes:
+      label: Struktly version
+      description: Paste the output of `struktly version`.
+    validations:
+      required: true
+  - type: textarea
+    id: layout
+    attributes:
+      label: Minimal repository layout and task
+      description: Show the smallest safe file tree and the scan or brief command.
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Actual and expected context
+      description: Describe what was selected or excluded, and what should have happened.
+    validations:
+      required: true

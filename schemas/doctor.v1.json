@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "struktly/doctor/v1",
+  "type": "object",
+  "properties": {
+    "schema": { "const": "struktly/doctor/v1" },
+    "repository": { "$ref": "#/$defs/repository" },
+    "checks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/check" }
+    }
+  },
+  "required": ["schema", "repository", "checks"],
+  "additionalProperties": true,
+  "$defs": {
+    "repository": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "identity": { "type": "string" },
+        "vcs": { "type": "string" },
+        "root": { "type": "string" },
+        "branch": { "type": "string" },
+        "head_revision": { "type": "string" },
+        "base_revision": { "type": "string" }
+      },
+      "required": ["name", "identity", "vcs", "root", "head_revision"],
+      "additionalProperties": true
+    },
+    "check": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "status": { "type": "string" },
+        "message": { "type": "string" }
+      },
+      "required": ["name", "status"],
+      "additionalProperties": true
+    }
+  }
+}

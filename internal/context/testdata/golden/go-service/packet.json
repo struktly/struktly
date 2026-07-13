@@ -1,0 +1,161 @@
+{
+  "schema": "struktly/packet/v1",
+  "generated_at": "2026-07-11T12:00:00Z",
+  "metadata": {
+    "generated_at": "2026-07-11T12:00:00Z",
+    "absolute_git_root": "."
+  },
+  "repository": {
+    "name": "go-service",
+    "identity": "git:0e709b14ea2e846e54e1d38161502ee8f4a49a40963cbbe8abb58b938ca7a1d7",
+    "vcs": "git",
+    "root": ".",
+    "branch": "main",
+    "head_revision": "983c7b8424a771fe26dbd36f266a305acf674d48",
+    "base_revision": "983c7b8424a771fe26dbd36f266a305acf674d48"
+  },
+  "items": [
+    {
+      "kind": "declaration",
+      "path": ".struktly/constraints.md",
+      "content": "# Constraints\n\n- Keep handler latency under 200ms.\n- No new third-party dependencies without a decision record.\n",
+      "content_hash": "sha256:81564faaa40d080d602077a0bfc444e5599f68f165e1c603c89ee505e5292485",
+      "provenance": {
+        "source": ".struktly/constraints.md",
+        "revision": "983c7b8424a771fe26dbd36f266a305acf674d48",
+        "method": "selection_rule",
+        "confidence": "detected"
+      },
+      "reason": "selection_rule",
+      "original_bytes": 112,
+      "included_bytes": 112,
+      "truncated": false
+    },
+    {
+      "kind": "declaration",
+      "path": ".struktly/direction.md",
+      "content": "---\ntype: direction\ntitle: \"Repository Direction\"\ndescription: \"Direction for the go-service fixture.\"\ntimestamp: 2026-07-01T00:00:00Z\n---\n\n# Direction\n\nShip a reliable payments API with strict timeouts on every outbound call.\n\n## Non-goals\n\n- No new public endpoints until the middleware chain is hardened.\n",
+      "content_hash": "sha256:1fff95fc45cbaa0c04fe78855816cc3d507df5e85b3b1c097ec98a5e12af0057",
+      "provenance": {
+        "source": ".struktly/direction.md",
+        "revision": "983c7b8424a771fe26dbd36f266a305acf674d48",
+        "method": "selection_rule",
+        "confidence": "detected"
+      },
+      "reason": "selection_rule",
+      "original_bytes": 308,
+      "included_bytes": 308,
+      "truncated": false
+    },
+    {
+      "kind": "manifest",
+      "path": "Makefile",
+      "content": "test:\n\tgo test ./...\n\nbuild:\n\tgo build ./...\n",
+      "content_hash": "sha256:e450912e118fd02bee73756f442a14547c1f17ce479dc9ab319b985468514bb9",
+      "provenance": {
+        "source": "Makefile",
+        "revision": "983c7b8424a771fe26dbd36f266a305acf674d48",
+        "method": "selection_rule",
+        "confidence": "detected"
+      },
+      "reason": "selection_rule",
+      "original_bytes": 45,
+      "included_bytes": 45,
+      "truncated": false
+    },
+    {
+      "kind": "documentation",
+      "path": "README.md",
+      "content": "# Go Service\n\nA small payments API used as a Struktly scan fixture.\n\n## Development\n\nRun `make test` before sending changes.\n",
+      "content_hash": "sha256:3358d5eb78ed93bd2419ed728bc1049ce2a689cb87ca55325ae0ceb4f48c962b",
+      "provenance": {
+        "source": "README.md",
+        "revision": "983c7b8424a771fe26dbd36f266a305acf674d48",
+        "method": "selection_rule",
+        "confidence": "detected"
+      },
+      "reason": "selection_rule",
+      "original_bytes": 125,
+      "included_bytes": 125,
+      "truncated": false
+    },
+    {
+      "kind": "manifest",
+      "path": "go.mod",
+      "content": "module example.com/go-service\n\ngo 1.24.0\n",
+      "content_hash": "sha256:f6c2e852e2767de6925f0cdffc43aceb1ccd9192f70473b0f0407448a4886ce1",
+      "provenance": {
+        "source": "go.mod",
+        "revision": "983c7b8424a771fe26dbd36f266a305acf674d48",
+        "method": "selection_rule",
+        "confidence": "detected"
+      },
+      "reason": "selection_rule",
+      "original_bytes": 41,
+      "included_bytes": 41,
+      "truncated": false
+    },
+    {
+      "kind": "source",
+      "path": "middleware/timeout.go",
+      "content": "// Package middleware provides HTTP middleware for the service.\npackage middleware\n\nimport (\n\t\"net/http\"\n\t\"time\"\n)\n\n// Timeout wraps h with a fixed request timeout.\nfunc Timeout(h http.Handler, d time.Duration) http.Handler {\n\treturn http.TimeoutHandler(h, d, \"request timed out\")\n}\n",
+      "content_hash": "sha256:1ddd4a28247cbd327889ea8e97584abab79c8074864dbc715869bcee82602f7d",
+      "provenance": {
+        "source": "middleware/timeout.go",
+        "revision": "983c7b8424a771fe26dbd36f266a305acf674d48",
+        "method": "task_match",
+        "confidence": "detected"
+      },
+      "reason": "task_match",
+      "original_bytes": 283,
+      "included_bytes": 283,
+      "truncated": false
+    }
+  ],
+  "required_checks": [],
+  "suggested_checks": [
+    "go build ./...",
+    "go test ./...",
+    "go vet ./...",
+    "make build",
+    "make test"
+  ],
+  "exclusions": [],
+  "truncations": [],
+  "limits": {
+    "max_items": 40,
+    "max_file_bytes": 65536,
+    "max_total_bytes": 524288
+  },
+  "packet_hash": "sha256:bd0a1b90ad07ddb8aa1da480323258e91762f674795fde44d2d823d22f4979b2",
+  "task": "add request timeout middleware",
+  "direction": "# Direction\n\nShip a reliable payments API with strict timeouts on every outbound call.\n\n## Non-goals\n\n- No new public endpoints until the middleware chain is hardened.",
+  "constraints": "# Constraints\n\n- Keep handler latency under 200ms.\n- No new third-party dependencies without a decision record.",
+  "verification_commands": [
+    "go build ./...",
+    "go test ./...",
+    "go vet ./...",
+    "make build",
+    "make test"
+  ],
+  "docs": [
+    "README.md",
+    "docs/adr/0001-record.md",
+    "docs/architecture.md"
+  ],
+  "suggested_files": [
+    "README.md",
+    "docs/adr/0001-record.md",
+    "middleware/",
+    "middleware/timeout.go"
+  ],
+  "source_refs": [
+    ".struktly/constraints.md",
+    ".struktly/direction.md",
+    "Makefile",
+    "README.md",
+    "docs/adr/0001-record.md",
+    "docs/architecture.md",
+    "go.mod"
+  ]
+}

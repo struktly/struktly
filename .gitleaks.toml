@@ -1,0 +1,7 @@
+title = "Struktly gitleaks configuration"
+
+[allowlist]
+description = "Intentional synthetic private-key marker used by secret-exclusion tests."
+paths = [
+  '''internal/context/selection_test\.go''',
+]
