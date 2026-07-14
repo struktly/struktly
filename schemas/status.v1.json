@@ -1,6 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "struktly/status/v1",
+  "title": "Struktly repository status",
+  "description": "The current state of repository-owned Struktly files and generated context.",
   "type": "object",
   "properties": {
     "schema": { "const": "struktly/status/v1" },

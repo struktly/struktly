@@ -1,6 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "struktly/doctor/v1",
+  "title": "Struktly diagnostics",
+  "description": "Repository and local installation checks reported by struktly doctor.",
   "type": "object",
   "properties": {
     "schema": { "const": "struktly/doctor/v1" },

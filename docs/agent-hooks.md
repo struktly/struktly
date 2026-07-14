@@ -1,6 +1,7 @@
-# Agent integrations
+# Coding-agent integrations
 
-Struktly does not edit agent configuration. The examples below are optional.
+Struktly prepares repository context. It does not change agent permissions or
+edit agent configuration. The examples below are optional.
 
 ## MCP
 
@@ -14,18 +15,22 @@ claude mcp add struktly -- struktly mcp --root .
 `context_brief` returns Markdown and a `struktly/packet/v1` value as structured
 content.
 
-## Shell
+## Claude Code and Codex
 
-Print a packet and pass it to any command that accepts a prompt:
+Pipe a Markdown context packet into either installed CLI:
+
+```sh
+struktly brief --stdout "add request timeout middleware" | claude -p
+struktly brief --stdout "add request timeout middleware" | codex exec -
+```
+
+The packet contains the task and selected repository files. The agent still uses
+its own configuration, permissions, and session storage.
+
+To inspect the packet before passing it on:
 
 ```sh
 struktly brief --stdout "add request timeout middleware"
-```
-
-Claude Code can receive the packet directly:
-
-```sh
-claude "$(struktly brief --stdout 'add request timeout middleware')"
 ```
 
 ## Instruction files
@@ -37,5 +42,5 @@ struktly scan
 struktly suggest-instructions
 ```
 
-The drafts are written under `.struktly/agent-instructions/`. Review a draft
-before copying it to `AGENTS.md`, `CLAUDE.md`, or a Cursor rules directory.
+Drafts are written under `.struktly/agent-instructions/`. Review one before
+copying it to `AGENTS.md`, `CLAUDE.md`, or a Cursor rules directory.

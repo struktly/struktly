@@ -1,7 +1,8 @@
 # CLI integration contract
 
-This is the noninteractive contract for scripts and other programs that invoke the
-Struktly executable. Human-readable output is not an API.
+This document defines the noninteractive contract for programs that invoke the
+Struktly CLI. Human-readable output is for people and may be reworded; JSON is
+the machine interface.
 
 ## Invocation and streams
 
@@ -25,7 +26,7 @@ stderr. stdout never mixes prose with JSON. `run` and `memory` subcommands also
 emit JSON, but their record shapes are not yet versioned schemas.
 
 `brief --stdout <task>` writes Markdown to stdout and its output path to stderr.
-Other default modes use plain developer-readable stdout.
+Other default modes write plain text for developers.
 `validate` checks both `.struktly/config.json` and every canonical task under
 `.struktly/tasks/*.md`.
 
@@ -121,7 +122,7 @@ Portable task handoffs live under `.struktly/tasks/` and follow
 [`struktly/task/v1`](task-format.md). They may name an agent, opaque session ID,
 and resume command. Provider session contents and execution logs remain runtime state.
 
-New runs, events, and pending memory candidates use a per-user directory under
+Experimental work records, events, and pending memory candidates use a per-user directory under
 the OS user configuration directory at `struktly/state/repositories/<checkout-key>`.
 Set `STRUKTLY_STATE_DIR` to choose the base directory. Existing repo-local legacy
 records remain readable; new writes never target them.

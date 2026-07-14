@@ -42,17 +42,17 @@ func TestRecordEvidenceAppendsStructuredEntry(t *testing.T) {
 	if !strings.HasPrefix(content, "---\ntype: evidence-log\n") {
 		t.Fatalf("fresh evidence ledger should start with OKF frontmatter:\n%s", content)
 	}
-	assertContains(t, content, "# Struktly Evidence Ledger")
+	assertContains(t, content, "# Work evidence")
 	assertContains(t, content, "## 2026-07-05T12:00:00Z — Record verification evidence")
 	assertContains(t, content, "| **Task** | Record verification evidence |")
-	assertContains(t, content, "| **Agent/tool** | Cursor agent |")
+	assertContains(t, content, "| **Performed by** | Cursor agent |")
 	assertContains(t, content, ".struktly/context-packets/packet.md")
 	assertContains(t, content, "sha256:")
 	assertContains(t, content, "### Checks run")
 	assertContains(t, content, "go test ./internal/context/...")
-	assertContains(t, content, "### Files touched")
+	assertContains(t, content, "### Files changed")
 	assertContains(t, content, "service/internal/context/evidence.go")
-	assertContains(t, content, "### Reviewer")
+	assertContains(t, content, "### Review")
 	assertContains(t, content, "pending")
 
 	second, err := RecordEvidence(EvidenceOptions{
@@ -105,8 +105,8 @@ func TestRecordEvidenceRunChecksDerivesPass(t *testing.T) {
 		t.Fatalf("read evidence ledger: %v", err)
 	}
 	content := string(data)
-	assertContains(t, content, "| **Verification** | checks executed by struktly |")
-	assertContains(t, content, "| **Checks result** | pass |")
+	assertContains(t, content, "| **Checks** | Run by Struktly |")
+	assertContains(t, content, "| **Result** | pass |")
 	assertContains(t, content, "- `true` — pass (exit 0, ")
 	if strings.Contains(content, "```") {
 		t.Fatalf("passing check should not include output block:\n%s", content)
@@ -133,7 +133,7 @@ func TestRecordEvidenceRunChecksRejectsShellSyntax(t *testing.T) {
 		t.Fatalf("read evidence ledger: %v", err)
 	}
 	content := string(data)
-	assertContains(t, content, "| **Checks result** | fail |")
+	assertContains(t, content, "| **Result** | fail |")
 	assertContains(t, content, "- `echo boom; exit 3` — fail (invalid command:")
 	assertContains(t, content, "shell metacharacters")
 }
@@ -230,10 +230,10 @@ func main() {
 	}
 	content := string(data)
 	assertContains(t, content, "- `go run ./sleeper/main.go` — fail (timeout after 50ms)")
-	assertContains(t, content, "| **Checks result** | fail |")
+	assertContains(t, content, "| **Result** | fail |")
 }
 
-func TestRecordEvidenceSelfReportedRenderingUnchanged(t *testing.T) {
+func TestRecordEvidenceSelfReportedRendering(t *testing.T) {
 	root := t.TempDir()
 	result, err := RecordEvidence(EvidenceOptions{
 		Root:        root,
@@ -257,7 +257,7 @@ func TestRecordEvidenceSelfReportedRenderingUnchanged(t *testing.T) {
 		"| Field | Value |\n" +
 		"|-------|-------|\n" +
 		"| **Task** | Ship feature |\n" +
-		"| **Agent/tool** | human |\n" +
+		"| **Performed by** | human |\n" +
 		"| **Context packet** | _(none)_ |\n" +
 		"| **Outcome** | done |\n" +
 		"\n### Checks run\n\n" +
@@ -266,8 +266,8 @@ func TestRecordEvidenceSelfReportedRenderingUnchanged(t *testing.T) {
 	if !strings.HasSuffix(content, want) {
 		t.Fatalf("self-reported entry rendering changed:\n%s", content)
 	}
-	if strings.Contains(content, "Verification") {
-		t.Fatalf("self-reported entry should not carry verification row:\n%s", content)
+	if strings.Contains(content, "Run by Struktly") {
+		t.Fatalf("self-reported entry should not claim Struktly ran the checks:\n%s", content)
 	}
 }
 

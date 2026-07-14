@@ -107,7 +107,7 @@ func newRootCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:           "struktly",
-		Short:         "Build task-specific context from a Git repository",
+		Short:         "Select task-specific context from a Git repository",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -217,7 +217,7 @@ func newValidateCmd(repoRoot *string) *cobra.Command {
 	var toJSON bool
 	cmd := &cobra.Command{
 		Use:   "validate",
-		Short: "Experimental: validate repository configuration",
+		Short: "Experimental: validate configuration and task files",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			report, err := app.Validate(cmd.Context(), *repoRoot)
@@ -429,7 +429,7 @@ func newEvidenceCmd(repoRoot *string) *cobra.Command {
 	opts := &evidenceOptions{}
 	cmd := &cobra.Command{
 		Use:   "evidence",
-		Short: "Append a structured evidence entry to .struktly/evidence.md",
+		Short: "Experimental: record completed work and checks",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runEvidence(cmd, *repoRoot, opts)
 		},
@@ -441,8 +441,8 @@ func newEvidenceCmd(repoRoot *string) *cobra.Command {
 	cmd.Flags().StringSliceVar(&opts.checks, "checks", nil, "Verification command that was run")
 	cmd.Flags().StringVar(&opts.checkResult, "result", "", "Result summary for checks run")
 	cmd.Flags().BoolVar(&opts.runChecks, "run-checks", false, "Execute the declared checks and record real exit codes")
-	cmd.Flags().StringSliceVar(&opts.filesTouched, "files", nil, "Files touched during the work")
-	cmd.Flags().StringVar(&opts.reviewer, "reviewer", "", "Reviewer name or pending marker")
+	cmd.Flags().StringSliceVar(&opts.filesTouched, "files", nil, "Files changed during the work")
+	cmd.Flags().StringVar(&opts.reviewer, "reviewer", "", "Reviewer name or review status")
 	cmd.Flags().StringVar(&opts.runID, "run", "", "Attach evidence ledger to a run id")
 	_ = cmd.MarkFlagRequired("task")
 	_ = cmd.MarkFlagRequired("agent")
@@ -487,7 +487,7 @@ func runEvidence(cmd *cobra.Command, repoRoot string, opts *evidenceOptions) err
 func newRunCmd(repoRoot *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run",
-		Short: "Create and inspect work records",
+		Short: "Experimental: create and inspect local work records",
 	}
 	cmd.AddCommand(newRunCreateCmd(repoRoot))
 	cmd.AddCommand(newRunListCmd(repoRoot))
@@ -620,7 +620,7 @@ func newRunFailCmd(repoRoot *string) *cobra.Command {
 func newMemoryCmd(repoRoot *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "memory",
-		Short: "Review local memory candidates and approved memory",
+		Short: "Experimental: review candidate and approved repository notes",
 	}
 	cmd.AddCommand(newMemoryCandidateCmd(repoRoot))
 	cmd.AddCommand(newMemoryCandidatesCmd(repoRoot))

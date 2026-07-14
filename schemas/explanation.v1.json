@@ -1,6 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "struktly/explanation/v1",
+  "title": "Context selection explanation",
+  "description": "Why a repository path is included in or excluded from task context.",
   "type": "object",
   "properties": {
     "schema": { "const": "struktly/explanation/v1" },

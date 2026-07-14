@@ -141,7 +141,7 @@ func TestBriefStdoutPrintsPacket(t *testing.T) {
 	if err != nil {
 		t.Fatalf("brief --stdout returned error: %v\nstderr:\n%s", err, stderr)
 	}
-	if !strings.Contains(stdout, "# Struktly Context Packet") {
+	if !strings.Contains(stdout, "# Context packet") {
 		t.Fatalf("expected packet content on stdout, got:\n%s", stdout)
 	}
 	if strings.Contains(stdout, "wrote") {
@@ -259,10 +259,10 @@ func TestEvidenceRunChecksExecutesDeclaredChecks(t *testing.T) {
 		t.Fatalf("read evidence ledger: %v", err)
 	}
 	content := string(data)
-	if !strings.Contains(content, "checks executed by struktly") {
+	if !strings.Contains(content, "| **Checks** | Run by Struktly |") {
 		t.Fatalf("expected verification mode in evidence ledger:\n%s", content)
 	}
-	if !strings.Contains(content, "| **Checks result** | pass |") {
+	if !strings.Contains(content, "| **Result** | pass |") {
 		t.Fatalf("expected derived pass result in evidence ledger:\n%s", content)
 	}
 
@@ -285,7 +285,7 @@ func TestEvidenceRunChecksExecutesDeclaredChecks(t *testing.T) {
 		t.Fatalf("read evidence ledger after failing check: %v", err)
 	}
 	content = string(data)
-	if !strings.Contains(content, "| **Checks result** | fail |") {
+	if !strings.Contains(content, "| **Result** | fail |") {
 		t.Fatalf("expected derived fail result in evidence ledger:\n%s", content)
 	}
 	if !strings.Contains(content, "- `false` — fail (exit 1, ") {

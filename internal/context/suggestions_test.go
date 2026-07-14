@@ -52,7 +52,7 @@ func TestSuggestInstructionsWritesSuggestedFiles(t *testing.T) {
 		if !strings.HasPrefix(content, "---\ntype: agent-instructions\n") {
 			t.Fatalf("draft %s should start with OKF frontmatter:\n%s", name, content)
 		}
-		assertContains(t, content, "# Suggested Agent Instructions")
+		assertContains(t, content, "# Agent instructions draft")
 		assertContains(t, content, "2026-07-05T14:00:00Z")
 		assertContains(t, content, "## Constraints")
 		assertContains(t, content, "Keep changes reviewable and evidence-backed.")
@@ -62,13 +62,13 @@ func TestSuggestInstructionsWritesSuggestedFiles(t *testing.T) {
 		assertContains(t, content, "## Non-goals")
 		assertContains(t, content, "Automatic source edits")
 		assertContains(t, content, "Hidden network access")
-		assertContains(t, content, "## Active Decisions")
+		assertContains(t, content, "## Active decisions")
 		assertContains(t, content, "Keep JSON stable")
 		assertContains(t, content, "Version every machine-readable format.")
 		if strings.Contains(content, "Add XML output") {
 			t.Fatalf("proposed decision should not appear in %s", name)
 		}
-		assertContains(t, content, "## Verification Commands")
+		assertContains(t, content, "## Checks")
 		assertContains(t, content, "make test")
 		assertContains(t, content, "never overwrites active agent instruction files")
 	}

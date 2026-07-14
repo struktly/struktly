@@ -9,8 +9,8 @@ Every versioned context document Struktly generates carries a schema identifier:
 - Markdown files: a `schema` key in the OKF frontmatter, e.g. `schema: struktly/packet/v1`.
 - JSON documents: a top-level `"schema"` field, e.g. `"schema": "struktly/snapshot/v1"`.
 
-Run and memory command records are still experimental and are explicitly not a
-versioned machine contract yet.
+The optional `run`, `memory`, and `evidence` record formats are experimental.
+They are not versioned machine contracts yet.
 
 Portable task Markdown under `.struktly/tasks/` uses `struktly/task/v1`; its
 frontmatter and required headings are defined in [task-format.md](task-format.md).

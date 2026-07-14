@@ -1,6 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "struktly/validation/v1",
+  "title": "Struktly validation result",
+  "description": "Validation of repository configuration and portable task files.",
   "type": "object",
   "properties": {
     "schema": { "const": "struktly/validation/v1" },

@@ -206,7 +206,7 @@ func TestToolsCallContextBrief(t *testing.T) {
 	if !strings.Contains(firstLine, filepath.Join(".struktly", "context-packets")) || !strings.HasSuffix(firstLine, ".md") {
 		t.Fatalf("first line should be the packet path, got: %q", firstLine)
 	}
-	if !strings.Contains(rest, "# Struktly Context Packet") {
+	if !strings.Contains(rest, "# Context packet") {
 		t.Fatalf("tool result should contain the packet markdown, got:\n%s", text)
 	}
 	structured, ok := result.StructuredContent.(map[string]any)

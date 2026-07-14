@@ -1,6 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "struktly/snapshot/v1",
+  "title": "Struktly repository snapshot",
+  "description": "A local summary of repository structure, commands, and guidance.",
   "type": "object",
   "properties": {
     "schema": { "const": "struktly/snapshot/v1" },

@@ -46,9 +46,9 @@ func TestScanWritesProjectContext(t *testing.T) {
 	if !strings.HasPrefix(content, "---\ntype: project-context\n") {
 		t.Fatalf("project context should start with OKF frontmatter:\n%s", content)
 	}
-	assertContains(t, content, "title: \"Project Context: "+filepath.Base(root)+"\"")
+	assertContains(t, content, "title: \"Repository context: "+filepath.Base(root)+"\"")
 	assertContains(t, content, "timestamp: 2026-07-05T12:00:00Z")
-	assertContains(t, content, "# Struktly Project Context")
+	assertContains(t, content, "# Repository context")
 	assertContains(t, content, "- Repository name: "+filepath.Base(root))
 	assertContains(t, content, "- Repository root: `.`")
 	if strings.Contains(content, filepath.ToSlash(root)) {
@@ -69,7 +69,7 @@ func TestScanWritesProjectContext(t *testing.T) {
 		t.Fatalf("direction frontmatter leaked into project context:\n%s", content)
 	}
 	assertContains(t, content, "Preserve stable command output.")
-	assertContains(t, content, "- `.env` / `.env.*`")
+	assertContains(t, content, "Common credential files and secret-looking filenames.")
 	assertContains(t, content, "Outside Git, root-level exact, directory, and glob .gitignore patterns are applied")
 
 	if strings.Contains(content, "node_modules/noise") {
@@ -79,7 +79,7 @@ func TestScanWritesProjectContext(t *testing.T) {
 		t.Fatalf("project context should not include secret file contents:\n%s", content)
 	}
 
-	assertContains(t, content, "## Deprioritized Paths")
+	assertContains(t, content, "## Deprioritized paths")
 	assertContains(t, content, "- `legacy`")
 	assertContains(t, content, "- `pkg/testdata`")
 	if strings.Contains(content, "old-plan.md") {

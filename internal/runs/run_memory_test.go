@@ -244,7 +244,7 @@ func TestMemoryCandidateApproveRejectAndApprovedMemoryInBrief(t *testing.T) {
 		t.Fatalf("read brief: %v", err)
 	}
 	content := string(data)
-	if !strings.Contains(content, "## Approved Memory") {
+	if !strings.Contains(content, "## Approved repository notes") {
 		t.Fatalf("expected approved memory section:\n%s", content)
 	}
 	if !strings.Contains(content, "Always run go test ./...") {

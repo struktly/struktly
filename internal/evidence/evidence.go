@@ -15,9 +15,9 @@ import (
 	"github.com/struktly/struktly/internal/runs"
 )
 
-const evidenceLedgerHeader = `# Struktly Evidence Ledger
+const evidenceLedgerHeader = `# Work evidence
 
-Append-only record of inspections, extractions, and verification outcomes. Audit-grade entries require human review.
+A local, append-only record of work and checks. Entries still require human review.
 
 ---
 `
@@ -256,7 +256,7 @@ func appendEvidenceEntry(outputPath string, now time.Time, entry string) error {
 		defer f.Close()
 
 		if existingInfo == nil || existingInfo.Size() == 0 {
-			header := files.OKFFrontmatter("evidence-log", "Evidence Log", "Append-only ledger of verified agent work outcomes.", now)
+			header := files.OKFFrontmatter("evidence-log", "Work evidence", "Local record of work and checks.", now)
 			if _, err := f.WriteString(header + evidenceLedgerHeader + "\n"); err != nil {
 				return fmt.Errorf("initialize evidence ledger: %w", err)
 			}
@@ -305,7 +305,7 @@ func readEvidenceLedger(path string, now time.Time) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return files.OKFFrontmatter("evidence-log", "Evidence Log", "Append-only ledger of verified agent work outcomes.", now) + evidenceLedgerHeader + "\n", nil
+			return files.OKFFrontmatter("evidence-log", "Work evidence", "Local record of work and checks.", now) + evidenceLedgerHeader + "\n", nil
 		}
 		return "", fmt.Errorf("read evidence ledger: %w", err)
 	}
@@ -344,7 +344,7 @@ func renderEvidenceEntry(entry evidenceEntry) string {
 	b.WriteString("| Field | Value |\n")
 	b.WriteString("|-------|-------|\n")
 	fmt.Fprintf(&b, "| **Task** | %s |\n", escapeTableCell(entry.Task))
-	fmt.Fprintf(&b, "| **Agent/tool** | %s |\n", escapeTableCell(entry.Agent))
+	fmt.Fprintf(&b, "| **Performed by** | %s |\n", escapeTableCell(entry.Agent))
 	if entry.ContextHash == "" {
 		fmt.Fprintf(&b, "| **Context packet** | %s |\n", escapeTableCell(entry.ContextPath))
 	} else {
@@ -352,8 +352,8 @@ func renderEvidenceEntry(entry evidenceEntry) string {
 	}
 	fmt.Fprintf(&b, "| **Outcome** | %s |\n", escapeTableCell(entry.Outcome))
 	if entry.RunChecks {
-		b.WriteString("| **Verification** | checks executed by struktly |\n")
-		fmt.Fprintf(&b, "| **Checks result** | %s |\n", escapeTableCell(entry.CheckResult))
+		b.WriteString("| **Checks** | Run by Struktly |\n")
+		fmt.Fprintf(&b, "| **Result** | %s |\n", escapeTableCell(entry.CheckResult))
 		b.WriteString("\n### Checks run\n\n")
 		for _, run := range entry.CheckRuns {
 			fmt.Fprintf(&b, "- `%s` — %s\n", run.Command, run.Status)
@@ -377,14 +377,14 @@ func renderEvidenceEntry(entry evidenceEntry) string {
 	}
 
 	if len(entry.FilesTouched) > 0 {
-		b.WriteString("\n### Files touched\n\n")
+		b.WriteString("\n### Files changed\n\n")
 		for _, file := range entry.FilesTouched {
 			fmt.Fprintf(&b, "- `%s`\n", file)
 		}
 	}
 
 	if entry.Reviewer != "" {
-		b.WriteString("\n### Reviewer\n\n")
+		b.WriteString("\n### Review\n\n")
 		b.WriteString(entry.Reviewer + "\n")
 	}
 

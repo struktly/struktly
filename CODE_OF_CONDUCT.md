@@ -26,9 +26,9 @@ professional setting.
 ## Enforcement
 
 Project maintainers are responsible for clarifying and enforcing these standards.
-Report unacceptable behavior through GitHub private vulnerability reporting at
-<https://github.com/struktly/struktly/security/advisories/new>. Reports will be
-handled confidentially.
+Report unacceptable behavior to <hello@struktly.io> with “Code of Conduct” in
+the subject. Reports will be handled confidentially. Use GitHub private
+vulnerability reporting only for security vulnerabilities.
 
 Maintainers may remove, edit, or reject comments, commits, code, issues, and other
 contributions that do not align with this Code of Conduct, and may temporarily or

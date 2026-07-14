@@ -1,12 +1,12 @@
 # Portable task format
 
-Repository-owned agent work lives in `.struktly/tasks/`. Each task is one
-reviewable Markdown file named `<id>.md` and identified by
-`schema: struktly/task/v1`.
+A portable task handoff is a Markdown file under `.struktly/tasks/`. Each file
+is named `<id>.md` and identified by `schema: struktly/task/v1`.
 
-Tasks are portable declarations. They may contain an agent handoff and a resume
-command, but they must not contain credentials, raw provider sessions, caches,
-logs, or high-volume runtime events. Runtime state remains outside the repository.
+These files are repository-owned instructions, not live execution records. They
+may identify an agent session and a resume command, but they must not contain
+credentials, chat history, caches, logs, or high-volume runtime events. Live
+state remains outside the repository.
 
 ## Canonical shape
 
@@ -26,8 +26,9 @@ agent: unassigned
 
 ## Pick up this task
 
-State how an agent should begin. When the task resumes an existing session, add
-`agent_session` and `resume_command` to the frontmatter and repeat the command here.
+State how a person or agent should begin. When the task resumes an existing
+agent session, add `agent_session` and `resume_command` to the frontmatter and
+repeat the command here.
 
 ## Objective
 
@@ -75,10 +76,10 @@ Unknown fields are rejected so misspellings fail early.
 
 ## Validation and context
 
-`struktly validate` validates every `.struktly/tasks/*.md` file in addition to
-`.struktly/config.json`. A brief selects a task when task words match its filename;
-selected task files are serialized as packet items with `kind: task`, provenance,
-and a content hash.
+`struktly validate` checks every `.struktly/tasks/*.md` file in addition to
+`.struktly/config.json`. A brief may include a task file when words from the
+requested task match its filename. Included task files appear in the packet with
+their path, selection reason, and content hash.
 
 Within `struktly/task/v1`, required field and heading meanings are stable. Additive
 format changes may introduce optional fields or sections. Breaking changes require

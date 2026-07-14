@@ -1,7 +1,7 @@
 # Contributing
 
 Bug reports and focused pull requests are welcome. Open an issue before changing
-a command, schema, or compatibility rule.
+a command, schema, compatibility rule, or the documented scope of the CLI.
 
 ## Development
 

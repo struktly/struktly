@@ -1,6 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "struktly/packet/v1",
+  "title": "Struktly context packet",
+  "description": "Repository files and guidance selected for one task.",
   "type": "object",
   "properties": {
     "schema": { "const": "struktly/packet/v1" },

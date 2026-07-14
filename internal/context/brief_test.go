@@ -14,6 +14,7 @@ func TestBriefWritesContextPacket(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, "README.md", "# Demo Repo\n")
 	writeFile(t, root, "Makefile", "test:\n\tgo test ./...\n")
+	writeFile(t, root, ".struktly/config.json", `{"schema":"struktly/config/v1","context":{},"checks":{"required":["go test ./..."],"suggested":["go vet ./..."]}}`)
 	writeFile(t, root, ".struktly/direction.md", "# Current Direction\n\nPreserve stable output and safe file selection.\n")
 	writeFile(t, root, ".struktly/constraints.md", "# Constraints\n\n- Keep output deterministic.\n\n## Non-goals\n\n- Do not add network access.\n")
 	writeFile(t, root, ".struktly/decisions.md", "# Decisions\n\n- Keep JSON schemas versioned.\n")
@@ -55,7 +56,7 @@ func TestBriefWritesContextPacket(t *testing.T) {
 		t.Fatalf("packet should start with OKF frontmatter:\n%s", content)
 	}
 	assertContains(t, content, "timestamp: 2026-07-04T12:00:00Z")
-	assertContains(t, content, "# Struktly Context Packet")
+	assertContains(t, content, "# Context packet")
 	assertContains(t, content, "## Task")
 	assertContains(t, content, "tighten request timeout handling")
 	assertContains(t, content, "## Repository")
@@ -64,10 +65,17 @@ func TestBriefWritesContextPacket(t *testing.T) {
 	assertContains(t, content, "## Constraints")
 	assertContains(t, content, "Keep output deterministic.")
 	assertContains(t, content, "Do not add network access.")
-	assertContains(t, content, "## Verification Commands")
-	assertContains(t, content, "make test")
-	assertContains(t, content, "## Suggested Files To Inspect")
-	assertContains(t, content, "## Source References")
+	assertContains(t, content, "## Required checks")
+	assertContains(t, sectionContent(content, "## Required checks"), "go test ./...")
+	assertContains(t, content, "## Suggested checks")
+	suggestedChecks := sectionContent(content, "## Suggested checks")
+	assertContains(t, suggestedChecks, "go vet ./...")
+	assertContains(t, suggestedChecks, "make test")
+	if strings.Contains(suggestedChecks, "go test ./...") {
+		t.Fatalf("required check should not be repeated as a suggestion:\n%s", suggestedChecks)
+	}
+	assertContains(t, content, "## Files to inspect")
+	assertContains(t, content, "## Sources")
 	assertContains(t, content, "README.md")
 	assertContains(t, content, ".struktly/decisions.md")
 	assertContains(t, content, ".struktly/evidence.md")
@@ -83,7 +91,7 @@ func TestBriefWritesContextPacket(t *testing.T) {
 		}
 	}
 
-	suggested := sectionContent(content, "## Suggested Files To Inspect")
+	suggested := sectionContent(content, "## Files to inspect")
 	if strings.Contains(suggested, ".struktly/project-context.md") {
 		t.Fatalf("suggested files should not self-reference project context:\n%s", suggested)
 	}
@@ -178,7 +186,7 @@ func TestBriefSurfacesTaskMatchedFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read context packet: %v", err)
 	}
-	suggested := sectionContent(string(data), "## Suggested Files To Inspect")
+	suggested := sectionContent(string(data), "## Files to inspect")
 
 	assertContains(t, suggested, "middleware/timeout.go")
 	assertContains(t, suggested, "middleware/")
