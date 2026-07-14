@@ -91,13 +91,13 @@ measured `stats.duration_ms` are intentionally volatile.
 
 ## Selection, exclusions, and limits
 
-The packet builder asks Git for tracked and non-ignored files using
+The context selector asks Git for tracked and non-ignored files using
 `git ls-files --cached --others --exclude-standard`. Built-in selection rules are
 always active; `.struktly/config.json` adds include rules and declares excludes.
 Task-word filename matches can add source files. Ordering is repository-relative
 lexicographic order.
 
-The builder never emits the content of:
+The CLI never emits the content of:
 
 - Git-ignored files or `.git` internals;
 - dependency, build, cache, generated runtime, or local state paths;
