@@ -68,6 +68,7 @@ func TestLoadTasksRejectsMalformedTasks(t *testing.T) {
 		want    string
 	}{
 		{name: "unknown field", path: "add-timeout.md", content: strings.Replace(validTaskDocument, "agent: unassigned", "agent: unassigned\nowner: team", 1), want: "unknown frontmatter field"},
+		{name: "noncanonical status", path: "add-timeout.md", content: strings.Replace(validTaskDocument, "status: ready", "status: completed", 1), want: "unsupported status"},
 		{name: "filename mismatch", path: "different.md", content: validTaskDocument, want: "must match filename"},
 		{name: "missing heading", path: "add-timeout.md", content: strings.Replace(validTaskDocument, "## Constraints", "## Notes", 1), want: "required heading"},
 		{name: "partial handoff", path: "add-timeout.md", content: strings.Replace(validTaskDocument, "agent: unassigned", "agent: codex\nagent_session: session-1", 1), want: "declared together"},
