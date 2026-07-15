@@ -47,6 +47,9 @@ func Scan(opts ScanOptions) (ScanResult, error) {
 	if err != nil {
 		return ScanResult{}, err
 	}
+	if opts.NoWrite && strings.TrimSpace(opts.RunID) != "" {
+		return ScanResult{}, fmt.Errorf("--no-write cannot be used with --run")
+	}
 
 	now := opts.Now
 	if now.IsZero() {
@@ -61,6 +64,11 @@ func Scan(opts ScanOptions) (ScanResult, error) {
 	}
 	scan.finalizeOpenQuestions()
 
+	snap := scan.snapshot(now, time.Since(start))
+	if opts.NoWrite {
+		return ScanResult{Snapshot: snap}, nil
+	}
+
 	outputPath := filepath.Join(root, ".struktly", "project-context.md")
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
 		return ScanResult{}, fmt.Errorf("create .struktly dir: %w", err)
@@ -70,7 +78,6 @@ func Scan(opts ScanOptions) (ScanResult, error) {
 		return ScanResult{}, fmt.Errorf("write project context: %w", err)
 	}
 
-	snap := scan.snapshot(now, time.Since(start))
 	snapshotPath := filepath.Join(root, ".struktly", "scans", "latest.json")
 	if err := os.MkdirAll(filepath.Dir(snapshotPath), 0o755); err != nil {
 		return ScanResult{}, fmt.Errorf("create .struktly/scans dir: %w", err)

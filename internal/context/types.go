@@ -6,9 +6,10 @@ import (
 )
 
 type ScanOptions struct {
-	Root  string
-	RunID string
-	Now   time.Time
+	Root    string
+	RunID   string
+	Now     time.Time
+	NoWrite bool
 }
 
 type ScanResult struct {
@@ -18,11 +19,13 @@ type ScanResult struct {
 }
 
 type BriefOptions struct {
-	Context stdcontext.Context
-	Root    string
-	Task    string
-	RunID   string
-	Now     time.Time
+	Context              stdcontext.Context
+	Root                 string
+	Task                 string
+	RunID                string
+	Now                  time.Time
+	NoWrite              bool
+	ExpectedBaseRevision string
 }
 
 type BriefResult struct {

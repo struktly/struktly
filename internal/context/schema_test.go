@@ -73,7 +73,7 @@ func TestConfigSchema(t *testing.T) {
 }
 
 func TestCommandSchemas(t *testing.T) {
-	for _, name := range []string{"error", "status", "validation", "doctor", "explanation"} {
+	for _, name := range []string{"capabilities", "error", "status", "validation", "doctor", "explanation"} {
 		doc := readSchema(t, name+".v1.json")
 		if doc.ID != "struktly/"+name+"/v1" || len(doc.Required) == 0 || !doc.AdditionalProperties {
 			t.Fatalf("invalid %s schema metadata: %+v", name, doc)

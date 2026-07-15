@@ -16,7 +16,7 @@ Portable task Markdown under `.struktly/tasks/` uses `struktly/task/v1`; its
 frontmatter and required headings are defined in [task-format.md](task-format.md).
 
 JSON Schema definitions live in [`schemas/`](../schemas/). Current schemas are
-`struktly/{snapshot,packet,config,error,status,validation,doctor,explanation}/v1`.
+`struktly/{snapshot,packet,config,error,status,validation,doctor,explanation,capabilities}/v1`.
 
 ## Change rules
 
@@ -26,6 +26,7 @@ JSON Schema definitions live in [`schemas/`](../schemas/). Current schemas are
 - **Breaking changes** (removing/renaming fields, changing meaning): bump the schema version (`v1` → `v2`) and document the change in [`CHANGELOG.md`](../CHANGELOG.md). Where cheap, readers tolerate the previous version for one transition release.
 - **JSON is the stable machine surface.** Markdown rendering is presentation and may evolve within a schema version; do not parse markdown when a JSON form exists.
 - **CLI surface**: existing commands and flags are stable and only extended additively. Commands labeled *Experimental* in `--help` may change without a major-version signal until the label is removed.
+- **Command language**: `context` is the primary name for request-scoped packet generation. `brief` remains a compatibility alias.
 - **MCP wire names** (tools, resource URIs) are a compatibility surface once released; renames follow the breaking-change rule.
 
 ## Context-packet identity

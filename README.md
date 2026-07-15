@@ -9,9 +9,9 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2ea44f" alt="MIT license"></a>
 </p>
 
-`struktly` selects useful repository context for a specific coding task. It
-reads a local Git repository and writes the result as Markdown for people and
-versioned JSON for tools.
+`struktly` builds useful repository context for a coding request. It reads a
+local Git repository and returns Markdown for people or versioned JSON for
+tools.
 
 The CLI runs locally. It does not call a model, upload source code, or start a
 coding agent.
@@ -34,22 +34,23 @@ struktly version
 Run these commands from a Git repository:
 
 ```sh
-# Create .struktly/config.json and scan the repository.
+# Create optional repository configuration and a general repository summary.
 struktly init
 
-# Print context selected for one task.
-struktly brief --stdout "add request timeout middleware"
+# Print context selected for one coding request.
+struktly context --stdout "add request timeout middleware"
 ```
 
-`brief` also writes a Markdown file and a `struktly/packet/v1` JSON file under
+`context` writes a Markdown file and a `struktly/packet/v1` JSON file under
 `.struktly/context-packets/`. Use `--json` when another program needs the
-structured packet.
+structured packet. Use `--json --no-write` when an integration needs only the
+packet and must not modify the repository. `brief` remains a compatible alias.
 
 You can pass the Markdown packet directly to an installed coding agent:
 
 ```sh
-struktly brief --stdout "add request timeout middleware" | claude -p
-struktly brief --stdout "add request timeout middleware" | codex exec -
+struktly context --stdout "add request timeout middleware" | claude -p
+struktly context --stdout "add request timeout middleware" | codex exec -
 ```
 
 Struktly supplies context only. Claude Code, Codex, or another caller still owns
@@ -60,17 +61,19 @@ its permissions and execution behavior.
 | Command | What it does |
 |---|---|
 | `init` | Create repository configuration and run the first scan. |
-| `scan` | Summarize repository structure, commands, and guidance. |
-| `brief <task>` | Select repository files and guidance for one task. |
-| `explain <path>` | Explain why a path would be included or excluded. |
+| `context <request>` | Build a request-specific packet from live repository state. |
+| `scan` | Write a general repository summary. It is optional and not a prerequisite for `context`. |
+| `explain <path>` | Diagnose why one path would be included or excluded. |
 | `validate` | Validate configuration and portable task files. |
 | `doctor` | Check the repository and local CLI setup. |
+| `capabilities` | Report supported schemas and machine-interface features. |
 | `suggest-instructions` | Draft agent instruction files for human review. |
 | `mcp` | Expose `scan`, `brief`, and `evidence` over MCP stdio. |
 
-The CLI also includes experimental `evidence`, `run`, and `memory` commands.
-Their record formats are not stable machine interfaces yet. They are kept
-separate from the versioned context schemas.
+The CLI retains experimental `evidence`, `run`, and `memory` commands for
+compatibility. Their record formats are not stable machine interfaces. The
+desktop app—not this CLI—owns chats, provider sessions, working copies, checks,
+and review history.
 
 Run `struktly <command> --help` for flags.
 
@@ -92,7 +95,7 @@ user configuration directory rather than the repository. Set
 ## What enters a packet
 
 Struktly asks Git for tracked and non-ignored files, then applies repository
-configuration and task-word matching. It skips sensitive filenames, detected
+configuration and request-word matching. It skips sensitive filenames, detected
 secrets, binaries, symlinks, dependencies, build output, and local runtime
 state. Every packet explains exclusions and truncation.
 
@@ -106,6 +109,8 @@ Machine-readable formats are defined in [`schemas/`](schemas/). The command,
 stream, error, and exit-code contract is documented in
 [`docs/integration-contract.md`](docs/integration-contract.md). Compatibility
 rules are in [`docs/compatibility.md`](docs/compatibility.md).
+Current scope and planned context-quality work are in
+[`docs/roadmap.md`](docs/roadmap.md).
 
 Start the MCP server with:
 

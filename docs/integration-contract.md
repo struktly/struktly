@@ -6,29 +6,54 @@ the machine interface.
 
 ## Invocation and streams
 
-All commands accept `--root <path>` and run without prompts. `brief`, `status`,
-`explain`, `validate`, and `doctor` require a Git repository. `brief` also requires
-a commit at `HEAD`; it collects live context and does not consume rendered scan Markdown.
+All commands accept `--root <path>` and run without prompts. `context`, `status`,
+`explain`, `validate`, and `doctor` require a Git repository. `context` also
+requires a commit at `HEAD`; it collects live context and does not consume
+rendered scan Markdown. `brief` is a compatibility alias for `context`.
 
 Machine modes write one JSON document to stdout:
 
 | Invocation | Schema |
 |---|---|
 | `scan --json` | `struktly/snapshot/v1` |
-| `brief --json <task>` | `struktly/packet/v1` |
+| `context --json <request>` | `struktly/packet/v1` |
 | `status --json` | `struktly/status/v1` |
 | `explain --json <path>` | `struktly/explanation/v1` |
 | `validate --json` | `struktly/validation/v1` |
 | `doctor --json` | `struktly/doctor/v1` |
+| `capabilities --json` | `struktly/capabilities/v1` |
 
-In machine mode, successful diagnostics such as the packet output path go to
-stderr. stdout never mixes prose with JSON. `run` and `memory` subcommands also
+In machine mode, successful diagnostics such as a generated packet path go to
+stderr. With `--no-write`, successful commands leave stderr empty. stdout never
+mixes prose with JSON. `run` and `memory` subcommands also
 emit JSON, but their record shapes are not yet versioned schemas.
 
-`brief --stdout <task>` writes Markdown to stdout and its output path to stderr.
+`context --stdout <request>` writes Markdown to stdout and its output path to stderr.
 Other default modes write plain text for developers.
 `validate` checks both `.struktly/config.json` and every canonical task under
 `.struktly/tasks/*.md`.
+
+Programs should inspect `capabilities --json` before depending on additive CLI
+features. The current stable feature identifiers are
+`context.cancellation`, `context.expect_base_revision`, `context.no_write`,
+`scan.no_write`, and `structured_errors`.
+
+For side-effect-free packet generation, invoke:
+
+```sh
+struktly context --json --no-write \
+  --expect-base-revision "$APPROVED_HEAD" \
+  "<coding request>"
+```
+
+`--no-write` requires `--json` and cannot be combined with `--run`. It suppresses
+both Markdown and JSON exports under `.struktly/`. `scan --json --no-write`
+similarly returns a snapshot without writing generated files.
+
+`--expect-base-revision <sha>` checks Git `HEAD` before and after context
+selection. A mismatch fails the command instead of returning a packet for a
+different revision. Callers that need repository-owned exports can omit
+`--no-write`; the revision check still applies.
 
 ## Errors and exit codes
 
@@ -45,8 +70,9 @@ document on stderr for a failed invocation:
 }
 ```
 
-Stable error codes currently include `not_git_repository`, `invalid_config`,
-`invalid_task`, `invalid_invocation`, `canceled`, and `operation_failed`. Messages are for people;
+Stable error codes currently include `not_git_repository`, `repository_changed`,
+`invalid_config`, `invalid_task`, `invalid_invocation`, `canceled`, and
+`operation_failed`. Messages are for people;
 automation must branch on `error.code` and the process exit code.
 
 | Exit | Meaning |
@@ -60,7 +86,7 @@ SIGINT and SIGTERM cancel the root command context. Cancellation is cooperative:
 Git-backed packet selection observes it, while an in-process filesystem scan
 finishes its current operation before returning. A signal received during a file
 replacement can leave an already-written generated artifact; callers may safely
-rerun the command.
+rerun the command. `--no-write` avoids this artifact case.
 The experimental MCP server currently accepts cancellation notifications but
 does not interrupt an in-flight tool call.
 
@@ -94,7 +120,7 @@ measured `stats.duration_ms` are intentionally volatile.
 The context selector asks Git for tracked and non-ignored files using
 `git ls-files --cached --others --exclude-standard`. Built-in selection rules are
 always active; `.struktly/config.json` adds include rules and declares excludes.
-Task-word filename matches can add source files. Ordering is repository-relative
+Request-word filename matches can add source files. Ordering is repository-relative
 lexicographic order.
 
 The CLI never emits the content of:

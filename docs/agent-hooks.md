@@ -20,8 +20,8 @@ content.
 Pipe a Markdown context packet into either installed CLI:
 
 ```sh
-struktly brief --stdout "add request timeout middleware" | claude -p
-struktly brief --stdout "add request timeout middleware" | codex exec -
+struktly context --stdout "add request timeout middleware" | claude -p
+struktly context --stdout "add request timeout middleware" | codex exec -
 ```
 
 The packet contains the task and selected repository files. The agent still uses
@@ -30,8 +30,12 @@ its own configuration, permissions, and session storage.
 To inspect the packet before passing it on:
 
 ```sh
-struktly brief --stdout "add request timeout middleware"
+struktly context --stdout "add request timeout middleware"
 ```
+
+`brief` remains an alias for existing scripts. Integrations that consume JSON
+without repository-local exports should use `context --json --no-write` and pin
+the approved `HEAD` with `--expect-base-revision`.
 
 ## Instruction files
 

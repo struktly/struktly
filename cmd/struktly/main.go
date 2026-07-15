@@ -68,6 +68,9 @@ func classifyError(err error) (int, string) {
 	if errors.Is(err, repoctx.ErrNotGitRepository) {
 		return 1, "not_git_repository"
 	}
+	if errors.Is(err, repoctx.ErrRepositoryChanged) {
+		return 1, "repository_changed"
+	}
 	if errors.Is(err, repoctx.ErrInvalidTask) {
 		return 1, "invalid_task"
 	}
@@ -76,7 +79,7 @@ func classifyError(err error) (int, string) {
 		return 1, "invalid_config"
 	}
 	for _, marker := range []string{
-		"unknown command", "unknown flag", "required flag", "accepts ", "requires ", "use either --stdout or --json",
+		"unknown command", "unknown flag", "required flag", "accepts ", "requires ", "cannot be used", "use either --stdout or --json",
 	} {
 		if strings.Contains(message, marker) {
 			return 2, "invalid_invocation"
@@ -107,7 +110,7 @@ func newRootCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:           "struktly",
-		Short:         "Select task-specific context from a Git repository",
+		Short:         "Build repository context for a coding request",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -127,7 +130,65 @@ func newRootCmd() *cobra.Command {
 	cmd.AddCommand(newDoctorCmd(&repoRoot))
 	cmd.AddCommand(newMCPCmd(&repoRoot))
 	cmd.AddCommand(newVersionCmd())
+	cmd.AddCommand(newCapabilitiesCmd())
 
+	return cmd
+}
+
+const capabilitiesSchema = "struktly/capabilities/v1"
+
+type capabilitiesDocument struct {
+	Schema   string         `json:"schema"`
+	Build    buildinfo.Info `json:"build"`
+	Commands []string       `json:"commands"`
+	Schemas  []string       `json:"schemas"`
+	Features []string       `json:"features"`
+}
+
+func currentCapabilities() capabilitiesDocument {
+	return capabilitiesDocument{
+		Schema:   capabilitiesSchema,
+		Build:    buildinfo.Current(),
+		Commands: []string{"capabilities", "context", "doctor", "explain", "scan", "status", "validate"},
+		Schemas: []string{
+			capabilitiesSchema,
+			"struktly/doctor/v1",
+			"struktly/error/v1",
+			"struktly/explanation/v1",
+			repoctx.PacketSchema,
+			repoctx.SnapshotSchema,
+			"struktly/status/v1",
+			"struktly/validation/v1",
+		},
+		Features: []string{
+			"context.cancellation",
+			"context.expect_base_revision",
+			"context.no_write",
+			"scan.no_write",
+			"structured_errors",
+		},
+	}
+}
+
+func newCapabilitiesCmd() *cobra.Command {
+	var toJSON bool
+	cmd := &cobra.Command{
+		Use:   "capabilities",
+		Short: "Report supported machine interfaces",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			capabilities := currentCapabilities()
+			if toJSON {
+				return writeJSON(cmd.OutOrStdout(), capabilities)
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "struktly %s\n", capabilities.Build.Version)
+			for _, feature := range capabilities.Features {
+				fmt.Fprintln(cmd.OutOrStdout(), feature)
+			}
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&toJSON, "json", false, "Print the versioned capabilities document")
 	return cmd
 }
 
@@ -317,11 +378,18 @@ func runInit(cmd *cobra.Command, repoRoot string) error {
 func newScanCmd(repoRoot *string) *cobra.Command {
 	var runID string
 	var toJSON bool
+	var noWrite bool
 	cmd := &cobra.Command{
 		Use:   "scan",
 		Short: "Write .struktly/project-context.md for a repository",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			result, err := repoctx.Scan(repoctx.ScanOptions{Root: *repoRoot, RunID: runID})
+			if noWrite && !toJSON {
+				return fmt.Errorf("--no-write requires --json")
+			}
+			if noWrite && runID != "" {
+				return fmt.Errorf("--no-write cannot be used with --run")
+			}
+			result, err := repoctx.Scan(repoctx.ScanOptions{Root: *repoRoot, RunID: runID, NoWrite: noWrite})
 			if err != nil {
 				return err
 			}
@@ -334,12 +402,15 @@ func newScanCmd(repoRoot *string) *cobra.Command {
 				}
 				confirmation = cmd.ErrOrStderr()
 			}
-			_, err = fmt.Fprintf(confirmation, "wrote %s\n", result.OutputPath)
+			if !noWrite {
+				_, err = fmt.Fprintf(confirmation, "wrote %s\n", result.OutputPath)
+			}
 			return err
 		},
 	}
 	cmd.Flags().StringVar(&runID, "run", "", "Attach scan output to a run id")
 	cmd.Flags().BoolVar(&toJSON, "json", false, "Print the structured snapshot to stdout for piping")
+	cmd.Flags().BoolVar(&noWrite, "no-write", false, "Do not write generated files; requires --json")
 	return cmd
 }
 
@@ -347,19 +418,30 @@ func newBriefCmd(repoRoot *string) *cobra.Command {
 	var runID string
 	var toStdout bool
 	var toJSON bool
+	var noWrite bool
+	var expectedBaseRevision string
 	cmd := &cobra.Command{
-		Use:   "brief <task>",
-		Short: "Write a task-specific context packet",
-		Args:  cobra.ExactArgs(1),
+		Use:     "context <request>",
+		Aliases: []string{"brief"},
+		Short:   "Build a context packet for one coding request",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if toStdout && toJSON {
 				return fmt.Errorf("use either --stdout or --json, not both")
 			}
+			if noWrite && !toJSON {
+				return fmt.Errorf("--no-write requires --json")
+			}
+			if noWrite && runID != "" {
+				return fmt.Errorf("--no-write cannot be used with --run")
+			}
 			result, err := repoctx.Brief(repoctx.BriefOptions{
-				Context: cmd.Context(),
-				Root:    *repoRoot,
-				Task:    args[0],
-				RunID:   runID,
+				Context:              cmd.Context(),
+				Root:                 *repoRoot,
+				Task:                 args[0],
+				RunID:                runID,
+				NoWrite:              noWrite,
+				ExpectedBaseRevision: expectedBaseRevision,
 			})
 			if err != nil {
 				return err
@@ -383,13 +465,17 @@ func newBriefCmd(repoRoot *string) *cobra.Command {
 				}
 				confirmation = cmd.ErrOrStderr()
 			}
-			_, err = fmt.Fprintf(confirmation, "wrote %s\n", result.OutputPath)
+			if !noWrite {
+				_, err = fmt.Fprintf(confirmation, "wrote %s\n", result.OutputPath)
+			}
 			return err
 		},
 	}
 	cmd.Flags().StringVar(&runID, "run", "", "Attach context packet to a run id")
 	cmd.Flags().BoolVar(&toStdout, "stdout", false, "Print the context packet to stdout for piping")
 	cmd.Flags().BoolVar(&toJSON, "json", false, "Print the structured packet to stdout for piping")
+	cmd.Flags().BoolVar(&noWrite, "no-write", false, "Do not write generated files; requires --json")
+	cmd.Flags().StringVar(&expectedBaseRevision, "expect-base-revision", "", "Fail if Git HEAD does not match this revision")
 	return cmd
 }
 

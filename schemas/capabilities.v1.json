@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "struktly/capabilities/v1",
+  "title": "Struktly CLI capabilities",
+  "description": "Versioned machine interfaces and additive features supported by one Struktly binary.",
+  "type": "object",
+  "properties": {
+    "schema": { "const": "struktly/capabilities/v1" },
+    "build": { "$ref": "#/$defs/build" },
+    "commands": { "$ref": "#/$defs/strings" },
+    "schemas": { "$ref": "#/$defs/strings" },
+    "features": { "$ref": "#/$defs/strings" }
+  },
+  "required": ["schema", "build", "commands", "schemas", "features"],
+  "additionalProperties": true,
+  "$defs": {
+    "strings": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "build": {
+      "type": "object",
+      "properties": {
+        "version": { "type": "string" },
+        "revision": { "type": "string" },
+        "date": { "type": "string" }
+      },
+      "required": ["version"],
+      "additionalProperties": true
+    }
+  }
+}

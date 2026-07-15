@@ -21,6 +21,9 @@ func Brief(opts BriefOptions) (BriefResult, error) {
 	if err != nil {
 		return BriefResult{}, err
 	}
+	if opts.NoWrite && strings.TrimSpace(opts.RunID) != "" {
+		return BriefResult{}, fmt.Errorf("--no-write cannot be used with --run")
+	}
 	ctx := opts.Context
 	if ctx == nil {
 		ctx = stdcontext.Background()
@@ -30,6 +33,10 @@ func Brief(opts BriefOptions) (BriefResult, error) {
 		return BriefResult{}, err
 	}
 	root = repository.absoluteRoot
+	expectedRevision := strings.TrimSpace(opts.ExpectedBaseRevision)
+	if expectedRevision != "" && repository.HeadRevision != expectedRevision {
+		return BriefResult{}, repositoryChangedError(expectedRevision, repository.HeadRevision)
+	}
 	task := strings.TrimSpace(opts.Task)
 	if task == "" {
 		return BriefResult{}, fmt.Errorf("task is required")
@@ -61,6 +68,16 @@ func Brief(opts BriefOptions) (BriefResult, error) {
 	pkt, err := packet.toPacket(ctx)
 	if err != nil {
 		return BriefResult{}, err
+	}
+	currentRepository, err := ResolveRepository(ctx, root)
+	if err != nil {
+		return BriefResult{}, err
+	}
+	if currentRepository.HeadRevision != repository.HeadRevision {
+		return BriefResult{}, repositoryChangedError(repository.HeadRevision, currentRepository.HeadRevision)
+	}
+	if opts.NoWrite {
+		return BriefResult{Packet: pkt}, nil
 	}
 
 	basename := now.Format("20060102-150405") + "-" + files.Slugify(task, 72)
@@ -95,6 +112,10 @@ func Brief(opts BriefOptions) (BriefResult, error) {
 	}
 
 	return BriefResult{OutputPath: outputPath, PacketPath: jsonOutputPath, Packet: pkt}, nil
+}
+
+func repositoryChangedError(expected, actual string) error {
+	return fmt.Errorf("%w: expected HEAD %s, found %s", ErrRepositoryChanged, expected, actual)
 }
 
 type contextPacket struct {

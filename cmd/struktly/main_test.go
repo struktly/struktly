@@ -7,8 +7,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+
+	repoctx "github.com/struktly/struktly/internal/context"
 )
 
 func TestRunCLIStructuredErrorsAndExitCodes(t *testing.T) {
@@ -99,6 +102,23 @@ func TestVersionCommandReportsBuildMetadata(t *testing.T) {
 	}
 }
 
+func TestCapabilitiesCommandReportsContextContract(t *testing.T) {
+	stdout, stderr, err := executeTestCommand("capabilities", "--json")
+	if err != nil {
+		t.Fatalf("capabilities returned error: %v\nstderr:\n%s", err, stderr)
+	}
+	if strings.TrimSpace(stderr) != "" {
+		t.Fatalf("capabilities wrote diagnostics on success: %s", stderr)
+	}
+	var document capabilitiesDocument
+	if err := json.Unmarshal([]byte(stdout), &document); err != nil {
+		t.Fatalf("capabilities output is not JSON: %v\n%s", err, stdout)
+	}
+	if document.Schema != capabilitiesSchema || !slices.Contains(document.Features, "context.no_write") || !slices.Contains(document.Features, "context.expect_base_revision") {
+		t.Fatalf("unexpected capabilities: %+v", document)
+	}
+}
+
 func TestInitScaffoldsAndScans(t *testing.T) {
 	root := t.TempDir()
 
@@ -158,6 +178,73 @@ func TestBriefStdoutPrintsPacket(t *testing.T) {
 	}
 	if stdout != string(data) {
 		t.Fatalf("stdout does not match packet file content\nstdout:\n%s\nfile:\n%s", stdout, data)
+	}
+}
+
+func TestContextNoWriteProducesPacketWithoutArtifacts(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, filepath.Join(root, "README.md"), "# Repo\n")
+	initTestGitRepo(t, root)
+
+	stdout, stderr, err := executeTestCommand("context", "--root", root, "--json", "--no-write", "inspect repository")
+	if err != nil {
+		t.Fatalf("context --no-write returned error: %v\nstderr:\n%s", err, stderr)
+	}
+	if strings.TrimSpace(stderr) != "" {
+		t.Fatalf("context --no-write wrote diagnostics: %s", stderr)
+	}
+	var packet struct {
+		Schema string `json:"schema"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &packet); err != nil || packet.Schema != repoctx.PacketSchema {
+		t.Fatalf("unexpected packet output: err=%v output=%s", err, stdout)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".struktly")); !os.IsNotExist(err) {
+		t.Fatalf("context --no-write created repository files: %v", err)
+	}
+}
+
+func TestScanNoWriteProducesSnapshotWithoutArtifacts(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, filepath.Join(root, "README.md"), "# Repo\n")
+
+	stdout, stderr, err := executeTestCommand("scan", "--root", root, "--json", "--no-write")
+	if err != nil {
+		t.Fatalf("scan --no-write returned error: %v\nstderr:\n%s", err, stderr)
+	}
+	if strings.TrimSpace(stderr) != "" {
+		t.Fatalf("scan --no-write wrote diagnostics: %s", stderr)
+	}
+	var snapshot struct {
+		Schema string `json:"schema"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &snapshot); err != nil || snapshot.Schema != repoctx.SnapshotSchema {
+		t.Fatalf("unexpected snapshot output: err=%v output=%s", err, stdout)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".struktly")); !os.IsNotExist(err) {
+		t.Fatalf("scan --no-write created repository files: %v", err)
+	}
+}
+
+func TestContextExpectedRevisionMismatchIsStructured(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, filepath.Join(root, "README.md"), "# Repo\n")
+	initTestGitRepo(t, root)
+
+	var stdout, stderr bytes.Buffer
+	exitCode := runCLI(context.Background(), []string{
+		"context", "--root", root, "--json", "--no-write",
+		"--expect-base-revision", strings.Repeat("0", 40), "inspect repository",
+	}, strings.NewReader(""), &stdout, &stderr)
+	if exitCode != 1 || stdout.Len() != 0 {
+		t.Fatalf("revision mismatch exit=%d stdout=%q stderr=%q", exitCode, &stdout, &stderr)
+	}
+	var document errorDocument
+	if err := json.Unmarshal(stderr.Bytes(), &document); err != nil {
+		t.Fatalf("revision mismatch error is not JSON: %v\n%s", err, &stderr)
+	}
+	if document.Error.Code != "repository_changed" {
+		t.Fatalf("error code = %q, want repository_changed", document.Error.Code)
 	}
 }
 

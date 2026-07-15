@@ -14,7 +14,10 @@ import (
 	"github.com/struktly/struktly/internal/files"
 )
 
-var ErrNotGitRepository = errors.New("not a Git repository")
+var (
+	ErrNotGitRepository  = errors.New("not a Git repository")
+	ErrRepositoryChanged = errors.New("repository changed while building context")
+)
 
 type Repository struct {
 	Name         string `json:"name"`
