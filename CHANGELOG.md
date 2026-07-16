@@ -4,6 +4,8 @@ Notable changes will be recorded here.
 
 ## Unreleased
 
+## v0.1.2 - 2026-07-16
+
 - Added side-effect-free JSON generation for context packets and scans.
 - Added approved-revision checks with structured `repository_changed` errors.
 - Added a versioned CLI capabilities document.
