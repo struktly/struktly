@@ -17,7 +17,7 @@ add request timeout middleware
 ## Packet details
 
 - Schema: `struktly/packet/v2`
-- Packet hash: `sha256:b167c155e8862f6ed24cb10f4d6320adeeace79f25ed36c2f46c237e37e83e57`
+- Packet hash: `sha256:531e1a152851a953d8caf4c1ad52de87fe7eeece25b292ec4b55275c6adf844c`
 - Repository: `git:0e709b14ea2e846e54e1d38161502ee8f4a49a40963cbbe8abb58b938ca7a1d7`
 - Branch: `main`
 - HEAD revision: `983c7b8424a771fe26dbd36f266a305acf674d48`
@@ -166,6 +166,30 @@ Run `make test` before sending changes.
 module example.com/go-service
 
 go 1.24.0
+```
+
+### `middleware/logger.go`
+
+- Type: Source
+- Why it was included: its filename matched the task
+- Content hash: `sha256:79ab9481be7e91f1130665b0c50407af6c808a804d625e2d625837b3d517f21a`
+- Bytes: `281/281`
+
+```text
+package middleware
+
+import (
+	"log"
+	"net/http"
+)
+
+// Logger logs each request method and path.
+func Logger(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("%s %s", r.Method, r.URL.Path)
+		h.ServeHTTP(w, r)
+	})
+}
 ```
 
 ### `middleware/timeout.go`

@@ -35,8 +35,8 @@ Other default modes write plain text for developers.
 
 Programs should inspect `capabilities --json` before depending on additive CLI
 features. The current stable feature identifiers are
-`context.cancellation`, `context.expect_base_revision`, `context.no_write`,
-`scan.no_write`, `structured_errors`, and `tasks.partial_results`.
+`context.cancellation`, `context.expect_base_revision`, `context.limits`,
+`context.no_write`, `scan.no_write`, `structured_errors`, and `tasks.partial_results`.
 
 For side-effect-free packet generation, invoke:
 
@@ -54,6 +54,20 @@ similarly returns a snapshot without writing generated files.
 selection. A mismatch fails the command instead of returning a packet for a
 different revision. Callers that need repository-owned exports can omit
 `--no-write`; the revision check still applies.
+
+`context` also accepts optional limit overrides:
+
+```sh
+struktly context \
+  --max-items 40 \
+  --max-file-bytes 65536 \
+  --max-total-bytes 524288 \
+  --json --no-write \
+  "<coding request>"
+```
+
+These values may only tighten the built-in packet defaults (40, 64 KiB, and
+512 KiB). Overly large or non-positive values fail with a clear validation error.
 
 ## Errors and exit codes
 
@@ -120,8 +134,10 @@ measured `stats.duration_ms` are intentionally volatile.
 The context selector asks Git for tracked and non-ignored files using
 `git ls-files --cached --others --exclude-standard`. Built-in selection rules are
 always active; `.struktly/config.json` adds include rules and declares excludes.
-Request-word filename matches can add source files. Ordering is repository-relative
-lexicographic order.
+Request matching tokenizes normalized relative paths and file names across
+path separators, punctuation, snake/kebab boundaries, and camel case before
+scoring overlap. Candidates are ranked deterministically by reason and relevance,
+then item count and byte limits are applied.
 
 The CLI never emits the content of:
 

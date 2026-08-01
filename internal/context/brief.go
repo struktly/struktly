@@ -36,6 +36,14 @@ func Brief(opts BriefOptions) (BriefResult, error) {
 	if task == "" {
 		return BriefResult{}, fmt.Errorf("task is required")
 	}
+	limits, err := resolvePacketLimits(PacketLimits{
+		MaxItems:      opts.MaxItems,
+		MaxFileBytes:  opts.MaxFileBytes,
+		MaxTotalBytes: opts.MaxTotalBytes,
+	})
+	if err != nil {
+		return BriefResult{}, err
+	}
 
 	scan := newRepositoryScan(root)
 	if err := scan.collect(); err != nil {
@@ -60,7 +68,7 @@ func Brief(opts BriefOptions) (BriefResult, error) {
 		packet.sourceRefs[source] = struct{}{}
 	}
 	packet.readOptionalInputs()
-	pkt, err := packet.toPacket(ctx)
+	pkt, err := packet.toPacket(ctx, limits)
 	if err != nil {
 		return BriefResult{}, err
 	}
@@ -345,9 +353,9 @@ func (p *contextPacket) writeDirection(b *strings.Builder) {
 
 // toPacket builds the machine-readable counterpart to renderMarkdown from
 // the same packet state.
-func (p *contextPacket) toPacket(ctx stdcontext.Context) (Packet, error) {
+func (p *contextPacket) toPacket(ctx stdcontext.Context, limits PacketLimits) (Packet, error) {
 	d := p.derive()
-	selection, err := selectPacketContext(ctx, p.root, p.task, d.detectedChecks)
+	selection, err := selectPacketContext(ctx, p.root, p.task, d.detectedChecks, limits)
 	if err != nil {
 		return Packet{}, err
 	}

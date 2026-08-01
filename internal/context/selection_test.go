@@ -21,7 +21,7 @@ func TestSelectionHonorsNestedAnchoredGitIgnore(t *testing.T) {
 	runGit(t, root, "add", "nested/.gitignore")
 	runGit(t, root, "commit", "-qm", "add nested ignore")
 
-	selection, err := selectPacketContext(stdcontext.Background(), root, "inspect private docs", nil)
+	selection, err := selectPacketContextWithLimits(stdcontext.Background(), root, "inspect private docs", nil, DefaultPacketLimits())
 	if err != nil {
 		t.Fatalf("selectPacketContext returned error: %v", err)
 	}
@@ -48,7 +48,7 @@ func TestSelectionExcludesSecretContentWithoutSerializingIt(t *testing.T) {
 	const secret = "private-material-must-not-leak"
 	writeFile(t, root, "src/auth.go", "-----BEGIN PRIVATE KEY-----\n"+secret+"\n")
 
-	selection, err := selectPacketContext(stdcontext.Background(), root, "review auth", nil)
+	selection, err := selectPacketContextWithLimits(stdcontext.Background(), root, "review auth", nil, DefaultPacketLimits())
 	if err != nil {
 		t.Fatalf("selectPacketContext returned error: %v", err)
 	}
@@ -96,7 +96,7 @@ func TestSelectionExcludesNULBinary(t *testing.T) {
 	root := initSelectionRepo(t)
 	writeFile(t, root, "binary.dat", "text\x00binary")
 
-	selection, err := selectPacketContext(stdcontext.Background(), root, "inspect binary", nil)
+	selection, err := selectPacketContextWithLimits(stdcontext.Background(), root, "inspect binary", nil, DefaultPacketLimits())
 	if err != nil {
 		t.Fatalf("selectPacketContext returned error: %v", err)
 	}
@@ -121,7 +121,7 @@ func TestSelectionClassifiesMatchingPortableTask(t *testing.T) {
 	root := initSelectionRepo(t)
 	writeFile(t, root, ".struktly/tasks/add-timeout.md", validTaskDocument)
 
-	selection, err := selectPacketContext(stdcontext.Background(), root, "add timeout", nil)
+	selection, err := selectPacketContextWithLimits(stdcontext.Background(), root, "add timeout", nil, DefaultPacketLimits())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +137,7 @@ func TestSelectionExcludesSymlink(t *testing.T) {
 		t.Fatalf("create symlink: %v", err)
 	}
 
-	selection, err := selectPacketContext(stdcontext.Background(), root, "inspect linked docs", nil)
+	selection, err := selectPacketContextWithLimits(stdcontext.Background(), root, "inspect linked docs", nil, DefaultPacketLimits())
 	if err != nil {
 		t.Fatalf("selectPacketContext returned error: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestSelectionTruncatesOversizedUTF8AtValidBoundary(t *testing.T) {
 	content := strings.Repeat("a", maxPacketFileBytes-1) + "€" + "tail"
 	writeFile(t, root, "oversized.txt", content)
 
-	selection, err := selectPacketContext(stdcontext.Background(), root, "inspect oversized file", nil)
+	selection, err := selectPacketContextWithLimits(stdcontext.Background(), root, "inspect oversized file", nil, DefaultPacketLimits())
 	if err != nil {
 		t.Fatalf("selectPacketContext returned error: %v", err)
 	}
@@ -167,6 +167,85 @@ func TestSelectionTruncatesOversizedUTF8AtValidBoundary(t *testing.T) {
 		t.Fatalf("content hash = %q, want %q", item.ContentHash, wantHash)
 	}
 	assertDecision(t, selection.truncations, "oversized.txt", "content_limit")
+}
+
+func TestSelectionDoesNotMatchGenericRepositoryWords(t *testing.T) {
+	root := initSelectionRepo(t)
+	writeFile(t, root, "repository-overview.md", "# Repository overview\n")
+	writeFile(t, root, "repo-summary.md", "# Repo summary\n")
+	writeFile(t, root, ".struktly/tasks/repository-task.md", "# repository task\n")
+	runGit(t, root, "add", "repository-overview.md", "repo-summary.md", ".struktly/tasks/repository-task.md")
+	runGit(t, root, "commit", "-qm", "add repository words")
+
+	selection, err := selectPacketContextWithLimits(
+		stdcontext.Background(),
+		root,
+		"What does this repository do?",
+		nil,
+		DefaultPacketLimits(),
+	)
+	if err != nil {
+		t.Fatalf("selectPacketContext returned error: %v", err)
+	}
+	for _, item := range selection.items {
+		if item.Path == "repository-overview.md" || item.Path == "repo-summary.md" || item.Path == ".struktly/tasks/repository-task.md" {
+			t.Fatalf("generic request words incorrectly matched %s", item.Path)
+		}
+		if item.Reason == "task_match" {
+			t.Fatalf("generic words should not drive task_match selection: %#v", item)
+		}
+	}
+}
+
+func TestSelectionDoesNotMatchDockerfileFromDockWord(t *testing.T) {
+	root := initSelectionRepo(t)
+	writeFile(t, root, "Dockerfile", "# docker image\n")
+	writeFile(t, root, ".dockerignore", "tmp/\n")
+	runGit(t, root, "add", "Dockerfile", ".dockerignore")
+	runGit(t, root, "commit", "-qm", "add docker files")
+
+	selection, err := selectPacketContextWithLimits(stdcontext.Background(), root, "terminal dock", nil, DefaultPacketLimits())
+	if err != nil {
+		t.Fatalf("selectPacketContext returned error: %v", err)
+	}
+	assertItemAbsent(t, selection.items, "Dockerfile")
+	assertItemAbsent(t, selection.items, ".dockerignore")
+}
+
+func TestSelectionPrefersImplementationOverTasksAndTestsUnderItemLimit(t *testing.T) {
+	root := initSelectionRepo(t)
+	writeFile(t, root, ".struktly/config.json", `{"schema":"struktly/config/v1","context":{"exclude":["README.md",".struktly/config.json"]},"checks":{}}`)
+	writeFile(t, root, "internal/timeout/service.go", "package timeout\n")
+	writeFile(t, root, "internal/timeout/timeout_test.go", "package timeout\n")
+	writeFile(t, root, "e2e/timeout-suite.md", "# E2E timeout\n")
+	writeFile(t, root, ".struktly/tasks/timeout.md", validTaskDocument)
+	runGit(t, root, "add", ".struktly/config.json", "internal/timeout/service.go", "internal/timeout/timeout_test.go", "e2e/timeout-suite.md", ".struktly/tasks/timeout.md")
+	runGit(t, root, "commit", "-qm", "add timeout candidates")
+
+	selection, err := selectPacketContextWithLimits(
+		stdcontext.Background(),
+		root,
+		"timeout",
+		nil,
+		PacketLimits{
+			MaxItems:      1,
+			MaxFileBytes:  maxPacketFileBytes,
+			MaxTotalBytes: maxPacketTotalBytes,
+		},
+	)
+	if err != nil {
+		t.Fatalf("selectPacketContext returned error: %v", err)
+	}
+	if len(selection.items) != 1 {
+		t.Fatalf("expected one selected item, got %d", len(selection.items))
+	}
+	item := requireItem(t, selection.items, "internal/timeout/service.go")
+	if item.Reason != "task_match" {
+		t.Fatalf("expected task_match reason for ranked source file, got: %#v", item)
+	}
+	assertDecision(t, selection.exclusions, "internal/timeout/timeout_test.go", "item_limit")
+	assertDecision(t, selection.exclusions, "e2e/timeout-suite.md", "item_limit")
+	assertDecision(t, selection.exclusions, ".struktly/tasks/timeout.md", "item_limit")
 }
 
 func TestPacketHashIgnoresGenerationTimeAndTracksSelectedContent(t *testing.T) {
@@ -241,6 +320,10 @@ func TestPacketHashTracksDeterministicCompatibilityFields(t *testing.T) {
 	if packet.PacketHash == first {
 		t.Fatal("packet hash did not change with deterministic packet content")
 	}
+}
+
+func selectPacketContextWithLimits(ctx stdcontext.Context, requestedRoot, task string, detectedChecks []string, limits PacketLimits) (packetSelection, error) {
+	return selectPacketContext(ctx, requestedRoot, task, detectedChecks, limits)
 }
 
 func initSelectionRepo(t *testing.T) string {

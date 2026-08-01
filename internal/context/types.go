@@ -24,6 +24,9 @@ type BriefOptions struct {
 	Now                  time.Time
 	NoWrite              bool
 	ExpectedBaseRevision string
+	MaxItems             int
+	MaxFileBytes         int
+	MaxTotalBytes        int
 }
 
 type BriefResult struct {

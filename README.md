@@ -90,7 +90,7 @@ Runtime and product state is deliberately absent from this CLI.
 
 ## System boundary
 
-This repository owns deterministic repository understanding: scanning,
+This repository owns deterministic repository selection and packaging: scanning,
 selection, context packets, task declarations, provenance, and validation.
 Request interpretation, privacy policy, model routing, local-model management,
 dispatch, approvals, sessions, and durable history belong to Struktly Platform.
@@ -100,13 +100,14 @@ needs them; they are not dependencies of this CLI.
 ## What enters a packet
 
 Struktly asks Git for tracked and non-ignored files, then applies repository
-configuration and request-word matching. It skips sensitive filenames, detected
-secrets, binaries, symlinks, dependencies, build output, and local runtime
-state. Every packet explains exclusions and truncation.
+configuration and token-aware request matching. It skips sensitive filenames,
+detected secrets, binaries, symlinks, dependencies, build output, and local
+runtime state. Every packet explains exclusions and truncation for selected
+items and applied limits.
 
-The current limits are 40 files, 64 KiB per file, and 512 KiB total. Selected
-files include their path, Git revision, byte counts, and full-content SHA-256
-hash.
+The built-in limits are 40 files, 64 KiB per file, and 512 KiB total. They are
+exposed as `context.limits` and can only be tightened with
+`--max-items`, `--max-file-bytes`, and `--max-total-bytes`.
 
 ## Integrations
 
