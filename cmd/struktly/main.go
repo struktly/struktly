@@ -71,6 +71,9 @@ func classifyError(err error) (int, string) {
 	if errors.Is(err, repoctx.ErrInvalidTask) {
 		return 1, "invalid_task"
 	}
+	if errors.Is(err, repoctx.ErrInvalidPacketLimit) {
+		return 2, "invalid_invocation"
+	}
 	message := err.Error()
 	if strings.Contains(message, ".struktly/config.json") {
 		return 1, "invalid_config"
@@ -158,6 +161,7 @@ func currentCapabilities() capabilitiesDocument {
 		},
 		Features: []string{
 			"context.cancellation",
+			"context.limits",
 			"context.expect_base_revision",
 			"context.no_write",
 			"scan.no_write",
@@ -442,6 +446,9 @@ func newBriefCmd(repoRoot *string) *cobra.Command {
 	var toJSON bool
 	var noWrite bool
 	var expectedBaseRevision string
+	var maxItems int
+	var maxFileBytes int
+	var maxTotalBytes int
 	cmd := &cobra.Command{
 		Use:     "context <request>",
 		Aliases: []string{"brief"},
@@ -454,12 +461,37 @@ func newBriefCmd(repoRoot *string) *cobra.Command {
 			if noWrite && !toJSON {
 				return fmt.Errorf("--no-write requires --json")
 			}
+			flags := cmd.Flags()
+			maxItemsSet := flags.Lookup("max-items").Changed
+			maxFileBytesSet := flags.Lookup("max-file-bytes").Changed
+			maxTotalBytesSet := flags.Lookup("max-total-bytes").Changed
+			if maxItemsSet && maxItems <= 0 {
+				return fmt.Errorf("%w: max_items must be greater than 0", repoctx.ErrInvalidPacketLimit)
+			}
+			if maxFileBytesSet && maxFileBytes <= 0 {
+				return fmt.Errorf("%w: max_file_bytes must be greater than 0", repoctx.ErrInvalidPacketLimit)
+			}
+			if maxTotalBytesSet && maxTotalBytes <= 0 {
+				return fmt.Errorf("%w: max_total_bytes must be greater than 0", repoctx.ErrInvalidPacketLimit)
+			}
+			if !maxItemsSet {
+				maxItems = 0
+			}
+			if !maxFileBytesSet {
+				maxFileBytes = 0
+			}
+			if !maxTotalBytesSet {
+				maxTotalBytes = 0
+			}
 			result, err := repoctx.Brief(repoctx.BriefOptions{
 				Context:              cmd.Context(),
 				Root:                 *repoRoot,
 				Task:                 args[0],
 				NoWrite:              noWrite,
 				ExpectedBaseRevision: expectedBaseRevision,
+				MaxItems:             maxItems,
+				MaxFileBytes:         maxFileBytes,
+				MaxTotalBytes:        maxTotalBytes,
 			})
 			if err != nil {
 				return err
@@ -493,6 +525,9 @@ func newBriefCmd(repoRoot *string) *cobra.Command {
 	cmd.Flags().BoolVar(&toJSON, "json", false, "Print the structured packet to stdout for piping")
 	cmd.Flags().BoolVar(&noWrite, "no-write", false, "Do not write generated files; requires --json")
 	cmd.Flags().StringVar(&expectedBaseRevision, "expect-base-revision", "", "Fail if Git HEAD does not match this revision")
+	cmd.Flags().IntVar(&maxItems, "max-items", 0, "Maximum selected files")
+	cmd.Flags().IntVar(&maxFileBytes, "max-file-bytes", 0, "Maximum bytes to read from each selected file")
+	cmd.Flags().IntVar(&maxTotalBytes, "max-total-bytes", 0, "Maximum total selected content bytes")
 	return cmd
 }
 

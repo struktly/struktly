@@ -4,6 +4,10 @@ Notable changes will be recorded here.
 
 ## Unreleased
 
+- Improved context selection with token-aware path ranking (including camel-case
+  matching) and caller-tightened packet limits with deterministic aggregated
+  truncation exclusions.
+
 ## v0.2.0 - 2026-08-01
 
 - Added `tasks --json` with exact task hashes, parsed contracts, partial invalid

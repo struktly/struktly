@@ -129,6 +129,9 @@ func TestCapabilitiesCommandReportsContextContract(t *testing.T) {
 	if document.Schema != capabilitiesSchema || !slices.Contains(document.Features, "context.no_write") || !slices.Contains(document.Features, "context.expect_base_revision") {
 		t.Fatalf("unexpected capabilities: %+v", document)
 	}
+	if !slices.Contains(document.Features, "context.limits") {
+		t.Fatalf("capabilities missing context.limits: %+v", document)
+	}
 	if !slices.Contains(document.Commands, "tasks") || !slices.Contains(document.Schemas, repoctx.TasksSchema) || !slices.Contains(document.Features, "tasks.partial_results") {
 		t.Fatalf("capabilities do not advertise tasks contract: %+v", document)
 	}
@@ -140,6 +143,89 @@ func TestCapabilitiesCommandReportsContextContract(t *testing.T) {
 			t.Fatalf("capabilities advertise removed command %q: %+v", command, document)
 		}
 	}
+}
+
+func TestContextCLIRespectsAndValidatesLimits(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, filepath.Join(root, "service-timeout.go"), "package main\n")
+	writeTestFile(t, filepath.Join(root, "request-timeout.go"), "package main\n")
+	initTestGitRepo(t, root)
+
+	stdout, stderr, err := executeTestCommand("context", "--root", root, "--json", "--no-write", "--max-items", "1", "timeout")
+	if err != nil || strings.TrimSpace(stderr) != "" {
+		t.Fatalf("context --max-items failed: err=%v stderr=%q", err, stderr)
+	}
+	var packet struct {
+		Items  []any `json:"items"`
+		Limits struct {
+			MaxItems      int `json:"max_items"`
+			MaxFileBytes  int `json:"max_file_bytes"`
+			MaxTotalBytes int `json:"max_total_bytes"`
+		} `json:"limits"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &packet); err != nil {
+		t.Fatalf("context packet output is not JSON: %v\nstdout=%s", err, stdout)
+	}
+	if len(packet.Items) != 1 {
+		t.Fatalf("expected item limit to truncate selection to one item, got %d", len(packet.Items))
+	}
+	if packet.Limits.MaxItems != 1 || packet.Limits.MaxFileBytes != 65536 || packet.Limits.MaxTotalBytes != 524288 {
+		t.Fatalf("packet limits should include requested and default values: %+v", packet.Limits)
+	}
+
+	for _, tc := range []struct {
+		name      string
+		args      []string
+		wantError string
+	}{
+		{
+			name:      "zero-max-items",
+			args:      []string{"context", "--root", root, "--json", "--no-write", "--max-items", "0", "timeout"},
+			wantError: "max_items must be greater than 0",
+		},
+		{
+			name:      "loosened-max-items",
+			args:      []string{"context", "--root", root, "--json", "--no-write", "--max-items", "41", "timeout"},
+			wantError: "max_items exceeds default max 40",
+		},
+		{
+			name:      "loosened-file-bytes",
+			args:      []string{"context", "--root", root, "--json", "--no-write", "--max-file-bytes", "65537", "timeout"},
+			wantError: "max_file_bytes exceeds default max 65536",
+		},
+		{
+			name:      "loosened-total-bytes",
+			args:      []string{"context", "--root", root, "--json", "--no-write", "--max-total-bytes", "524289", "timeout"},
+			wantError: "max_total_bytes exceeds default max 524288",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, stderr, exitCode := executeCLICommand(tc.args...)
+			if exitCode != 2 {
+				t.Fatalf("expected context limit failure for %s", tc.name)
+			}
+			if strings.TrimSpace(stderr) == "" {
+				t.Fatalf("expected structured json for %s error, got empty stderr", tc.name)
+			}
+			var doc errorDocument
+			if err := json.Unmarshal([]byte(stderr), &doc); err != nil {
+				t.Fatalf("expected structured error for %s: %v\nstderr=%s", tc.name, err, stderr)
+			}
+			if doc.Error.Code != "invalid_invocation" {
+				t.Fatalf("expected invalid_invocation for %s, got %+v", tc.name, doc)
+			}
+			if !strings.Contains(doc.Error.Message, tc.wantError) {
+				t.Fatalf("unexpected %s error=%+v", tc.name, doc.Error)
+			}
+		})
+	}
+}
+
+func executeCLICommand(args ...string) (stdout string, stderr string, exitCode int) {
+	var commandStdout bytes.Buffer
+	var commandStderr bytes.Buffer
+	exitCode = runCLI(context.Background(), args, strings.NewReader(""), &commandStdout, &commandStderr)
+	return commandStdout.String(), commandStderr.String(), exitCode
 }
 
 func TestTasksCommandEmitsValidAndInvalidFiles(t *testing.T) {
