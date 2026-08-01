@@ -13,13 +13,11 @@ func OKFFrontmatter(docType, title, description string, ts time.Time) string {
 	var b strings.Builder
 	b.WriteString("---\n")
 	b.WriteString("type: " + docType + "\n")
-	schemaType := docType
-	if schemaType == "context-packet" {
-		schemaType = "packet"
-	} else if schemaType == "evidence-log" {
-		schemaType = "evidence"
+	schema := "struktly/" + docType + "/v1"
+	if docType == "context-packet" {
+		schema = "struktly/packet/v2"
 	}
-	b.WriteString("schema: struktly/" + schemaType + "/v1\n")
+	b.WriteString("schema: " + schema + "\n")
 	if title != "" {
 		fmt.Fprintf(&b, "title: %q\n", title)
 	}

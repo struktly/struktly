@@ -81,6 +81,16 @@ Unknown fields are rejected so misspellings fail early.
 requested task match its filename. Included task files appear in the packet with
 their path, selection reason, and content hash.
 
+`struktly tasks --json` provides tolerant machine discovery as
+`struktly/tasks/v1`. It reports valid siblings even when another file is
+malformed, includes the SHA-256 of each task's exact bytes, and maps body sections
+to `outcome`, `done_when`, `non_goals`, and `required_checks`. Historical body
+headings remain discoverable with explicit `compatibility_notes`; strict
+`validate` still enforces the canonical headings above. Discovery also preserves
+historical dotted IDs with a compatibility note while strict validation rejects
+them. Other invalid frontmatter, unsafe files, and unsupported statuses appear
+under `invalid` rather than being silently normalized.
+
 Within `struktly/task/v1`, required field and heading meanings are stable. Additive
 format changes may introduce optional fields or sections. Breaking changes require
 a new task schema version.

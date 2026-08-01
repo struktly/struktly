@@ -152,14 +152,13 @@ func TestToolsList(t *testing.T) {
 	if err := json.Unmarshal(resp.Result, &result); err != nil {
 		t.Fatalf("unmarshal tools/list result: %v", err)
 	}
-	if len(result.Tools) != 3 {
-		t.Fatalf("expected 3 tools, got %d", len(result.Tools))
+	if len(result.Tools) != 2 {
+		t.Fatalf("expected 2 tools, got %d", len(result.Tools))
 	}
 
 	wantRequired := map[string][]string{
-		"context_scan":    nil,
-		"context_brief":   {"task"},
-		"evidence_record": {"task", "agent", "outcome"},
+		"context_scan":  nil,
+		"context_brief": {"task"},
 	}
 	for _, tool := range result.Tools {
 		required, ok := wantRequired[tool.Name]
@@ -218,7 +217,7 @@ func TestToolsCallContextBrief(t *testing.T) {
 	}
 }
 
-func TestToolsCallScanAndEvidence(t *testing.T) {
+func TestToolsCallScan(t *testing.T) {
 	serverRoot := t.TempDir()
 	otherRoot := t.TempDir()
 	if err := os.WriteFile(filepath.Join(otherRoot, "README.md"), []byte("# Other Repo\n"), 0o644); err != nil {
@@ -230,10 +229,9 @@ func TestToolsCallScanAndEvidence(t *testing.T) {
 		t.Fatalf("marshal scan arguments: %v", err)
 	}
 	lines := serveLines(t, serverRoot,
-		`{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"context_scan","arguments":`+string(scanArgs)+`}}`,
-		`{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"evidence_record","arguments":{"task":"Add MCP server","agent":"claude","outcome":"done","checks":["go test ./..."],"result":"pass"}}}`)
-	if len(lines) != 2 {
-		t.Fatalf("expected 2 response lines, got %d: %v", len(lines), lines)
+		`{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"context_scan","arguments":`+string(scanArgs)+`}}`)
+	if len(lines) != 1 {
+		t.Fatalf("expected 1 response line, got %d: %v", len(lines), lines)
 	}
 
 	scanResult := decodeToolResult(t, lines[0])
@@ -246,22 +244,6 @@ func TestToolsCallScanAndEvidence(t *testing.T) {
 	}
 	if _, err := os.Stat(wantScanPath); err != nil {
 		t.Fatalf("scan should write project context in the root argument: %v", err)
-	}
-
-	evidenceResult := decodeToolResult(t, lines[1])
-	if evidenceResult.IsError {
-		t.Fatalf("evidence_record returned isError: %s", evidenceResult.Content[0].Text)
-	}
-	wantLedgerPath := filepath.Join(serverRoot, ".struktly", "evidence.md")
-	if !strings.Contains(evidenceResult.Content[0].Text, wantLedgerPath) {
-		t.Fatalf("evidence confirmation should name %s, got: %s", wantLedgerPath, evidenceResult.Content[0].Text)
-	}
-	ledger, err := os.ReadFile(wantLedgerPath)
-	if err != nil {
-		t.Fatalf("read evidence ledger: %v", err)
-	}
-	if !strings.Contains(string(ledger), "go test ./...") {
-		t.Fatalf("evidence ledger should record the check, got:\n%s", ledger)
 	}
 }
 

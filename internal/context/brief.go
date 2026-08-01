@@ -12,17 +12,12 @@ import (
 	"unicode"
 
 	"github.com/struktly/struktly/internal/files"
-	"github.com/struktly/struktly/internal/memory"
-	"github.com/struktly/struktly/internal/runs"
 )
 
 func Brief(opts BriefOptions) (BriefResult, error) {
 	root, err := files.CleanRoot(opts.Root)
 	if err != nil {
 		return BriefResult{}, err
-	}
-	if opts.NoWrite && strings.TrimSpace(opts.RunID) != "" {
-		return BriefResult{}, fmt.Errorf("--no-write cannot be used with --run")
 	}
 	ctx := opts.Context
 	if ctx == nil {
@@ -98,19 +93,6 @@ func Brief(opts BriefOptions) (BriefResult, error) {
 		return BriefResult{}, fmt.Errorf("write context packet json: %w", err)
 	}
 
-	if strings.TrimSpace(opts.RunID) != "" {
-		if _, err := runs.AttachRunArtifact(runs.AttachRunArtifactOptions{
-			Root:         root,
-			RunID:        opts.RunID,
-			ArtifactType: "brief",
-			Path:         outputPath,
-			Message:      "Attached context packet.",
-			Now:          now,
-		}); err != nil {
-			return BriefResult{}, err
-		}
-	}
-
 	return BriefResult{OutputPath: outputPath, PacketPath: jsonOutputPath, Packet: pkt}, nil
 }
 
@@ -127,8 +109,6 @@ type contextPacket struct {
 	currentDirection string
 	constraints      string
 	decisions        string
-	evidence         string
-	approvedMemory   []memory.Record
 	readWarnings     []string
 	sourceRefs       map[string]struct{}
 }
@@ -141,7 +121,6 @@ func (p *contextPacket) readOptionalInputs() {
 		{rel: ".struktly/direction.md", assign: func(text string) { p.currentDirection = text }},
 		{rel: ".struktly/constraints.md", assign: func(text string) { p.constraints = text }},
 		{rel: ".struktly/decisions.md", assign: func(text string) { p.decisions = text }},
-		{rel: ".struktly/evidence.md", assign: func(text string) { p.evidence = text }},
 	} {
 		text, err := files.ReadSmallTextFile(filepath.Join(p.root, filepath.FromSlash(input.rel)), 512*1024)
 		if err != nil {
@@ -152,15 +131,6 @@ func (p *contextPacket) readOptionalInputs() {
 		}
 		input.assign(files.StripFrontmatter(text))
 		files.AddString(p.sourceRefs, input.rel)
-	}
-	memories, err := memory.ReadApprovedForBrief(p.root, 8)
-	if err != nil {
-		p.readWarnings = append(p.readWarnings, "Unable to read approved memory.")
-	} else {
-		p.approvedMemory = memories
-		if len(memories) > 0 {
-			files.AddString(p.sourceRefs, ".struktly/memory/approved/")
-		}
 	}
 	sort.Strings(p.readWarnings)
 }
@@ -221,11 +191,6 @@ func (p *contextPacket) renderMarkdown(pkt Packet) string {
 		b.WriteString("From `.struktly/constraints.md`:\n\n")
 		b.WriteString(excerptMarkdown(p.constraints, 1600))
 		b.WriteString("\n\n")
-	}
-
-	if len(p.approvedMemory) > 0 {
-		b.WriteString("## Approved repository notes\n\n")
-		p.writeApprovedMemory(&b)
 	}
 
 	b.WriteString("## Required checks\n\n")
@@ -357,7 +322,7 @@ func (p *contextPacket) writeDirection(b *strings.Builder) {
 	if direction == "" {
 		known = strings.TrimSpace(sectionContent(p.projectContext, "## Repository Direction"))
 	}
-	if direction == "" && known == "" && strings.TrimSpace(p.decisions) == "" && strings.TrimSpace(p.evidence) == "" {
+	if direction == "" && known == "" && strings.TrimSpace(p.decisions) == "" {
 		return
 	}
 
@@ -376,11 +341,6 @@ func (p *contextPacket) writeDirection(b *strings.Builder) {
 		b.WriteString("\n\n")
 	}
 
-	if strings.TrimSpace(p.evidence) != "" {
-		b.WriteString("Existing evidence ledger excerpt:\n\n")
-		b.WriteString(excerptMarkdown(p.evidence, 900))
-		b.WriteString("\n\n")
-	}
 }
 
 // toPacket builds the machine-readable counterpart to renderMarkdown from
@@ -392,16 +352,6 @@ func (p *contextPacket) toPacket(ctx stdcontext.Context) (Packet, error) {
 		return Packet{}, err
 	}
 	p.sanitizeLegacyFields(selection)
-	var mem []PacketMemoryItem
-	for _, item := range p.approvedMemory {
-		mem = append(mem, PacketMemoryItem{
-			Content:        item.Content,
-			Scope:          item.Scope,
-			SourceRunID:    item.SourceRunID,
-			SourceArtifact: item.SourceArtifact,
-			Tags:           item.Tags,
-		})
-	}
 	verification := uniqueSorted(append(append([]string(nil), selection.requiredChecks...), selection.suggestedChecks...))
 	pkt := Packet{
 		Schema:      PacketSchema,
@@ -422,8 +372,6 @@ func (p *contextPacket) toPacket(ctx stdcontext.Context) (Packet, error) {
 		Direction:            strings.TrimSpace(p.currentDirection),
 		Constraints:          strings.TrimSpace(p.constraints),
 		Decisions:            strings.TrimSpace(p.decisions),
-		Evidence:             strings.TrimSpace(p.evidence),
-		ApprovedMemory:       mem,
 		VerificationCommands: verification,
 		Docs:                 files.LimitStrings(d.docs, 15),
 		SuggestedFiles:       d.suggestedFiles,
@@ -448,44 +396,11 @@ func (p *contextPacket) sanitizeLegacyFields(selection packetSelection) {
 		{path: ".struktly/direction.md", clear: func() { p.currentDirection = "" }},
 		{path: ".struktly/constraints.md", clear: func() { p.constraints = "" }},
 		{path: ".struktly/decisions.md", clear: func() { p.decisions = "" }},
-		{path: ".struktly/evidence.md", clear: func() { p.evidence = "" }},
 	} {
 		if _, ok := selected[input.path]; !ok {
 			input.clear()
 		}
 	}
-	memories := p.approvedMemory[:0]
-	for _, item := range p.approvedMemory {
-		path := ".struktly/memory/approved/" + item.ID + ".json"
-		if _, ok := selected[path]; ok {
-			memories = append(memories, item)
-		}
-	}
-	p.approvedMemory = memories
-}
-
-func (p *contextPacket) writeApprovedMemory(b *strings.Builder) {
-	for _, item := range p.approvedMemory {
-		line := "- " + item.Content
-		details := []string{}
-		if item.Scope != "" {
-			details = append(details, "scope: "+item.Scope)
-		}
-		if item.SourceRunID != "" {
-			details = append(details, "source_run_id: "+item.SourceRunID)
-		}
-		if item.SourceArtifact != "" {
-			details = append(details, "source_artifact: "+item.SourceArtifact)
-		}
-		if len(item.Tags) > 0 {
-			details = append(details, "tags: "+strings.Join(item.Tags, ", "))
-		}
-		if len(details) > 0 {
-			line += " (" + strings.Join(details, "; ") + ")"
-		}
-		b.WriteString(line + "\n")
-	}
-	b.WriteString("\n")
 }
 
 func (p *contextPacket) suggestedFiles(docs, adrs, agentFiles, topDirs []string) []string {

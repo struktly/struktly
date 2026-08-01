@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 
 	repoctx "github.com/struktly/struktly/internal/context"
 )
@@ -132,19 +131,6 @@ func Doctor(ctx context.Context, root string) (DoctorReport, error) {
 	default:
 		checks = append(checks, DoctorCheck{Name: "config", Status: "pass", Message: "using built-in defaults"})
 	}
-
-	for _, path := range []string{".struktly/runs", ".struktly/memory/candidates"} {
-		check := DoctorCheck{Name: path, Status: "pass"}
-		if _, err := os.Stat(filepath.Join(repository.AbsoluteRoot(), filepath.FromSlash(path))); err == nil {
-			check.Status = "warning"
-			check.Message = "legacy runtime state is stored inside the repository"
-		} else if !os.IsNotExist(err) {
-			check.Status = "fail"
-			check.Message = fmt.Sprintf("inspect %s: %v", path, err)
-		}
-		checks = append(checks, check)
-	}
-	sort.Slice(checks, func(i, j int) bool { return checks[i].Name < checks[j].Name })
 
 	return DoctorReport{Schema: doctorSchema, Repository: repository, Checks: checks}, nil
 }

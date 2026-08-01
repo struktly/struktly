@@ -41,7 +41,7 @@ struktly init
 struktly context --stdout "add request timeout middleware"
 ```
 
-`context` writes a Markdown file and a `struktly/packet/v1` JSON file under
+`context` writes a Markdown file and a `struktly/packet/v2` JSON file under
 `.struktly/context-packets/`. Use `--json` when another program needs the
 structured packet. Use `--json --no-write` when an integration needs only the
 packet and must not modify the repository. `brief` remains a compatible alias.
@@ -63,17 +63,16 @@ its permissions and execution behavior.
 | `init` | Create repository configuration and run the first scan. |
 | `context <request>` | Build a request-specific packet from live repository state. |
 | `scan` | Write a general repository summary. It is optional and not a prerequisite for `context`. |
+| `tasks` | Emit safely readable repository task declarations and per-file invalid results. |
 | `explain <path>` | Diagnose why one path would be included or excluded. |
 | `validate` | Validate configuration and portable task files. |
 | `doctor` | Check the repository and local CLI setup. |
 | `capabilities` | Report supported schemas and machine-interface features. |
 | `suggest-instructions` | Draft agent instruction files for human review. |
-| `mcp` | Expose `scan`, `brief`, and `evidence` over MCP stdio. |
+| `mcp` | Expose repository scanning and request-specific context over MCP stdio. |
 
-The CLI retains experimental `evidence`, `run`, and `memory` commands for
-compatibility. Their record formats are not stable machine interfaces. The
-desktop app—not this CLI—owns chats, provider sessions, working copies, checks,
-and review history.
+The desktop app—not this CLI—owns chats, executions, provider sessions, working
+copies, checks, evidence, memory, and review history.
 
 Run `struktly <command> --help` for flags.
 
@@ -86,11 +85,17 @@ Repository-owned files live under `.struktly/`:
   guidance written by people.
 - `project-context.md` and `context-packets/` are generated output.
 - `tasks/` contains optional portable task handoffs.
-- `evidence.md` and `memory/approved/` contain optional reviewed records.
 
-Runtime work records, event logs, and unapproved memory candidates live in the
-user configuration directory rather than the repository. Set
-`STRUKTLY_STATE_DIR` to choose another location.
+Runtime and product state is deliberately absent from this CLI.
+
+## System boundary
+
+This repository owns deterministic repository understanding: scanning,
+selection, context packets, task declarations, provenance, and validation.
+Request interpretation, privacy policy, model routing, local-model management,
+dispatch, approvals, sessions, and durable history belong to Struktly Platform.
+Intelligence experiments are integrated there only when a product capability
+needs them; they are not dependencies of this CLI.
 
 ## What enters a packet
 

@@ -81,12 +81,9 @@ func TestValidateRejectsMalformedConfig(t *testing.T) {
 	}
 }
 
-func TestDoctorReportsMalformedConfigAndLegacyRuntimeWarning(t *testing.T) {
+func TestDoctorReportsMalformedConfig(t *testing.T) {
 	root := newGitRepository(t)
 	writeFile(t, root, ".struktly/config.json", `{"schema":"wrong","context":{},"checks":{}}`)
-	if err := os.MkdirAll(filepath.Join(root, ".struktly", "runs"), 0o755); err != nil {
-		t.Fatal(err)
-	}
 
 	report, err := Doctor(context.Background(), root)
 	if err != nil {
@@ -95,12 +92,6 @@ func TestDoctorReportsMalformedConfigAndLegacyRuntimeWarning(t *testing.T) {
 	if report.Schema != "struktly/doctor/v1" {
 		t.Fatalf("unexpected schema: %q", report.Schema)
 	}
-	wantNames := []string{".struktly/memory/candidates", ".struktly/runs", "config", "git_repository"}
-	for i, want := range wantNames {
-		if report.Checks[i].Name != want {
-			t.Fatalf("checks are not sorted: %#v", report.Checks)
-		}
-	}
 	checks := make(map[string]DoctorCheck, len(report.Checks))
 	for _, check := range report.Checks {
 		checks[check.Name] = check
@@ -108,11 +99,8 @@ func TestDoctorReportsMalformedConfigAndLegacyRuntimeWarning(t *testing.T) {
 	if checks["config"].Status != "fail" {
 		t.Fatalf("config check = %#v, want failure", checks["config"])
 	}
-	if checks[".struktly/runs"].Status != "warning" {
-		t.Fatalf("legacy runs check = %#v, want warning", checks[".struktly/runs"])
-	}
-	if checks[".struktly/memory/candidates"].Status != "pass" {
-		t.Fatalf("absent legacy memory check = %#v, want pass", checks[".struktly/memory/candidates"])
+	if len(report.Checks) != 2 {
+		t.Fatalf("doctor should report only repository context checks: %#v", report.Checks)
 	}
 }
 

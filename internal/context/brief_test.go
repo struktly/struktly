@@ -18,7 +18,8 @@ func TestBriefWritesContextPacket(t *testing.T) {
 	writeFile(t, root, ".struktly/direction.md", "# Current Direction\n\nPreserve stable output and safe file selection.\n")
 	writeFile(t, root, ".struktly/constraints.md", "# Constraints\n\n- Keep output deterministic.\n\n## Non-goals\n\n- Do not add network access.\n")
 	writeFile(t, root, ".struktly/decisions.md", "# Decisions\n\n- Keep JSON schemas versioned.\n")
-	writeFile(t, root, ".struktly/evidence.md", "# Evidence\n\n- Selection rules verified.\n")
+	writeFile(t, root, ".struktly/evidence.md", "# Removed evidence ledger\n\n- Must not enter context.\n")
+	writeFile(t, root, ".struktly/memory/approved/legacy.json", `{"content":"Must not enter context."}`)
 	if _, err := Scan(ScanOptions{Root: root}); err != nil {
 		t.Fatalf("scan fixture: %v", err)
 	}
@@ -78,7 +79,9 @@ func TestBriefWritesContextPacket(t *testing.T) {
 	assertContains(t, content, "## Sources")
 	assertContains(t, content, "README.md")
 	assertContains(t, content, ".struktly/decisions.md")
-	assertContains(t, content, ".struktly/evidence.md")
+	if strings.Contains(content, "Removed evidence ledger") || strings.Contains(content, "legacy.json") {
+		t.Fatalf("removed evidence or memory state entered the packet:\n%s", content)
+	}
 
 	for _, retired := range []string{
 		"## Repo Summary",

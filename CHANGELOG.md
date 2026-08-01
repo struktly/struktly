@@ -4,6 +4,13 @@ Notable changes will be recorded here.
 
 ## Unreleased
 
+- Added `tasks --json` with exact task hashes, parsed contracts, partial invalid
+  results, explicit compatibility notes, and the `struktly/tasks/v1` schema.
+- Moved current context generation to `struktly/packet/v2`, removing experimental
+  evidence and approved-memory fields while retaining the historical v1 schema.
+- Removed the experimental `run`, `memory`, and `evidence` commands and the MCP
+  `evidence_record` tool; Platform owns those product-state concerns.
+
 ## v0.1.2 - 2026-07-16
 
 - Added side-effect-free JSON generation for context packets and scans.
