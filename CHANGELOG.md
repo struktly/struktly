@@ -4,6 +4,8 @@ Notable changes will be recorded here.
 
 ## Unreleased
 
+## v0.2.0 - 2026-08-01
+
 - Added `tasks --json` with exact task hashes, parsed contracts, partial invalid
   results, explicit compatibility notes, and the `struktly/tasks/v1` schema.
 - Moved current context generation to `struktly/packet/v2`, removing experimental
