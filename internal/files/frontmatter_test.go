@@ -9,7 +9,7 @@ func TestOKFFrontmatter(t *testing.T) {
 	got := OKFFrontmatter("context-packet", "Context Packet: add auth", "Task-scoped context.", time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC))
 	want := "---\n" +
 		"type: context-packet\n" +
-		"schema: struktly/packet/v1\n" +
+		"schema: struktly/packet/v2\n" +
 		"title: \"Context Packet: add auth\"\n" +
 		"description: \"Task-scoped context.\"\n" +
 		"timestamp: 2026-07-10T10:00:00Z\n" +

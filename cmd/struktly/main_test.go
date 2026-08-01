@@ -40,6 +40,18 @@ func TestRunCLIStructuredErrorsAndExitCodes(t *testing.T) {
 	}
 }
 
+func TestRemovedProductStateCommandsAreUnavailable(t *testing.T) {
+	for _, command := range []string{"evidence", "memory", "run"} {
+		t.Run(command, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			exitCode := runCLI(context.Background(), []string{command}, strings.NewReader(""), &stdout, &stderr)
+			if exitCode != 2 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "unknown command") {
+				t.Fatalf("removed command %q: exit=%d stdout=%q stderr=%q", command, exitCode, &stdout, &stderr)
+			}
+		})
+	}
+}
+
 func TestRunCLICanceledExitCode(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -116,6 +128,72 @@ func TestCapabilitiesCommandReportsContextContract(t *testing.T) {
 	}
 	if document.Schema != capabilitiesSchema || !slices.Contains(document.Features, "context.no_write") || !slices.Contains(document.Features, "context.expect_base_revision") {
 		t.Fatalf("unexpected capabilities: %+v", document)
+	}
+	if !slices.Contains(document.Commands, "tasks") || !slices.Contains(document.Schemas, repoctx.TasksSchema) || !slices.Contains(document.Features, "tasks.partial_results") {
+		t.Fatalf("capabilities do not advertise tasks contract: %+v", document)
+	}
+	if slices.Contains(document.Schemas, "struktly/packet/v1") {
+		t.Fatalf("capabilities advertise historical packet generation: %+v", document)
+	}
+	for _, command := range []string{"evidence", "memory", "run"} {
+		if slices.Contains(document.Commands, command) {
+			t.Fatalf("capabilities advertise removed command %q: %+v", command, document)
+		}
+	}
+}
+
+func TestTasksCommandEmitsValidAndInvalidFiles(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, filepath.Join(root, ".struktly", "tasks", "add-timeout.md"), taskDocument("add-timeout", "Add timeout"))
+	writeTestFile(t, filepath.Join(root, ".struktly", "tasks", "z-review.md"), taskDocument("z-review", "Review changes"))
+	writeTestFile(t, filepath.Join(root, ".struktly", "tasks", "broken.md"), "# missing frontmatter\n")
+
+	stdout, stderr, err := executeTestCommand("tasks", "--root", root, "--json")
+	if err != nil {
+		t.Fatalf("tasks returned error: %v\nstderr:\n%s", err, stderr)
+	}
+	if strings.TrimSpace(stderr) != "" {
+		t.Fatalf("tasks wrote diagnostics on success: %s", stderr)
+	}
+	var document repoctx.TasksDocument
+	if err := json.Unmarshal([]byte(stdout), &document); err != nil {
+		t.Fatalf("tasks output is not JSON: %v\n%s", err, stdout)
+	}
+	if document.Schema != repoctx.TasksSchema || len(document.Tasks) != 2 || len(document.Invalid) != 1 {
+		t.Fatalf("unexpected tasks document: %#v", document)
+	}
+	if document.Tasks[0].ID != "add-timeout" || document.Tasks[1].ID != "z-review" || document.Invalid[0].Path != ".struktly/tasks/broken.md" {
+		t.Fatalf("unexpected task ordering or invalid result: %#v", document)
+	}
+}
+
+func TestTasksCommandMissingDirectoryIsSuccess(t *testing.T) {
+	stdout, stderr, err := executeTestCommand("tasks", "--root", t.TempDir(), "--json")
+	if err != nil {
+		t.Fatalf("tasks returned error: %v\nstderr:\n%s", err, stderr)
+	}
+	var document repoctx.TasksDocument
+	if err := json.Unmarshal([]byte(stdout), &document); err != nil {
+		t.Fatal(err)
+	}
+	if document.Tasks == nil || document.Invalid == nil || len(document.Tasks) != 0 || len(document.Invalid) != 0 {
+		t.Fatalf("unexpected empty document: %#v", document)
+	}
+}
+
+func TestTasksCommandUnreadableRootUsesStructuredError(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "missing")
+	var stdout, stderr bytes.Buffer
+	exitCode := runCLI(context.Background(), []string{"tasks", "--root", missing, "--json"}, strings.NewReader(""), &stdout, &stderr)
+	if exitCode != 1 || stdout.Len() != 0 {
+		t.Fatalf("tasks failure exit=%d stdout=%q stderr=%q", exitCode, &stdout, &stderr)
+	}
+	var document errorDocument
+	if err := json.Unmarshal(stderr.Bytes(), &document); err != nil {
+		t.Fatalf("tasks error is not structured JSON: %v\n%s", err, &stderr)
+	}
+	if document.Error.Code != "operation_failed" || !strings.Contains(document.Error.Message, "stat root") {
+		t.Fatalf("unexpected error document: %#v", document)
 	}
 }
 
@@ -288,183 +366,6 @@ func TestSuggestInstructionsWritesSuggestedFiles(t *testing.T) {
 	}
 }
 
-func TestEvidenceAppendsLedgerEntry(t *testing.T) {
-	root := t.TempDir()
-	writeTestFile(t, filepath.Join(root, "packet.md"), "# Packet\n")
-
-	stdout, stderr, err := executeTestCommand(
-		"evidence",
-		"--root", root,
-		"--task", "Verify evidence command",
-		"--agent", "go test",
-		"--outcome", "Evidence command appends structured markdown.",
-		"--context-packet", "packet.md",
-		"--checks", "go test ./cmd/struktly/...",
-		"--result", "pass",
-	)
-	if err != nil {
-		t.Fatalf("evidence returned error: %v\nstderr:\n%s", err, stderr)
-	}
-	if !strings.Contains(stdout, "appended to") {
-		t.Fatalf("expected append confirmation, got:\n%s", stdout)
-	}
-
-	data, err := os.ReadFile(filepath.Join(root, ".struktly", "evidence.md"))
-	if err != nil {
-		t.Fatalf("read evidence ledger: %v", err)
-	}
-	content := string(data)
-	if !strings.Contains(content, "Verify evidence command") {
-		t.Fatalf("expected task in evidence ledger:\n%s", content)
-	}
-	if !strings.Contains(content, "sha256:") {
-		t.Fatalf("expected context packet hash in evidence ledger:\n%s", content)
-	}
-}
-
-func TestEvidenceRunChecksExecutesDeclaredChecks(t *testing.T) {
-	root := t.TempDir()
-
-	stdout, stderr, err := executeTestCommand(
-		"evidence",
-		"--root", root,
-		"--task", "Verified passing checks",
-		"--agent", "struktly",
-		"--outcome", "Checks executed by struktly.",
-		"--checks", "true",
-		"--run-checks",
-	)
-	if err != nil {
-		t.Fatalf("evidence --run-checks returned error: %v\nstderr:\n%s", err, stderr)
-	}
-	if !strings.Contains(stdout, "appended to") {
-		t.Fatalf("expected append confirmation, got:\n%s", stdout)
-	}
-
-	data, err := os.ReadFile(filepath.Join(root, ".struktly", "evidence.md"))
-	if err != nil {
-		t.Fatalf("read evidence ledger: %v", err)
-	}
-	content := string(data)
-	if !strings.Contains(content, "| **Checks** | Run by Struktly |") {
-		t.Fatalf("expected verification mode in evidence ledger:\n%s", content)
-	}
-	if !strings.Contains(content, "| **Result** | pass |") {
-		t.Fatalf("expected derived pass result in evidence ledger:\n%s", content)
-	}
-
-	// A failing check is data, not a CLI error: recording succeeds and the entry says fail.
-	_, stderr, err = executeTestCommand(
-		"evidence",
-		"--root", root,
-		"--task", "Verified failing checks",
-		"--agent", "struktly",
-		"--outcome", "Checks executed by struktly.",
-		"--checks", "false",
-		"--run-checks",
-	)
-	if err != nil {
-		t.Fatalf("evidence --run-checks with failing check should exit 0, got: %v\nstderr:\n%s", err, stderr)
-	}
-
-	data, err = os.ReadFile(filepath.Join(root, ".struktly", "evidence.md"))
-	if err != nil {
-		t.Fatalf("read evidence ledger after failing check: %v", err)
-	}
-	content = string(data)
-	if !strings.Contains(content, "| **Result** | fail |") {
-		t.Fatalf("expected derived fail result in evidence ledger:\n%s", content)
-	}
-	if !strings.Contains(content, "- `false` — fail (exit 1, ") {
-		t.Fatalf("expected failing check line with exit code:\n%s", content)
-	}
-}
-
-func TestRunCommandsCreateListShowEventAndComplete(t *testing.T) {
-	t.Setenv("STRUKTLY_STATE_DIR", t.TempDir())
-	root := t.TempDir()
-
-	stdout, stderr, err := executeTestCommand("run", "create", "--root", root, "--goal", "Prepare handoff")
-	if err != nil {
-		t.Fatalf("run create returned error: %v\nstderr:\n%s", err, stderr)
-	}
-	var created struct {
-		ID string `json:"id"`
-	}
-	if err := json.Unmarshal([]byte(stdout), &created); err != nil {
-		t.Fatalf("decode run create stdout: %v\n%s", err, stdout)
-	}
-	if created.ID == "" {
-		t.Fatalf("expected run id in stdout: %s", stdout)
-	}
-
-	stdout, stderr, err = executeTestCommand("run", "event", "--root", root, created.ID, "--type", "agent_message", "--message", "Ready for agent.")
-	if err != nil {
-		t.Fatalf("run event returned error: %v\nstderr:\n%s", err, stderr)
-	}
-	if !strings.Contains(stdout, "agent_message") {
-		t.Fatalf("expected event type in stdout: %s", stdout)
-	}
-
-	stdout, stderr, err = executeTestCommand("run", "list", "--root", root)
-	if err != nil {
-		t.Fatalf("run list returned error: %v\nstderr:\n%s", err, stderr)
-	}
-	if !strings.Contains(stdout, created.ID) {
-		t.Fatalf("expected created run in list: %s", stdout)
-	}
-
-	stdout, stderr, err = executeTestCommand("run", "show", "--root", root, created.ID)
-	if err != nil {
-		t.Fatalf("run show returned error: %v\nstderr:\n%s", err, stderr)
-	}
-	if !strings.Contains(stdout, "Ready for agent.") {
-		t.Fatalf("expected event in show output: %s", stdout)
-	}
-
-	stdout, stderr, err = executeTestCommand("run", "complete", "--root", root, created.ID)
-	if err != nil {
-		t.Fatalf("run complete returned error: %v\nstderr:\n%s", err, stderr)
-	}
-	if !strings.Contains(stdout, `"status": "completed"`) {
-		t.Fatalf("expected completed status: %s", stdout)
-	}
-}
-
-func TestScanAndBriefCanAttachToRunFromCLI(t *testing.T) {
-	t.Setenv("STRUKTLY_STATE_DIR", t.TempDir())
-	root := t.TempDir()
-	writeTestFile(t, filepath.Join(root, "README.md"), "# Repo\n")
-	writeTestFile(t, filepath.Join(root, "go.mod"), "module example.com/repo\n\ngo 1.24.0\n")
-	initTestGitRepo(t, root)
-
-	stdout, stderr, err := executeTestCommand("run", "create", "--root", root, "--goal", "Attach outputs")
-	if err != nil {
-		t.Fatalf("run create returned error: %v\nstderr:\n%s", err, stderr)
-	}
-	var created struct {
-		ID string `json:"id"`
-	}
-	if err := json.Unmarshal([]byte(stdout), &created); err != nil {
-		t.Fatalf("decode run create stdout: %v\n%s", err, stdout)
-	}
-
-	if _, stderr, err := executeTestCommand("scan", "--root", root, "--run", created.ID); err != nil {
-		t.Fatalf("scan --run returned error: %v\nstderr:\n%s", err, stderr)
-	}
-	if _, stderr, err := executeTestCommand("brief", "--root", root, "--run", created.ID, "Attach context"); err != nil {
-		t.Fatalf("brief --run returned error: %v\nstderr:\n%s", err, stderr)
-	}
-
-	stdout, stderr, err = executeTestCommand("run", "show", "--root", root, created.ID)
-	if err != nil {
-		t.Fatalf("run show returned error: %v\nstderr:\n%s", err, stderr)
-	}
-	if !strings.Contains(stdout, `"type": "scan"`) || !strings.Contains(stdout, `"type": "brief"`) {
-		t.Fatalf("expected scan and brief artifacts in run show: %s", stdout)
-	}
-}
-
 func TestInspectCommandsEmitStructuredOutput(t *testing.T) {
 	root := t.TempDir()
 	writeTestFile(t, filepath.Join(root, "README.md"), "# Repo\n")
@@ -499,83 +400,6 @@ func TestInspectCommandsEmitStructuredOutput(t *testing.T) {
 	}
 }
 
-func TestMemoryCommandsCandidateApproveRejectAndList(t *testing.T) {
-	t.Setenv("STRUKTLY_STATE_DIR", t.TempDir())
-	root := t.TempDir()
-
-	runStdout, stderr, err := executeTestCommand("run", "create", "--root", root, "--goal", "Capture memory")
-	if err != nil {
-		t.Fatalf("run create returned error: %v\nstderr:\n%s", err, stderr)
-	}
-	var createdRun struct {
-		ID string `json:"id"`
-	}
-	if err := json.Unmarshal([]byte(runStdout), &createdRun); err != nil {
-		t.Fatalf("decode run create stdout: %v\n%s", err, runStdout)
-	}
-
-	stdout, stderr, err := executeTestCommand(
-		"memory", "candidate",
-		"--root", root,
-		"--scope", "repository",
-		"--content", "Prefer file-backed state for v1.5 workflows.",
-		"--tags", "compatibility,file-contract",
-		"--source-run-id", createdRun.ID,
-		"--source-artifact", ".struktly/project-context.md",
-	)
-	if err != nil {
-		t.Fatalf("memory candidate returned error: %v\nstderr:\n%s", err, stderr)
-	}
-	var candidate struct {
-		ID string `json:"id"`
-	}
-	if err := json.Unmarshal([]byte(stdout), &candidate); err != nil {
-		t.Fatalf("decode memory candidate stdout: %v\n%s", err, stdout)
-	}
-
-	stdout, stderr, err = executeTestCommand("memory", "candidates", "--root", root)
-	if err != nil {
-		t.Fatalf("memory candidates returned error: %v\nstderr:\n%s", err, stderr)
-	}
-	if !strings.Contains(stdout, candidate.ID) {
-		t.Fatalf("expected candidate in list: %s", stdout)
-	}
-
-	stdout, stderr, err = executeTestCommand("memory", "approve", "--root", root, candidate.ID)
-	if err != nil {
-		t.Fatalf("memory approve returned error: %v\nstderr:\n%s", err, stderr)
-	}
-	if !strings.Contains(stdout, `"status": "approved"`) {
-		t.Fatalf("expected approved status: %s", stdout)
-	}
-
-	stdout, stderr, err = executeTestCommand("memory", "list", "--root", root)
-	if err != nil {
-		t.Fatalf("memory list returned error: %v\nstderr:\n%s", err, stderr)
-	}
-	if !strings.Contains(stdout, "Prefer file-backed state") {
-		t.Fatalf("expected approved memory in list: %s", stdout)
-	}
-
-	rejectStdout, stderr, err := executeTestCommand("memory", "candidate", "--root", root, "--content", "Reject me")
-	if err != nil {
-		t.Fatalf("second memory candidate returned error: %v\nstderr:\n%s", err, stderr)
-	}
-	var rejectedCandidate struct {
-		ID string `json:"id"`
-	}
-	if err := json.Unmarshal([]byte(rejectStdout), &rejectedCandidate); err != nil {
-		t.Fatalf("decode second candidate stdout: %v\n%s", err, rejectStdout)
-	}
-	stdout, stderr, err = executeTestCommand("memory", "reject", "--root", root, rejectedCandidate.ID)
-	if err != nil {
-		t.Fatalf("memory reject returned error: %v\nstderr:\n%s", err, stderr)
-	}
-	if !strings.Contains(stdout, `"status": "rejected"`) {
-		t.Fatalf("expected rejected status: %s", stdout)
-	}
-}
-
 func executeTestCommand(args ...string) (string, string, error) {
 	cmd := newRootCmd()
 	var stdout bytes.Buffer
@@ -595,6 +419,26 @@ func writeTestFile(t *testing.T, path, content string) {
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("write fixture: %v", err)
 	}
+}
+
+func taskDocument(id, title string) string {
+	return `---
+type: task
+schema: struktly/task/v1
+id: ` + id + `
+title: "` + title + `"
+status: ready
+priority: normal
+created: 2026-07-13
+agent: unassigned
+---
+
+# ` + title + `
+
+## Objective
+
+Complete the task.
+`
 }
 
 func initTestGitRepo(t *testing.T, root string) {

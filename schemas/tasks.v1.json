@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "struktly/tasks/v1",
+  "title": "Struktly repository tasks",
+  "description": "Safely readable repository task declarations plus per-file invalid results.",
+  "type": "object",
+  "properties": {
+    "schema": { "const": "struktly/tasks/v1" },
+    "tasks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/task" }
+    },
+    "invalid": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/invalid" }
+    }
+  },
+  "required": ["schema", "tasks", "invalid"],
+  "additionalProperties": true,
+  "$defs": {
+    "strings": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "contract": {
+      "type": "object",
+      "properties": {
+        "outcome": { "type": "string" },
+        "done_when": { "$ref": "#/$defs/strings" },
+        "non_goals": { "$ref": "#/$defs/strings" },
+        "required_checks": { "$ref": "#/$defs/strings" }
+      },
+      "required": ["outcome", "done_when", "non_goals", "required_checks"],
+      "additionalProperties": true
+    },
+    "task": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string" },
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "status": { "enum": ["draft", "ready", "in-progress", "blocked", "done", "canceled"] },
+        "priority": { "enum": ["low", "normal", "high", "critical"] },
+        "created": { "type": "string", "format": "date" },
+        "updated": { "type": "string", "format": "date" },
+        "agent": { "type": "string" },
+        "agent_model": { "type": "string" },
+        "reasoning_effort": { "type": "string" },
+        "agent_session": { "type": "string" },
+        "resume_command": { "type": "string" },
+        "contract": { "$ref": "#/$defs/contract" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "compatibility_notes": { "$ref": "#/$defs/strings" }
+      },
+      "required": ["path", "id", "title", "status", "priority", "created", "agent", "contract", "sha256"],
+      "additionalProperties": true
+    },
+    "invalid": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string" },
+        "reason": { "type": "string" }
+      },
+      "required": ["path", "reason"],
+      "additionalProperties": true
+    }
+  }
+}

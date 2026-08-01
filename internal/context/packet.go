@@ -9,43 +9,33 @@ import (
 
 // PacketSchema identifies the machine-readable brief result format; see
 // docs/compatibility.md.
-const PacketSchema = "struktly/packet/v1"
-
-type PacketMemoryItem struct {
-	Content        string   `json:"content"`
-	Scope          string   `json:"scope,omitempty"`
-	SourceRunID    string   `json:"source_run_id,omitempty"`
-	SourceArtifact string   `json:"source_artifact,omitempty"`
-	Tags           []string `json:"tags,omitempty"`
-}
+const PacketSchema = "struktly/packet/v2"
 
 // Packet is the structured counterpart to the context-packet markdown Brief
 // writes. Programmatic consumers should read this rather than parsing markdown.
 type Packet struct {
-	Schema               string             `json:"schema"`
-	GeneratedAt          time.Time          `json:"generated_at"`
-	Metadata             PacketMetadata     `json:"metadata"`
-	Repository           Repository         `json:"repository"`
-	Items                []PacketItem       `json:"items"`
-	InstructionFiles     []string           `json:"instruction_files,omitempty"`
-	RequiredChecks       []string           `json:"required_checks"`
-	SuggestedChecks      []string           `json:"suggested_checks"`
-	Exclusions           []PacketDecision   `json:"exclusions"`
-	Truncations          []PacketDecision   `json:"truncations"`
-	Limits               PacketLimits       `json:"limits"`
-	PacketHash           string             `json:"packet_hash"`
-	Task                 string             `json:"task"`
-	Direction            string             `json:"direction,omitempty"`
-	Constraints          string             `json:"constraints,omitempty"`
-	Decisions            string             `json:"decisions,omitempty"`
-	Evidence             string             `json:"evidence,omitempty"`
-	ApprovedMemory       []PacketMemoryItem `json:"approved_memory,omitempty"`
-	VerificationCommands []string           `json:"verification_commands"`
-	Docs                 []string           `json:"docs,omitempty"`
-	SuggestedFiles       []string           `json:"suggested_files"`
-	MissingContext       []string           `json:"missing_context,omitempty"`
-	ReadWarnings         []string           `json:"read_warnings,omitempty"`
-	SourceRefs           []string           `json:"source_refs"`
+	Schema               string           `json:"schema"`
+	GeneratedAt          time.Time        `json:"generated_at"`
+	Metadata             PacketMetadata   `json:"metadata"`
+	Repository           Repository       `json:"repository"`
+	Items                []PacketItem     `json:"items"`
+	InstructionFiles     []string         `json:"instruction_files,omitempty"`
+	RequiredChecks       []string         `json:"required_checks"`
+	SuggestedChecks      []string         `json:"suggested_checks"`
+	Exclusions           []PacketDecision `json:"exclusions"`
+	Truncations          []PacketDecision `json:"truncations"`
+	Limits               PacketLimits     `json:"limits"`
+	PacketHash           string           `json:"packet_hash"`
+	Task                 string           `json:"task"`
+	Direction            string           `json:"direction,omitempty"`
+	Constraints          string           `json:"constraints,omitempty"`
+	Decisions            string           `json:"decisions,omitempty"`
+	VerificationCommands []string         `json:"verification_commands"`
+	Docs                 []string         `json:"docs,omitempty"`
+	SuggestedFiles       []string         `json:"suggested_files"`
+	MissingContext       []string         `json:"missing_context,omitempty"`
+	ReadWarnings         []string         `json:"read_warnings,omitempty"`
+	SourceRefs           []string         `json:"source_refs"`
 }
 
 type packetHashInput struct {
@@ -62,8 +52,6 @@ type packetHashInput struct {
 	Direction            string               `json:"direction,omitempty"`
 	Constraints          string               `json:"constraints,omitempty"`
 	Decisions            string               `json:"decisions,omitempty"`
-	Evidence             string               `json:"evidence,omitempty"`
-	ApprovedMemory       []PacketMemoryItem   `json:"approved_memory,omitempty"`
 	VerificationCommands []string             `json:"verification_commands"`
 	Docs                 []string             `json:"docs,omitempty"`
 	SuggestedFiles       []string             `json:"suggested_files"`
@@ -99,8 +87,6 @@ func (p *Packet) setHash() error {
 		Direction:            p.Direction,
 		Constraints:          p.Constraints,
 		Decisions:            p.Decisions,
-		Evidence:             p.Evidence,
-		ApprovedMemory:       p.ApprovedMemory,
 		VerificationCommands: p.VerificationCommands,
 		Docs:                 p.Docs,
 		SuggestedFiles:       p.SuggestedFiles,

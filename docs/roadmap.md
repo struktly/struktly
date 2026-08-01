@@ -5,16 +5,16 @@ agents, and the Struktly desktop app. It turns a coding request plus live Git
 repository state into a deterministic, inspectable context packet.
 
 The CLI does not own chats, provider sessions, working copies, approvals,
-checks, or review history. Those are desktop-app concerns. The experimental
-execution-era commands remain available for compatibility, but they are not the
-direction of the standalone product.
+checks, evidence, memory, request intelligence, routing, or review history.
+Those are Platform concerns.
 
 ## Command model
 
 - `context <request>` selects the files and repository guidance relevant to one
-  coding request and returns `struktly/packet/v1`.
+  coding request and returns `struktly/packet/v2`.
 - `scan` creates a general repository summary for people and diagnostics. It is
   optional; `context` always reads live repository state.
+- `tasks` returns repository-owned task declarations as `struktly/tasks/v1`.
 - `explain <path>` diagnoses the selector's decision for one file. It does not
   create context or change configuration.
 

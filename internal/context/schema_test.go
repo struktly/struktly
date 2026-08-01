@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -36,7 +37,7 @@ func TestSnapshotSchema(t *testing.T) {
 }
 
 func TestPacketSchema(t *testing.T) {
-	doc := readSchema(t, "packet.v1.json")
+	doc := readSchema(t, "packet.v2.json")
 	value := Packet{
 		Schema:      PacketSchema,
 		GeneratedAt: time.Unix(0, 0).UTC(),
@@ -61,6 +62,36 @@ func TestPacketSchema(t *testing.T) {
 	assertRequired(t, doc.Required, "packet_hash", "limits")
 }
 
+func TestHistoricalPacketV1SchemaRemainsAvailable(t *testing.T) {
+	doc := readSchema(t, "packet.v1.json")
+	if doc.ID != "struktly/packet/v1" {
+		t.Fatalf("historical packet schema id = %q", doc.ID)
+	}
+	for _, field := range []string{"evidence", "approved_memory"} {
+		if _, ok := doc.Properties[field]; !ok {
+			t.Fatalf("historical packet/v1 schema lost %q", field)
+		}
+	}
+}
+
+func TestTasksSchema(t *testing.T) {
+	doc := readSchema(t, "tasks.v1.json")
+	value := TasksDocument{
+		Schema: TasksSchema,
+		Tasks: []Task{{
+			Path: ".struktly/tasks/example.md", ID: "example", Title: "Example",
+			Status: "ready", Priority: "normal", Created: "2026-07-13", Agent: "unassigned",
+			Contract: TaskContract{Outcome: "Complete it.", DoneWhen: []string{}, NonGoals: []string{}, RequiredChecks: []string{}},
+			SHA256:   strings.Repeat("0", 64),
+		}},
+		Invalid: []InvalidTaskFile{},
+	}
+	assertSchemaMatchesValue(t, doc, TasksSchema, value)
+	assertRequired(t, doc.Defs["task"].Required, "path", "contract", "sha256")
+	assertRequired(t, doc.Defs["contract"].Required, "outcome", "done_when", "non_goals", "required_checks")
+	assertRequired(t, doc.Defs["invalid"].Required, "path", "reason")
+}
+
 func TestConfigSchema(t *testing.T) {
 	doc := readSchema(t, "config.v1.json")
 	if doc.ID != ConfigSchema || doc.AdditionalProperties {
@@ -78,24 +109,6 @@ func TestCommandSchemas(t *testing.T) {
 		if doc.ID != "struktly/"+name+"/v1" || len(doc.Required) == 0 || !doc.AdditionalProperties {
 			t.Fatalf("invalid %s schema metadata: %+v", name, doc)
 		}
-	}
-}
-
-func TestPacketV1BackwardCompatibility(t *testing.T) {
-	legacy := []byte(`{
-  "schema": "struktly/packet/v1",
-  "generated_at": "2026-07-11T12:00:00Z",
-  "task": "legacy task",
-  "verification_commands": [],
-  "suggested_files": [],
-  "source_refs": []
-}`)
-	var packet Packet
-	if err := json.Unmarshal(legacy, &packet); err != nil {
-		t.Fatalf("unmarshal legacy packet: %v", err)
-	}
-	if packet.Schema != PacketSchema || packet.Task != "legacy task" {
-		t.Fatalf("unexpected legacy packet: schema=%q task=%q", packet.Schema, packet.Task)
 	}
 }
 
@@ -142,7 +155,7 @@ func assertSchemaMatchesValue(t *testing.T, doc schemaDocument, wantID string, v
 		t.Fatalf("schema $id = %q, want %q", doc.ID, wantID)
 	}
 	if !doc.AdditionalProperties {
-		t.Fatal("v1 schema must allow additive properties")
+		t.Fatal("output schema must allow additive properties")
 	}
 	data, err := json.Marshal(value)
 	if err != nil {

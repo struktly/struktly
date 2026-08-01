@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/struktly/struktly/internal/files"
-	"github.com/struktly/struktly/internal/runs"
 )
 
 const (
@@ -47,10 +46,6 @@ func Scan(opts ScanOptions) (ScanResult, error) {
 	if err != nil {
 		return ScanResult{}, err
 	}
-	if opts.NoWrite && strings.TrimSpace(opts.RunID) != "" {
-		return ScanResult{}, fmt.Errorf("--no-write cannot be used with --run")
-	}
-
 	now := opts.Now
 	if now.IsZero() {
 		now = time.Now().UTC()
@@ -88,18 +83,6 @@ func Scan(opts ScanOptions) (ScanResult, error) {
 	}
 	if err := os.WriteFile(snapshotPath, append(snapshotData, '\n'), 0o644); err != nil {
 		return ScanResult{}, fmt.Errorf("write scan snapshot: %w", err)
-	}
-
-	if strings.TrimSpace(opts.RunID) != "" {
-		if _, err := runs.AttachRunArtifact(runs.AttachRunArtifactOptions{
-			Root:         root,
-			RunID:        opts.RunID,
-			ArtifactType: "scan",
-			Path:         outputPath,
-			Message:      "Attached repository scan output.",
-		}); err != nil {
-			return ScanResult{}, err
-		}
 	}
 
 	return ScanResult{OutputPath: outputPath, Snapshot: snap, SnapshotPath: snapshotPath}, nil

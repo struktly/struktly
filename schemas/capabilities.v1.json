@@ -7,9 +7,9 @@
   "properties": {
     "schema": { "const": "struktly/capabilities/v1" },
     "build": { "$ref": "#/$defs/build" },
-    "commands": { "$ref": "#/$defs/strings" },
-    "schemas": { "$ref": "#/$defs/strings" },
-    "features": { "$ref": "#/$defs/strings" }
+    "commands": { "$ref": "#/$defs/strings", "description": "Stable machine commands, including context and tasks." },
+    "schemas": { "$ref": "#/$defs/strings", "description": "Schemas emitted by the current binary; historical schemas may remain on disk for provenance." },
+    "features": { "$ref": "#/$defs/strings", "description": "Additive feature identifiers, including tasks.partial_results." }
   },
   "required": ["schema", "build", "commands", "schemas", "features"],
   "additionalProperties": true,

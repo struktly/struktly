@@ -5,14 +5,14 @@ edit agent configuration. The examples below are optional.
 
 ## MCP
 
-The `mcp` command exposes `context_scan`, `context_brief`, and `evidence_record`
-over stdio. For Claude Code:
+The `mcp` command exposes `context_scan` and `context_brief` over stdio. For
+Claude Code:
 
 ```sh
 claude mcp add struktly -- struktly mcp --root .
 ```
 
-`context_brief` returns Markdown and a `struktly/packet/v1` value as structured
+`context_brief` returns Markdown and a `struktly/packet/v2` value as structured
 content.
 
 ## Claude Code and Codex

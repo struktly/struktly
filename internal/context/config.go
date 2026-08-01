@@ -32,8 +32,6 @@ var defaultIncludePatterns = []string{
 	".struktly/direction.md",
 	".struktly/constraints.md",
 	".struktly/decisions.md",
-	".struktly/evidence.md",
-	".struktly/memory/approved/*.json",
 }
 
 type ContextConfig struct {

@@ -18,9 +18,6 @@ import (
 	"github.com/struktly/struktly/internal/app"
 	"github.com/struktly/struktly/internal/buildinfo"
 	repoctx "github.com/struktly/struktly/internal/context"
-	"github.com/struktly/struktly/internal/evidence"
-	"github.com/struktly/struktly/internal/memory"
-	"github.com/struktly/struktly/internal/runs"
 )
 
 func main() {
@@ -120,10 +117,8 @@ func newRootCmd() *cobra.Command {
 	cmd.AddCommand(newInitCmd(&repoRoot))
 	cmd.AddCommand(newScanCmd(&repoRoot))
 	cmd.AddCommand(newBriefCmd(&repoRoot))
-	cmd.AddCommand(newEvidenceCmd(&repoRoot))
+	cmd.AddCommand(newTasksCmd(&repoRoot))
 	cmd.AddCommand(newSuggestInstructionsCmd(&repoRoot))
-	cmd.AddCommand(newRunCmd(&repoRoot))
-	cmd.AddCommand(newMemoryCmd(&repoRoot))
 	cmd.AddCommand(newStatusCmd(&repoRoot))
 	cmd.AddCommand(newExplainCmd(&repoRoot))
 	cmd.AddCommand(newValidateCmd(&repoRoot))
@@ -149,7 +144,7 @@ func currentCapabilities() capabilitiesDocument {
 	return capabilitiesDocument{
 		Schema:   capabilitiesSchema,
 		Build:    buildinfo.Current(),
-		Commands: []string{"capabilities", "context", "doctor", "explain", "scan", "status", "validate"},
+		Commands: []string{"capabilities", "context", "doctor", "explain", "scan", "status", "tasks", "validate"},
 		Schemas: []string{
 			capabilitiesSchema,
 			"struktly/doctor/v1",
@@ -157,6 +152,7 @@ func currentCapabilities() capabilitiesDocument {
 			"struktly/explanation/v1",
 			repoctx.PacketSchema,
 			repoctx.SnapshotSchema,
+			repoctx.TasksSchema,
 			"struktly/status/v1",
 			"struktly/validation/v1",
 		},
@@ -166,8 +162,40 @@ func currentCapabilities() capabilitiesDocument {
 			"context.no_write",
 			"scan.no_write",
 			"structured_errors",
+			"tasks.partial_results",
 		},
 	}
+}
+
+func newTasksCmd(repoRoot *string) *cobra.Command {
+	var toJSON bool
+	cmd := &cobra.Command{
+		Use:   "tasks",
+		Short: "List repository task declarations",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			document, err := repoctx.DiscoverTasks(*repoRoot)
+			if err != nil {
+				return err
+			}
+			if toJSON {
+				return writeJSON(cmd.OutOrStdout(), document)
+			}
+			for _, task := range document.Tasks {
+				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "%s\t%s\t%s\n", task.Status, task.Path, task.Title); err != nil {
+					return err
+				}
+			}
+			for _, invalid := range document.Invalid {
+				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "invalid\t%s\t%s\n", invalid.Path, invalid.Reason); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&toJSON, "json", false, "Print the versioned tasks document")
+	return cmd
 }
 
 func newCapabilitiesCmd() *cobra.Command {
@@ -376,7 +404,6 @@ func runInit(cmd *cobra.Command, repoRoot string) error {
 }
 
 func newScanCmd(repoRoot *string) *cobra.Command {
-	var runID string
 	var toJSON bool
 	var noWrite bool
 	cmd := &cobra.Command{
@@ -386,10 +413,7 @@ func newScanCmd(repoRoot *string) *cobra.Command {
 			if noWrite && !toJSON {
 				return fmt.Errorf("--no-write requires --json")
 			}
-			if noWrite && runID != "" {
-				return fmt.Errorf("--no-write cannot be used with --run")
-			}
-			result, err := repoctx.Scan(repoctx.ScanOptions{Root: *repoRoot, RunID: runID, NoWrite: noWrite})
+			result, err := repoctx.Scan(repoctx.ScanOptions{Root: *repoRoot, NoWrite: noWrite})
 			if err != nil {
 				return err
 			}
@@ -408,14 +432,12 @@ func newScanCmd(repoRoot *string) *cobra.Command {
 			return err
 		},
 	}
-	cmd.Flags().StringVar(&runID, "run", "", "Attach scan output to a run id")
 	cmd.Flags().BoolVar(&toJSON, "json", false, "Print the structured snapshot to stdout for piping")
 	cmd.Flags().BoolVar(&noWrite, "no-write", false, "Do not write generated files; requires --json")
 	return cmd
 }
 
 func newBriefCmd(repoRoot *string) *cobra.Command {
-	var runID string
 	var toStdout bool
 	var toJSON bool
 	var noWrite bool
@@ -432,14 +454,10 @@ func newBriefCmd(repoRoot *string) *cobra.Command {
 			if noWrite && !toJSON {
 				return fmt.Errorf("--no-write requires --json")
 			}
-			if noWrite && runID != "" {
-				return fmt.Errorf("--no-write cannot be used with --run")
-			}
 			result, err := repoctx.Brief(repoctx.BriefOptions{
 				Context:              cmd.Context(),
 				Root:                 *repoRoot,
 				Task:                 args[0],
-				RunID:                runID,
 				NoWrite:              noWrite,
 				ExpectedBaseRevision: expectedBaseRevision,
 			})
@@ -471,7 +489,6 @@ func newBriefCmd(repoRoot *string) *cobra.Command {
 			return err
 		},
 	}
-	cmd.Flags().StringVar(&runID, "run", "", "Attach context packet to a run id")
 	cmd.Flags().BoolVar(&toStdout, "stdout", false, "Print the context packet to stdout for piping")
 	cmd.Flags().BoolVar(&toJSON, "json", false, "Print the structured packet to stdout for piping")
 	cmd.Flags().BoolVar(&noWrite, "no-write", false, "Do not write generated files; requires --json")
@@ -509,306 +526,6 @@ func runSuggestInstructions(cmd *cobra.Command, repoRoot string) error {
 		}
 	}
 	return nil
-}
-
-func newEvidenceCmd(repoRoot *string) *cobra.Command {
-	opts := &evidenceOptions{}
-	cmd := &cobra.Command{
-		Use:   "evidence",
-		Short: "Experimental: record completed work and checks",
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runEvidence(cmd, *repoRoot, opts)
-		},
-	}
-	cmd.Flags().StringVar(&opts.task, "task", "", "Task or work summary")
-	cmd.Flags().StringVar(&opts.agent, "agent", "", "Agent or tool name")
-	cmd.Flags().StringVar(&opts.outcome, "outcome", "", "Outcome summary")
-	cmd.Flags().StringVar(&opts.contextPacket, "context-packet", "", "Path to context packet used for the work")
-	cmd.Flags().StringSliceVar(&opts.checks, "checks", nil, "Verification command that was run")
-	cmd.Flags().StringVar(&opts.checkResult, "result", "", "Result summary for checks run")
-	cmd.Flags().BoolVar(&opts.runChecks, "run-checks", false, "Execute the declared checks and record real exit codes")
-	cmd.Flags().StringSliceVar(&opts.filesTouched, "files", nil, "Files changed during the work")
-	cmd.Flags().StringVar(&opts.reviewer, "reviewer", "", "Reviewer name or review status")
-	cmd.Flags().StringVar(&opts.runID, "run", "", "Attach evidence ledger to a run id")
-	_ = cmd.MarkFlagRequired("task")
-	_ = cmd.MarkFlagRequired("agent")
-	_ = cmd.MarkFlagRequired("outcome")
-	return cmd
-}
-
-type evidenceOptions struct {
-	task          string
-	agent         string
-	outcome       string
-	contextPacket string
-	checks        []string
-	checkResult   string
-	runChecks     bool
-	filesTouched  []string
-	reviewer      string
-	runID         string
-}
-
-func runEvidence(cmd *cobra.Command, repoRoot string, opts *evidenceOptions) error {
-	result, err := evidence.RecordEvidence(evidence.EvidenceOptions{
-		Root:          repoRoot,
-		Task:          opts.task,
-		Agent:         opts.agent,
-		Outcome:       opts.outcome,
-		ContextPacket: opts.contextPacket,
-		Checks:        opts.checks,
-		CheckResult:   opts.checkResult,
-		RunChecks:     opts.runChecks,
-		FilesTouched:  opts.filesTouched,
-		Reviewer:      opts.reviewer,
-		RunID:         opts.runID,
-	})
-	if err != nil {
-		return err
-	}
-	_, err = fmt.Fprintf(cmd.OutOrStdout(), "appended to %s\n", result.OutputPath)
-	return err
-}
-
-func newRunCmd(repoRoot *string) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "run",
-		Short: "Experimental: create and inspect local work records",
-	}
-	cmd.AddCommand(newRunCreateCmd(repoRoot))
-	cmd.AddCommand(newRunListCmd(repoRoot))
-	cmd.AddCommand(newRunShowCmd(repoRoot))
-	cmd.AddCommand(newRunEventCmd(repoRoot))
-	cmd.AddCommand(newRunCompleteCmd(repoRoot))
-	cmd.AddCommand(newRunFailCmd(repoRoot))
-	return cmd
-}
-
-type runCreateOptions struct {
-	goal     string
-	repoPath string
-}
-
-func newRunCreateCmd(repoRoot *string) *cobra.Command {
-	opts := &runCreateOptions{}
-	cmd := &cobra.Command{
-		Use:   "create",
-		Short: "Create a work record",
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			result, err := runs.CreateRun(runs.CreateRunOptions{
-				Root:          *repoRoot,
-				Goal:          opts.goal,
-				RepoPath:      opts.repoPath,
-				SourceCommand: "struktly run create --goal " + opts.goal,
-			})
-			if err != nil {
-				return err
-			}
-			return writeJSON(cmd.OutOrStdout(), result.Run)
-		},
-	}
-	cmd.Flags().StringVar(&opts.goal, "goal", "", "Run goal")
-	cmd.Flags().StringVar(&opts.repoPath, "repo", "", "Repository path for the run (defaults to --root)")
-	_ = cmd.MarkFlagRequired("goal")
-	return cmd
-}
-
-func newRunListCmd(repoRoot *string) *cobra.Command {
-	return &cobra.Command{
-		Use:   "list",
-		Short: "List local run records",
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			result, err := runs.ListRuns(runs.ListRunsOptions{Root: *repoRoot})
-			if err != nil {
-				return err
-			}
-			return writeJSON(cmd.OutOrStdout(), result)
-		},
-	}
-}
-
-func newRunShowCmd(repoRoot *string) *cobra.Command {
-	return &cobra.Command{
-		Use:   "show <run-id>",
-		Short: "Show a run record and events",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			result, err := runs.ShowRun(runs.ShowRunOptions{Root: *repoRoot, RunID: args[0]})
-			if err != nil {
-				return err
-			}
-			return writeJSON(cmd.OutOrStdout(), result)
-		},
-	}
-}
-
-type runEventOptions struct {
-	eventType string
-	message   string
-}
-
-func newRunEventCmd(repoRoot *string) *cobra.Command {
-	opts := &runEventOptions{}
-	cmd := &cobra.Command{
-		Use:   "event <run-id>",
-		Short: "Append an event to a run",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			result, err := runs.AppendRunEvent(runs.RunEventOptions{
-				Root:    *repoRoot,
-				RunID:   args[0],
-				Type:    opts.eventType,
-				Message: opts.message,
-			})
-			if err != nil {
-				return err
-			}
-			return writeJSON(cmd.OutOrStdout(), result.Event)
-		},
-	}
-	cmd.Flags().StringVar(&opts.eventType, "type", "", "Event type")
-	cmd.Flags().StringVar(&opts.message, "message", "", "Event message")
-	_ = cmd.MarkFlagRequired("type")
-	_ = cmd.MarkFlagRequired("message")
-	return cmd
-}
-
-func newRunCompleteCmd(repoRoot *string) *cobra.Command {
-	return &cobra.Command{
-		Use:   "complete <run-id>",
-		Short: "Mark a run completed",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			result, err := runs.CompleteRun(runs.UpdateRunStatusOptions{Root: *repoRoot, RunID: args[0]})
-			if err != nil {
-				return err
-			}
-			return writeJSON(cmd.OutOrStdout(), result.Run)
-		},
-	}
-}
-
-func newRunFailCmd(repoRoot *string) *cobra.Command {
-	return &cobra.Command{
-		Use:   "fail <run-id>",
-		Short: "Mark a run failed",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			result, err := runs.FailRun(runs.UpdateRunStatusOptions{Root: *repoRoot, RunID: args[0]})
-			if err != nil {
-				return err
-			}
-			return writeJSON(cmd.OutOrStdout(), result.Run)
-		},
-	}
-}
-
-func newMemoryCmd(repoRoot *string) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "memory",
-		Short: "Experimental: review candidate and approved repository notes",
-	}
-	cmd.AddCommand(newMemoryCandidateCmd(repoRoot))
-	cmd.AddCommand(newMemoryCandidatesCmd(repoRoot))
-	cmd.AddCommand(newMemoryApproveCmd(repoRoot))
-	cmd.AddCommand(newMemoryRejectCmd(repoRoot))
-	cmd.AddCommand(newMemoryListCmd(repoRoot))
-	return cmd
-}
-
-type memoryCandidateOptions struct {
-	scope          string
-	content        string
-	tags           []string
-	sourceRunID    string
-	sourceArtifact string
-}
-
-func newMemoryCandidateCmd(repoRoot *string) *cobra.Command {
-	opts := &memoryCandidateOptions{}
-	cmd := &cobra.Command{
-		Use:   "candidate",
-		Short: "Create a human-reviewed memory candidate",
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			result, err := memory.CreateMemoryCandidate(memory.MemoryCandidateOptions{
-				Root:           *repoRoot,
-				Scope:          opts.scope,
-				Content:        opts.content,
-				Tags:           opts.tags,
-				SourceRunID:    opts.sourceRunID,
-				SourceArtifact: opts.sourceArtifact,
-			})
-			if err != nil {
-				return err
-			}
-			return writeJSON(cmd.OutOrStdout(), result.Candidate)
-		},
-	}
-	cmd.Flags().StringVar(&opts.scope, "scope", "repository", "Memory scope: global, project, or repository")
-	cmd.Flags().StringVar(&opts.content, "content", "", "Candidate memory content")
-	cmd.Flags().StringSliceVar(&opts.tags, "tags", nil, "Comma-separated memory tags")
-	cmd.Flags().StringVar(&opts.sourceRunID, "source-run-id", "", "Source run id")
-	cmd.Flags().StringVar(&opts.sourceArtifact, "source-artifact", "", "Source artifact path")
-	_ = cmd.MarkFlagRequired("content")
-	return cmd
-}
-
-func newMemoryCandidatesCmd(repoRoot *string) *cobra.Command {
-	return &cobra.Command{
-		Use:   "candidates",
-		Short: "List memory candidates",
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			result, err := memory.ListMemoryCandidates(memory.ListMemoryOptions{Root: *repoRoot})
-			if err != nil {
-				return err
-			}
-			return writeJSON(cmd.OutOrStdout(), result)
-		},
-	}
-}
-
-func newMemoryApproveCmd(repoRoot *string) *cobra.Command {
-	return &cobra.Command{
-		Use:   "approve <candidate-id>",
-		Short: "Approve a memory candidate",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			result, err := memory.ApproveMemoryCandidate(memory.MemoryResolutionOptions{Root: *repoRoot, CandidateID: args[0]})
-			if err != nil {
-				return err
-			}
-			return writeJSON(cmd.OutOrStdout(), result.Memory)
-		},
-	}
-}
-
-func newMemoryRejectCmd(repoRoot *string) *cobra.Command {
-	return &cobra.Command{
-		Use:   "reject <candidate-id>",
-		Short: "Reject a memory candidate",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			result, err := memory.RejectMemoryCandidate(memory.MemoryResolutionOptions{Root: *repoRoot, CandidateID: args[0]})
-			if err != nil {
-				return err
-			}
-			return writeJSON(cmd.OutOrStdout(), result.Candidate)
-		},
-	}
-}
-
-func newMemoryListCmd(repoRoot *string) *cobra.Command {
-	return &cobra.Command{
-		Use:   "list",
-		Short: "List approved memory",
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			result, err := memory.ListApprovedMemory(memory.ListMemoryOptions{Root: *repoRoot})
-			if err != nil {
-				return err
-			}
-			return writeJSON(cmd.OutOrStdout(), result)
-		},
-	}
 }
 
 func relToRoot(root, path string) string {

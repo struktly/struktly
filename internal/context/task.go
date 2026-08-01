@@ -1,8 +1,11 @@
 package context
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -16,33 +19,58 @@ import (
 
 const (
 	TaskSchema   = "struktly/task/v1"
+	TasksSchema  = "struktly/tasks/v1"
+	tasksDir     = ".struktly/tasks"
 	maxTaskBytes = 512 * 1024
 )
 
 var (
-	ErrInvalidTask = errors.New("invalid task")
-	taskIDPattern  = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
+	ErrInvalidTask      = errors.New("invalid task")
+	taskIDPattern       = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
+	legacyTaskIDPattern = regexp.MustCompile(`^[a-z0-9]+(?:[.-][a-z0-9]+)*$`)
+	taskCodeSpan        = regexp.MustCompile("`([^`\n]+)`")
 )
 
+type TaskContract struct {
+	Outcome        string   `json:"outcome"`
+	DoneWhen       []string `json:"done_when"`
+	NonGoals       []string `json:"non_goals"`
+	RequiredChecks []string `json:"required_checks"`
+}
+
 type Task struct {
-	Path          string `json:"path"`
-	ID            string `json:"id"`
-	Title         string `json:"title"`
-	Status        string `json:"status"`
-	Priority      string `json:"priority"`
-	Created       string `json:"created"`
-	Updated       string `json:"updated,omitempty"`
-	Agent         string `json:"agent"`
-	AgentModel    string `json:"agent_model,omitempty"`
-	Reasoning     string `json:"reasoning_effort,omitempty"`
-	AgentSession  string `json:"agent_session,omitempty"`
-	ResumeCommand string `json:"resume_command,omitempty"`
+	Path               string       `json:"path"`
+	ID                 string       `json:"id"`
+	Title              string       `json:"title"`
+	Status             string       `json:"status"`
+	Priority           string       `json:"priority"`
+	Created            string       `json:"created"`
+	Updated            string       `json:"updated,omitempty"`
+	Agent              string       `json:"agent"`
+	AgentModel         string       `json:"agent_model,omitempty"`
+	Reasoning          string       `json:"reasoning_effort,omitempty"`
+	AgentSession       string       `json:"agent_session,omitempty"`
+	ResumeCommand      string       `json:"resume_command,omitempty"`
+	Contract           TaskContract `json:"contract"`
+	SHA256             string       `json:"sha256"`
+	CompatibilityNotes []string     `json:"compatibility_notes,omitempty"`
+}
+
+type InvalidTaskFile struct {
+	Path   string `json:"path"`
+	Reason string `json:"reason"`
+}
+
+type TasksDocument struct {
+	Schema  string            `json:"schema"`
+	Tasks   []Task            `json:"tasks"`
+	Invalid []InvalidTaskFile `json:"invalid"`
 }
 
 // LoadTasks validates and returns the portable task declarations in canonical
 // path order. Runtime session state is deliberately not loaded here.
 func LoadTasks(root string) ([]Task, error) {
-	pattern := filepath.Join(root, ".struktly", "tasks", "*.md")
+	pattern := filepath.Join(root, filepath.FromSlash(tasksDir), "*.md")
 	paths, err := filepath.Glob(pattern)
 	if err != nil {
 		return nil, fmt.Errorf("list tasks: %w", err)
@@ -59,7 +87,59 @@ func LoadTasks(root string) ([]Task, error) {
 	return tasks, nil
 }
 
+// DiscoverTasks returns every safely readable task declaration in canonical
+// path order. Unlike LoadTasks, body headings are interpreted when present but
+// are not required: historical repository task prose remains discoverable, and
+// malformed files are reported without hiding valid siblings.
+func DiscoverTasks(root string) (TasksDocument, error) {
+	root, err := files.CleanRoot(root)
+	if err != nil {
+		return TasksDocument{}, err
+	}
+	dir := filepath.Join(root, filepath.FromSlash(tasksDir))
+	info, err := os.Lstat(dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return emptyTasksDocument(), nil
+	}
+	if err != nil {
+		return TasksDocument{}, fmt.Errorf("inspect %s: %w", tasksDir, err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+		return TasksDocument{}, fmt.Errorf("%s must be a directory, not a symlink", tasksDir)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return TasksDocument{}, fmt.Errorf("read %s: %w", tasksDir, err)
+	}
+
+	document := emptyTasksDocument()
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".md" {
+			continue
+		}
+		path := filepath.Join(dir, entry.Name())
+		rel := files.RelPath(root, path)
+		task, err := loadTaskFile(root, path, false)
+		if err != nil {
+			document.Invalid = append(document.Invalid, InvalidTaskFile{Path: rel, Reason: taskErrorReason(rel, err)})
+			continue
+		}
+		document.Tasks = append(document.Tasks, task)
+	}
+	sort.Slice(document.Tasks, func(i, j int) bool { return document.Tasks[i].Path < document.Tasks[j].Path })
+	sort.Slice(document.Invalid, func(i, j int) bool { return document.Invalid[i].Path < document.Invalid[j].Path })
+	return document, nil
+}
+
+func emptyTasksDocument() TasksDocument {
+	return TasksDocument{Schema: TasksSchema, Tasks: []Task{}, Invalid: []InvalidTaskFile{}}
+}
+
 func loadTask(root, path string) (Task, error) {
+	return loadTaskFile(root, path, true)
+}
+
+func loadTaskFile(root, path string, validateBody bool) (Task, error) {
 	rel := files.RelPath(root, path)
 	info, err := os.Lstat(path)
 	if err != nil {
@@ -102,8 +182,12 @@ func loadTask(root, path string) (Task, error) {
 	if metadata["schema"] != TaskSchema {
 		return Task{}, invalidTask(rel, fmt.Errorf("schema must be %q", TaskSchema))
 	}
+	compatibilityNotes := []string{}
 	if !taskIDPattern.MatchString(metadata["id"]) {
-		return Task{}, invalidTask(rel, errors.New("id must contain lowercase letters, digits, and single hyphens"))
+		if validateBody || !legacyTaskIDPattern.MatchString(metadata["id"]) {
+			return Task{}, invalidTask(rel, errors.New("id must contain lowercase letters, digits, and single hyphens"))
+		}
+		compatibilityNotes = append(compatibilityNotes, "Compatibility import: canonical task/v1 validation rejects this historical dotted task ID.")
 	}
 	filenameID := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 	if metadata["id"] != filenameID {
@@ -129,24 +213,160 @@ func loadTask(root, path string) (Task, error) {
 	if (metadata["agent_session"] == "") != (metadata["resume_command"] == "") {
 		return Task{}, invalidTask(rel, errors.New("agent_session and resume_command must be declared together"))
 	}
-	if err := validateTaskBody(body); err != nil {
-		return Task{}, invalidTask(rel, err)
+	bodyValidationErr := validateTaskBody(body)
+	if validateBody {
+		if bodyValidationErr != nil {
+			return Task{}, invalidTask(rel, bodyValidationErr)
+		}
 	}
+	contract, bodyCompatibilityNotes := parseTaskContract(body)
+	compatibilityNotes = append(compatibilityNotes, bodyCompatibilityNotes...)
+	if !validateBody && bodyValidationErr != nil {
+		compatibilityNotes = append(compatibilityNotes, "Compatibility import: canonical task/v1 validation would reject this body: "+bodyValidationErr.Error())
+	}
+	digest := sha256.Sum256(data)
 
 	return Task{
-		Path:          rel,
-		ID:            metadata["id"],
-		Title:         metadata["title"],
-		Status:        metadata["status"],
-		Priority:      metadata["priority"],
-		Created:       metadata["created"],
-		Updated:       metadata["updated"],
-		Agent:         metadata["agent"],
-		AgentModel:    metadata["agent_model"],
-		Reasoning:     metadata["reasoning_effort"],
-		AgentSession:  metadata["agent_session"],
-		ResumeCommand: metadata["resume_command"],
+		Path:               rel,
+		ID:                 metadata["id"],
+		Title:              metadata["title"],
+		Status:             metadata["status"],
+		Priority:           metadata["priority"],
+		Created:            metadata["created"],
+		Updated:            metadata["updated"],
+		Agent:              metadata["agent"],
+		AgentModel:         metadata["agent_model"],
+		Reasoning:          metadata["reasoning_effort"],
+		AgentSession:       metadata["agent_session"],
+		ResumeCommand:      metadata["resume_command"],
+		Contract:           contract,
+		SHA256:             hex.EncodeToString(digest[:]),
+		CompatibilityNotes: compatibilityNotes,
 	}, nil
+}
+
+func parseTaskContract(body string) (TaskContract, []string) {
+	sections := parseTaskSections(body)
+	notes := []string{}
+	contract := TaskContract{
+		DoneWhen:       []string{},
+		NonGoals:       []string{},
+		RequiredChecks: []string{},
+	}
+	contract.Outcome = firstTaskSection(sections, "objective")
+	if contract.Outcome == "" {
+		if mission := firstTaskSection(sections, "mission"); mission != "" {
+			contract.Outcome = mission
+			notes = append(notes, "Mapped historical Mission heading to Objective.")
+		} else if outcome := firstTaskSection(sections, "outcome"); outcome != "" {
+			contract.Outcome = outcome
+			notes = append(notes, "Mapped historical Outcome heading to Objective.")
+		}
+	}
+	done := firstTaskSection(sections, "required outcomes")
+	if done == "" {
+		for _, historical := range []string{"success", "success criteria", "acceptance criteria", "done when", "definition of done", "requirements"} {
+			if value := firstTaskSection(sections, historical); value != "" {
+				done = value
+				notes = append(notes, "Mapped historical "+taskHeading(historical)+" heading to Required outcomes.")
+				break
+			}
+		}
+	}
+	if done != "" {
+		contract.DoneWhen = taskItemsOrText(done)
+	}
+	if nonGoals := firstTaskSection(sections, "non-goals"); nonGoals != "" {
+		contract.NonGoals = taskItemsOrText(nonGoals)
+	}
+	checkText := strings.Join([]string{
+		sections["definition of done"],
+		sections["verification"],
+		sections["required checks"],
+	}, "\n")
+	seen := map[string]bool{}
+	for _, match := range taskCodeSpan.FindAllStringSubmatch(checkText, -1) {
+		value := strings.TrimSpace(match[1])
+		if value != "" && !seen[value] {
+			seen[value] = true
+			contract.RequiredChecks = append(contract.RequiredChecks, value)
+		}
+	}
+	return contract, notes
+}
+
+func taskHeading(value string) string {
+	words := strings.Fields(value)
+	for i := range words {
+		words[i] = strings.ToUpper(words[i][:1]) + words[i][1:]
+	}
+	return strings.Join(words, " ")
+}
+
+func parseTaskSections(body string) map[string]string {
+	sections := map[string]string{}
+	current := ""
+	lines := []string{}
+	flush := func() {
+		if current != "" {
+			sections[current] = strings.TrimSpace(strings.Join(lines, "\n"))
+		}
+	}
+	for _, line := range strings.Split(body, "\n") {
+		if strings.HasPrefix(line, "## ") {
+			flush()
+			current = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(line, "## ")))
+			lines = nil
+			continue
+		}
+		if current != "" {
+			lines = append(lines, line)
+		}
+	}
+	flush()
+	return sections
+}
+
+func firstTaskSection(sections map[string]string, names ...string) string {
+	for _, name := range names {
+		if value := strings.TrimSpace(sections[name]); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func taskItemsOrText(text string) []string {
+	items := []string{}
+	for _, line := range strings.Split(text, "\n") {
+		trimmed := strings.TrimSpace(line)
+		item := ""
+		switch {
+		case strings.HasPrefix(trimmed, "- [ ] "), strings.HasPrefix(trimmed, "- [x] "), strings.HasPrefix(trimmed, "- [X] "):
+			item = strings.TrimSpace(trimmed[6:])
+		case strings.HasPrefix(trimmed, "- "), strings.HasPrefix(trimmed, "* "):
+			item = strings.TrimSpace(trimmed[2:])
+		}
+		if item != "" {
+			items = append(items, item)
+			continue
+		}
+		if len(items) > 0 && trimmed != "" {
+			items[len(items)-1] += " " + trimmed
+		}
+	}
+	if len(items) > 0 {
+		return items
+	}
+	if text = strings.TrimSpace(text); text != "" {
+		return []string{text}
+	}
+	return []string{}
+}
+
+func taskErrorReason(path string, err error) string {
+	prefix := ErrInvalidTask.Error() + ": " + path + ": "
+	return strings.TrimPrefix(err.Error(), prefix)
 }
 
 func parseTaskFrontmatter(content string) (map[string]string, string, error) {

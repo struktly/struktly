@@ -12,7 +12,6 @@ import (
 
 	"github.com/struktly/struktly/internal/buildinfo"
 	repoctx "github.com/struktly/struktly/internal/context"
-	"github.com/struktly/struktly/internal/evidence"
 )
 
 const (
@@ -142,38 +141,12 @@ func toolDefs() []toolDef {
 				"required": []string{"task"},
 			},
 		},
-		{
-			Name:        "evidence_record",
-			Description: "Append a structured evidence entry to .struktly/evidence.md",
-			InputSchema: map[string]any{
-				"type": "object",
-				"properties": map[string]any{
-					"root":    rootProp,
-					"task":    map[string]any{"type": "string", "description": "Task or work summary"},
-					"agent":   map[string]any{"type": "string", "description": "Agent or tool name"},
-					"outcome": map[string]any{"type": "string", "description": "Outcome summary"},
-					"checks": map[string]any{
-						"type":        "array",
-						"items":       map[string]any{"type": "string"},
-						"description": "Verification commands that were run",
-					},
-					"result":        map[string]any{"type": "string", "description": "Result summary for checks run"},
-					"contextPacket": map[string]any{"type": "string", "description": "Path to the context packet used for the work"},
-				},
-				"required": []string{"task", "agent", "outcome"},
-			},
-		},
 	}
 }
 
 type toolArgs struct {
-	Root          string   `json:"root"`
-	Task          string   `json:"task"`
-	Agent         string   `json:"agent"`
-	Outcome       string   `json:"outcome"`
-	Checks        []string `json:"checks"`
-	Result        string   `json:"result"`
-	ContextPacket string   `json:"contextPacket"`
+	Root string `json:"root"`
+	Task string `json:"task"`
 }
 
 type toolResult struct {
@@ -219,8 +192,6 @@ func callTool(root string, params json.RawMessage) (toolResult, *rpcError) {
 		return runScan(args), nil
 	case "context_brief":
 		return runBrief(args), nil
-	case "evidence_record":
-		return runEvidence(args), nil
 	default:
 		return toolResult{}, &rpcError{Code: -32602, Message: "unknown tool: " + call.Name}
 	}
@@ -246,20 +217,4 @@ func runBrief(args toolArgs) toolResult {
 	toolResult := textResult(result.OutputPath + "\n\n" + string(data))
 	toolResult.StructuredContent = result.Packet
 	return toolResult
-}
-
-func runEvidence(args toolArgs) toolResult {
-	result, err := evidence.RecordEvidence(evidence.EvidenceOptions{
-		Root:          args.Root,
-		Task:          args.Task,
-		Agent:         args.Agent,
-		Outcome:       args.Outcome,
-		Checks:        args.Checks,
-		CheckResult:   args.Result,
-		ContextPacket: args.ContextPacket,
-	})
-	if err != nil {
-		return errorResult(err.Error())
-	}
-	return textResult("appended to " + result.OutputPath)
 }

@@ -35,7 +35,8 @@ var DefaultIgnoredDirs = []string{
 
 var DefaultIgnoredPaths = []string{
 	".struktly/runs",
-	".struktly/memory/candidates",
+	".struktly/memory",
+	".struktly/evidence.md",
 	".struktly/context-packets",
 	".struktly/scans",
 	".struktly/ui",

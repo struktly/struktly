@@ -1,6 +1,6 @@
 ---
 type: context-packet
-schema: struktly/packet/v1
+schema: struktly/packet/v2
 title: "Context: add request timeout middleware"
 description: "Repository files and guidance selected for this task."
 timestamp: $TIMESTAMP
@@ -16,8 +16,8 @@ add request timeout middleware
 
 ## Packet details
 
-- Schema: `struktly/packet/v1`
-- Packet hash: `sha256:bd0a1b90ad07ddb8aa1da480323258e91762f674795fde44d2d823d22f4979b2`
+- Schema: `struktly/packet/v2`
+- Packet hash: `sha256:b167c155e8862f6ed24cb10f4d6320adeeace79f25ed36c2f46c237e37e83e57`
 - Repository: `git:0e709b14ea2e846e54e1d38161502ee8f4a49a40963cbbe8abb58b938ca7a1d7`
 - Branch: `main`
 - HEAD revision: `983c7b8424a771fe26dbd36f266a305acf674d48`

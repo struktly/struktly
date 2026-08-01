@@ -1,5 +1,5 @@
 {
-  "schema": "struktly/packet/v1",
+  "schema": "struktly/packet/v2",
   "generated_at": "2026-07-11T12:00:00Z",
   "metadata": {
     "generated_at": "2026-07-11T12:00:00Z",
@@ -61,7 +61,7 @@
     "max_file_bytes": 65536,
     "max_total_bytes": 524288
   },
-  "packet_hash": "sha256:314d4658e2c8d58cb3c8459cd8af45669ff6ce292260e80f857482e4ac163f78",
+  "packet_hash": "sha256:fc8997eb03992365c3dde1f12c3e91d410ac6cedf4307753c8db4a310f73837b",
   "task": "add request timeout middleware",
   "verification_commands": [
     "go build ./...",

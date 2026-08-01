@@ -24,8 +24,8 @@ additive; breaking changes require a new schema version. See
 
 Generated context must remain deterministic. It must respect Git ignores and
 must not include secrets, binaries, symlinks, dependencies, build output, or
-runtime state. Repository writes belong under `.struktly/`; run state and
-unapproved memory remain outside the repository.
+runtime state. Repository writes belong under `.struktly/`; product state belongs
+to Struktly Platform rather than this CLI.
 
 ## Reports
 

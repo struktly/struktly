@@ -16,7 +16,8 @@ Machine modes write one JSON document to stdout:
 | Invocation | Schema |
 |---|---|
 | `scan --json` | `struktly/snapshot/v1` |
-| `context --json <request>` | `struktly/packet/v1` |
+| `context --json <request>` | `struktly/packet/v2` |
+| `tasks --json` | `struktly/tasks/v1` |
 | `status --json` | `struktly/status/v1` |
 | `explain --json <path>` | `struktly/explanation/v1` |
 | `validate --json` | `struktly/validation/v1` |
@@ -25,8 +26,7 @@ Machine modes write one JSON document to stdout:
 
 In machine mode, successful diagnostics such as a generated packet path go to
 stderr. With `--no-write`, successful commands leave stderr empty. stdout never
-mixes prose with JSON. `run` and `memory` subcommands also
-emit JSON, but their record shapes are not yet versioned schemas.
+mixes prose with JSON.
 
 `context --stdout <request>` writes Markdown to stdout and its output path to stderr.
 Other default modes write plain text for developers.
@@ -36,7 +36,7 @@ Other default modes write plain text for developers.
 Programs should inspect `capabilities --json` before depending on additive CLI
 features. The current stable feature identifiers are
 `context.cancellation`, `context.expect_base_revision`, `context.no_write`,
-`scan.no_write`, and `structured_errors`.
+`scan.no_write`, `structured_errors`, and `tasks.partial_results`.
 
 For side-effect-free packet generation, invoke:
 
@@ -46,8 +46,8 @@ struktly context --json --no-write \
   "<coding request>"
 ```
 
-`--no-write` requires `--json` and cannot be combined with `--run`. It suppresses
-both Markdown and JSON exports under `.struktly/`. `scan --json --no-write`
+`--no-write` requires `--json`. It suppresses both Markdown and JSON exports
+under `.struktly/`. `scan --json --no-write`
 similarly returns a snapshot without writing generated files.
 
 `--expect-base-revision <sha>` checks Git `HEAD` before and after context
@@ -92,8 +92,8 @@ does not interrupt an in-flight tool call.
 
 ## Packet determinism and versioning
 
-`struktly/packet/v1` hashes all deterministic packet fields, including repository
-identity, branch and revisions, task, sorted context items, compatibility fields,
+`struktly/packet/v2` hashes all deterministic packet fields, including repository
+identity, branch and revisions, task, sorted context items, repository guidance,
 instructions, checks, warnings, exclusions, truncations, and fixed limits. Every
 selected item carries its source, Git revision, selection method, confidence,
 full-content SHA-256, and byte counts.
@@ -136,22 +136,25 @@ boundary; `content_hash` still hashes the complete source file. Exclusions and
 truncations carry stable reason codes in the packet. `explain --json <path>` uses
 the same classifier and reports `included` or `excluded` with its reason.
 
-There is no flag in v1 to include Git-ignored or security-excluded content.
+There is no flag to include Git-ignored or security-excluded content.
 
 ## Portable and runtime state
 
-Portable repository declarations and approved knowledge live under `.struktly/`.
-Generated scans and packet exports also live there. Credentials, raw provider
-sessions, caches, run event logs, and pending memory do not.
+Portable repository declarations and user-owned guidance live under `.struktly/`.
+Generated scans and packet exports also live there. Credentials and product
+runtime state do not.
 
 Portable task handoffs live under `.struktly/tasks/` and follow
 [`struktly/task/v1`](task-format.md). They may name an agent, opaque session ID,
 and resume command. Provider session contents and execution logs remain runtime state.
 
-Experimental work records, events, and pending memory candidates use a per-user directory under
-the OS user configuration directory at `struktly/state/repositories/<checkout-key>`.
-Set `STRUKTLY_STATE_DIR` to choose the base directory. Existing repo-local legacy
-records remain readable; new writes never target them.
+`tasks --json` emits `struktly/tasks/v1`. Safely readable declarations appear in
+canonical path order under `tasks`; malformed files appear under `invalid` and
+do not hide valid siblings. Each task includes the exact file SHA-256 and a
+body-derived contract. A missing body contract is represented by empty fields.
+
+Chats, executions, sessions, approvals, evidence, memory, checks, and review
+history are Platform state and are never created or read by this CLI.
 
 ## Performance characteristics
 

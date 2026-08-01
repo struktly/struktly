@@ -1,5 +1,5 @@
 {
-  "schema": "struktly/packet/v1",
+  "schema": "struktly/packet/v2",
   "generated_at": "2026-07-11T12:00:00Z",
   "metadata": {
     "generated_at": "2026-07-11T12:00:00Z",
@@ -127,7 +127,7 @@
     "max_file_bytes": 65536,
     "max_total_bytes": 524288
   },
-  "packet_hash": "sha256:bd0a1b90ad07ddb8aa1da480323258e91762f674795fde44d2d823d22f4979b2",
+  "packet_hash": "sha256:b167c155e8862f6ed24cb10f4d6320adeeace79f25ed36c2f46c237e37e83e57",
   "task": "add request timeout middleware",
   "direction": "# Direction\n\nShip a reliable payments API with strict timeouts on every outbound call.\n\n## Non-goals\n\n- No new public endpoints until the middleware chain is hardened.",
   "constraints": "# Constraints\n\n- Keep handler latency under 200ms.\n- No new third-party dependencies without a decision record.",

@@ -217,7 +217,7 @@ func (d *instructionDraft) renderMarkdown(target string) string {
 	b.WriteString("## Using Struktly\n\n")
 	writeBullets(&b, []string{
 		"Run `struktly brief \"<task>\"` when task-specific repository context is needed.",
-		"After work, record checks with `struktly evidence`.",
+		"After work, report checks and outcomes to the calling tool.",
 	})
 	b.WriteString("\n")
 
