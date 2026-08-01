@@ -201,7 +201,7 @@ func TestContextCLIRespectsAndValidatesLimits(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, stderr, exitCode := executeCLICommand(tc.args...)
-			if exitCode == 0 {
+			if exitCode != 2 {
 				t.Fatalf("expected context limit failure for %s", tc.name)
 			}
 			if strings.TrimSpace(stderr) == "" {
@@ -210,6 +210,9 @@ func TestContextCLIRespectsAndValidatesLimits(t *testing.T) {
 			var doc errorDocument
 			if err := json.Unmarshal([]byte(stderr), &doc); err != nil {
 				t.Fatalf("expected structured error for %s: %v\nstderr=%s", tc.name, err, stderr)
+			}
+			if doc.Error.Code != "invalid_invocation" {
+				t.Fatalf("expected invalid_invocation for %s, got %+v", tc.name, doc)
 			}
 			if !strings.Contains(doc.Error.Message, tc.wantError) {
 				t.Fatalf("unexpected %s error=%+v", tc.name, doc.Error)

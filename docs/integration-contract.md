@@ -147,9 +147,11 @@ The CLI never emits the content of:
 - symlinks, non-regular files, binary files, or invalid UTF-8.
 
 The current fixed limits are 40 items, 64 KiB per selected text file, and
-512 KiB total selected content. Oversized UTF-8 text is truncated on a valid rune
-boundary; `content_hash` still hashes the complete source file. Exclusions and
-truncations carry stable reason codes in the packet. `explain --json <path>` uses
+512 KiB total selected content. `max_total_bytes` is enforced against selected
+content bytes, not packet JSON size. Oversized UTF-8 text is truncated on a valid
+rune boundary; `content_hash` still hashes the complete source file. Exclusions from
+item and total limits are summarized with counts and stable reason codes in the
+packet. `explain --json <path>` uses
 the same classifier and reports `included` or `excluded` with its reason.
 
 There is no flag to include Git-ignored or security-excluded content.

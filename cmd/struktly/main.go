@@ -71,6 +71,9 @@ func classifyError(err error) (int, string) {
 	if errors.Is(err, repoctx.ErrInvalidTask) {
 		return 1, "invalid_task"
 	}
+	if errors.Is(err, repoctx.ErrInvalidPacketLimit) {
+		return 2, "invalid_invocation"
+	}
 	message := err.Error()
 	if strings.Contains(message, ".struktly/config.json") {
 		return 1, "invalid_config"
@@ -463,13 +466,13 @@ func newBriefCmd(repoRoot *string) *cobra.Command {
 			maxFileBytesSet := flags.Lookup("max-file-bytes").Changed
 			maxTotalBytesSet := flags.Lookup("max-total-bytes").Changed
 			if maxItemsSet && maxItems <= 0 {
-				return fmt.Errorf("max_items must be greater than 0")
+				return fmt.Errorf("%w: max_items must be greater than 0", repoctx.ErrInvalidPacketLimit)
 			}
 			if maxFileBytesSet && maxFileBytes <= 0 {
-				return fmt.Errorf("max_file_bytes must be greater than 0")
+				return fmt.Errorf("%w: max_file_bytes must be greater than 0", repoctx.ErrInvalidPacketLimit)
 			}
 			if maxTotalBytesSet && maxTotalBytes <= 0 {
-				return fmt.Errorf("max_total_bytes must be greater than 0")
+				return fmt.Errorf("%w: max_total_bytes must be greater than 0", repoctx.ErrInvalidPacketLimit)
 			}
 			if !maxItemsSet {
 				maxItems = 0

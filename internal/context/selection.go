@@ -57,6 +57,8 @@ var stopWords = map[string]struct{}{
 	"with":       {},
 }
 
+var ErrInvalidPacketLimit = errors.New("invalid packet limit")
+
 var secretContentPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----`),
 	regexp.MustCompile(`\bAKIA[0-9A-Z]{16}\b`),
@@ -82,28 +84,28 @@ func resolvePacketLimits(overrides PacketLimits) (PacketLimits, error) {
 	limits := DefaultPacketLimits()
 	if overrides.MaxItems != 0 {
 		if overrides.MaxItems <= 0 {
-			return PacketLimits{}, fmt.Errorf("max_items must be greater than 0")
+			return PacketLimits{}, fmt.Errorf("%w: max_items must be greater than 0", ErrInvalidPacketLimit)
 		}
 		if overrides.MaxItems > limits.MaxItems {
-			return PacketLimits{}, fmt.Errorf("max_items exceeds default max %d", limits.MaxItems)
+			return PacketLimits{}, fmt.Errorf("%w: max_items exceeds default max %d", ErrInvalidPacketLimit, limits.MaxItems)
 		}
 		limits.MaxItems = overrides.MaxItems
 	}
 	if overrides.MaxFileBytes != 0 {
 		if overrides.MaxFileBytes <= 0 {
-			return PacketLimits{}, fmt.Errorf("max_file_bytes must be greater than 0")
+			return PacketLimits{}, fmt.Errorf("%w: max_file_bytes must be greater than 0", ErrInvalidPacketLimit)
 		}
 		if overrides.MaxFileBytes > limits.MaxFileBytes {
-			return PacketLimits{}, fmt.Errorf("max_file_bytes exceeds default max %d", limits.MaxFileBytes)
+			return PacketLimits{}, fmt.Errorf("%w: max_file_bytes exceeds default max %d", ErrInvalidPacketLimit, limits.MaxFileBytes)
 		}
 		limits.MaxFileBytes = overrides.MaxFileBytes
 	}
 	if overrides.MaxTotalBytes != 0 {
 		if overrides.MaxTotalBytes <= 0 {
-			return PacketLimits{}, fmt.Errorf("max_total_bytes must be greater than 0")
+			return PacketLimits{}, fmt.Errorf("%w: max_total_bytes must be greater than 0", ErrInvalidPacketLimit)
 		}
 		if overrides.MaxTotalBytes > limits.MaxTotalBytes {
-			return PacketLimits{}, fmt.Errorf("max_total_bytes exceeds default max %d", limits.MaxTotalBytes)
+			return PacketLimits{}, fmt.Errorf("%w: max_total_bytes exceeds default max %d", ErrInvalidPacketLimit, limits.MaxTotalBytes)
 		}
 		limits.MaxTotalBytes = overrides.MaxTotalBytes
 	}
@@ -154,6 +156,12 @@ type packetSelection struct {
 	limits          PacketLimits
 }
 
+type limitDecision struct {
+	count int
+	first string
+	last  string
+}
+
 func selectPacketContext(ctx stdcontext.Context, requestedRoot, task string, detectedChecks []string, limits PacketLimits) (packetSelection, error) {
 	repo, err := ResolveRepository(ctx, requestedRoot)
 	if err != nil {
@@ -177,6 +185,10 @@ func selectPacketContext(ctx stdcontext.Context, requestedRoot, task string, det
 		suggestedChecks: uniqueSorted(append(append([]string(nil), cfg.Checks.Suggested...), detectedChecks...)),
 		instructions:    []string{},
 		limits:          limits,
+	}
+	limitOmissions := map[string]limitDecision{
+		"item_limit":  {},
+		"total_limit": {},
 	}
 
 	candidates := make([]packetCandidate, 0, len(paths))
@@ -204,7 +216,13 @@ func selectPacketContext(ctx stdcontext.Context, requestedRoot, task string, det
 		rel := candidate.path
 		reason := candidate.reason
 		if len(result.items) >= limits.MaxItems {
-			result.exclusions = append(result.exclusions, PacketDecision{Path: rel, Reason: "item_limit"})
+			entry := limitOmissions["item_limit"]
+			entry.count++
+			if entry.count == 1 {
+				entry.first = rel
+			}
+			entry.last = rel
+			limitOmissions["item_limit"] = entry
 			continue
 		}
 		decision, item, err := inspectSelectedFile(repo, rel, reason, limits.MaxTotalBytes-total, limits.MaxFileBytes)
@@ -212,6 +230,16 @@ func selectPacketContext(ctx stdcontext.Context, requestedRoot, task string, det
 			return packetSelection{}, err
 		}
 		if decision.Reason != "" {
+			if decision.Reason == "total_limit" {
+				entry := limitOmissions["total_limit"]
+				entry.count++
+				if entry.count == 1 {
+					entry.first = rel
+				}
+				entry.last = rel
+				limitOmissions["total_limit"] = entry
+				continue
+			}
 			result.exclusions = append(result.exclusions, decision)
 			continue
 		}
@@ -226,6 +254,20 @@ func selectPacketContext(ctx stdcontext.Context, requestedRoot, task string, det
 		if item.Kind == "instruction" {
 			result.instructions = append(result.instructions, item.Path)
 		}
+	}
+	if omitted := limitOmissions["item_limit"]; omitted.count > 0 {
+		result.exclusions = append(result.exclusions, PacketDecision{
+			Path:   "item_limit",
+			Reason: "item_limit",
+			Detail: limitExclusionDetail("item_limit", omitted.count, omitted.first, omitted.last),
+		})
+	}
+	if omitted := limitOmissions["total_limit"]; omitted.count > 0 {
+		result.exclusions = append(result.exclusions, PacketDecision{
+			Path:   "total_limit",
+			Reason: "total_limit",
+			Detail: limitExclusionDetail("total_limit", omitted.count, omitted.first, omitted.last),
+		})
 	}
 	sort.Slice(result.items, func(i, j int) bool { return result.items[i].Path < result.items[j].Path })
 	sortDecisions(result.exclusions)
@@ -273,7 +315,7 @@ func pathPriority(path string) int {
 	if strings.HasPrefix(lowerPath, ".struktly/tasks/") {
 		return 4
 	}
-	if strings.Contains(lowerPath, "e2e") || strings.Contains(lowerPath, "/test/") || strings.Contains(lowerPath, "/tests/") || strings.Contains(lowerPath, "_test") || strings.Contains(lowerPath, "/test.") {
+	if strings.Contains(lowerPath, "e2e") || strings.Contains(lowerPath, "/test/") || strings.Contains(lowerPath, "/tests/") || strings.Contains(lowerPath, "_test") || strings.Contains(lowerPath, "_test.") || strings.Contains(lowerPath, ".test") || strings.Contains(lowerPath, ".spec") {
 		return 3
 	}
 	return 0
@@ -346,10 +388,11 @@ func taskMatchScore(task, rel, reason string) int {
 
 func pathTokens(rel string) map[string]struct{} {
 	tokens := map[string]struct{}{}
-	for _, token := range strings.FieldsFunc(strings.ToLower(filepath.ToSlash(rel)), func(r rune) bool {
+	for _, token := range strings.FieldsFunc(filepath.ToSlash(rel), func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
 	}) {
 		for _, segment := range splitToken(token) {
+			segment = strings.ToLower(segment)
 			if len(segment) < 3 {
 				continue
 			}
@@ -364,11 +407,18 @@ func splitToken(value string) []string {
 	if len(parts) > 0 {
 		return parts
 	}
-	if _, stopped := stopWords[value]; !stopped {
-		return []string{value}
-	}
-	return nil
+	return []string{value}
+}
 
+func limitExclusionDetail(reason string, count int, first, last string) string {
+	detail := fmt.Sprintf("omitted %d matching candidates due %s limit", count, strings.ReplaceAll(reason, "_", " "))
+	if first == "" {
+		return detail
+	}
+	if first == last {
+		return detail + "; first/last: " + first
+	}
+	return detail + "; first: " + first + "; last: " + last
 }
 
 func splitCamelToken(value string) []string {

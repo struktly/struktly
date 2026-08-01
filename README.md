@@ -102,8 +102,8 @@ needs them; they are not dependencies of this CLI.
 Struktly asks Git for tracked and non-ignored files, then applies repository
 configuration and token-aware request matching. It skips sensitive filenames,
 detected secrets, binaries, symlinks, dependencies, build output, and local
-runtime state. Every packet explains exclusions and truncation for selected
-items and applied limits.
+runtime state. packets record selected items, relevant exclusions, and truncation
+caused by applied limits.
 
 The built-in limits are 40 files, 64 KiB per file, and 512 KiB total. They are
 exposed as `context.limits` and can only be tightened with
