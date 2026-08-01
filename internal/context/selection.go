@@ -411,7 +411,9 @@ func splitToken(value string) []string {
 }
 
 func limitExclusionDetail(reason string, count int, first, last string) string {
-	detail := fmt.Sprintf("omitted %d matching candidates due %s limit", count, strings.ReplaceAll(reason, "_", " "))
+	reasonLabel := strings.ReplaceAll(reason, "_", " ")
+	reasonLabel = strings.TrimSuffix(reasonLabel, " limit")
+	detail := fmt.Sprintf("omitted %d matching candidates due to %s limit", count, reasonLabel)
 	if first == "" {
 		return detail
 	}

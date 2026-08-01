@@ -251,6 +251,12 @@ func TestSelectionPrefersImplementationForCamelCaseQuickSwitcherUnderItemLimit(t
 	if decision.Path != "item_limit" || !strings.Contains(decision.Detail, "omitted 3") {
 		t.Fatalf("unexpected item-limit summary: %#v", decision)
 	}
+	if !strings.Contains(decision.Detail, "due to item limit") {
+		t.Fatalf("unexpected item-limit rationale: %#v", decision)
+	}
+	if strings.Contains(decision.Detail, "limit limit") {
+		t.Fatalf("unexpected duplicated limit wording: %#v", decision)
+	}
 }
 
 func TestSelectionAggregatesItemLimitExclusions(t *testing.T) {
@@ -286,6 +292,12 @@ func TestSelectionAggregatesItemLimitExclusions(t *testing.T) {
 	if !strings.Contains(decision.Detail, "omitted 7") {
 		t.Fatalf("unexpected item-limit detail: %#v", decision)
 	}
+	if !strings.Contains(decision.Detail, "due to item limit") {
+		t.Fatalf("unexpected item-limit rationale: %#v", decision)
+	}
+	if strings.Contains(decision.Detail, "limit limit") {
+		t.Fatalf("unexpected duplicated limit wording: %#v", decision)
+	}
 }
 
 func TestSelectionAggregatesTotalLimitExclusions(t *testing.T) {
@@ -320,6 +332,12 @@ func TestSelectionAggregatesTotalLimitExclusions(t *testing.T) {
 	}
 	if !strings.Contains(decision.Detail, "omitted 6") {
 		t.Fatalf("unexpected total-limit detail: %#v", decision)
+	}
+	if !strings.Contains(decision.Detail, "due to total limit") {
+		t.Fatalf("unexpected total-limit rationale: %#v", decision)
+	}
+	if strings.Contains(decision.Detail, "limit limit") {
+		t.Fatalf("unexpected duplicated limit wording: %#v", decision)
 	}
 }
 
