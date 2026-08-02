@@ -9,44 +9,61 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2ea44f" alt="MIT license"></a>
 </p>
 
-`struktly` builds useful repository context for a coding request. It reads a
-local Git repository and returns Markdown for people or versioned JSON for
-tools.
+`struktly` is the part of Struktly that decides what a coding agent is given.
+It reads a local Git repository and produces a context packet: the files and
+repository guidance selected for one coding request, with a record of what was
+selected, what was excluded, and why.
+
+This repository is public so that decision can be audited. The
+[Struktly desktop app](https://struktly.io/) is a separate, closed product that
+runs and reviews agent work; it uses this CLI as its context layer. What you can
+read here is what the app uses to build context — so the selection behavior, the
+exclusions, and the limits are checkable by anyone, not taken on trust.
 
 The CLI runs locally. It does not call a model, upload source code, or start a
 coding agent.
 
-The [Struktly desktop app](https://struktly.io/) uses this CLI as its context
-layer. The app is a separate product for running and reviewing agent work; this
-repository contains only the open-source CLI.
-
-## Install
+## Verify it yourself
 
 Struktly requires Go 1.25 or newer and Git.
+
+```sh
+git clone https://github.com/struktly/struktly
+cd struktly
+make test
+make build
+```
+
+Or install the published build directly:
 
 ```sh
 go install github.com/struktly/struktly/cmd/struktly@latest
 struktly version
 ```
 
-## Try it
-
-Run these commands from a Git repository:
+Run it against a repository you know well and read what it selected:
 
 ```sh
-# Create optional repository configuration and a general repository summary.
-struktly init
-
-# Print context selected for one coding request.
 struktly context --stdout "add request timeout middleware"
 ```
 
-`context` writes a Markdown file and a `struktly/packet/v2` JSON file under
-`.struktly/context-packets/`. Use `--json` when another program needs the
-structured packet. Use `--json --no-write` when an integration needs only the
-packet and must not modify the repository. `brief` remains a compatible alias.
+The packet is a plain artifact. `context` writes a Markdown file and a
+`struktly/packet/v2` JSON file under `.struktly/context-packets/`. Use `--json`
+for the structured packet, and `--json --no-write` when nothing may be written to
+the repository. `brief` remains a compatible alias.
 
-You can pass the Markdown packet directly to an installed coding agent:
+Two commands exist specifically to make the selection inspectable:
+
+```sh
+# Why would this file be included or excluded?
+struktly explain internal/http/router.go
+
+# What schemas and machine-interface features does this build support?
+struktly capabilities
+```
+
+Because the packet is just text, you can confirm that what reaches an agent is
+exactly what the packet contains:
 
 ```sh
 struktly context --stdout "add request timeout middleware" | claude -p
@@ -56,7 +73,7 @@ struktly context --stdout "add request timeout middleware" | codex exec -
 Struktly supplies context only. Claude Code, Codex, or another caller still owns
 its permissions and execution behavior.
 
-## Core commands
+## Commands
 
 | Command | What it does |
 |---|---|
@@ -71,10 +88,19 @@ its permissions and execution behavior.
 | `suggest-instructions` | Draft agent instruction files for human review. |
 | `mcp` | Expose repository scanning and request-specific context over MCP stdio. |
 
-The desktop app—not this CLI—owns chats, executions, provider sessions, working
-copies, checks, evidence, memory, and review history.
-
 Run `struktly <command> --help` for flags.
+
+## What enters a packet
+
+Struktly asks Git for tracked and non-ignored files, then applies repository
+configuration and token-aware request matching. It skips sensitive filenames,
+detected secrets, binaries, symlinks, dependencies, build output, and local
+runtime state. Packets record selected items, relevant exclusions, and truncation
+caused by applied limits.
+
+The built-in limits are 40 files, 64 KiB per file, and 512 KiB total. They are
+exposed as `context.limits` and can only be tightened with `--max-items`,
+`--max-file-bytes`, and `--max-total-bytes`.
 
 ## Files and state
 
@@ -97,26 +123,16 @@ dispatch, approvals, sessions, and durable history belong to Struktly Platform.
 Intelligence experiments are integrated there only when a product capability
 needs them; they are not dependencies of this CLI.
 
-## What enters a packet
+The desktop app—not this CLI—owns chats, executions, provider sessions, working
+copies, checks, evidence, memory, and review history.
 
-Struktly asks Git for tracked and non-ignored files, then applies repository
-configuration and token-aware request matching. It skips sensitive filenames,
-detected secrets, binaries, symlinks, dependencies, build output, and local
-runtime state. packets record selected items, relevant exclusions, and truncation
-caused by applied limits.
-
-The built-in limits are 40 files, 64 KiB per file, and 512 KiB total. They are
-exposed as `context.limits` and can only be tightened with
-`--max-items`, `--max-file-bytes`, and `--max-total-bytes`.
-
-## Integrations
+## Machine interfaces
 
 Machine-readable formats are defined in [`schemas/`](schemas/). The command,
 stream, error, and exit-code contract is documented in
 [`docs/integration-contract.md`](docs/integration-contract.md). Compatibility
-rules are in [`docs/compatibility.md`](docs/compatibility.md).
-Current scope and planned context-quality work are in
-[`docs/roadmap.md`](docs/roadmap.md).
+rules are in [`docs/compatibility.md`](docs/compatibility.md). Current scope and
+planned context-quality work are in [`docs/roadmap.md`](docs/roadmap.md).
 
 Start the MCP server with:
 
