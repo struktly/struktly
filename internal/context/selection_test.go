@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,7 +22,7 @@ func TestSelectionHonorsNestedAnchoredGitIgnore(t *testing.T) {
 	runGit(t, root, "add", "nested/.gitignore")
 	runGit(t, root, "commit", "-qm", "add nested ignore")
 
-	selection, err := selectPacketContext(stdcontext.Background(), root, "inspect private docs", nil)
+	selection, err := selectPacketContextWithLimits(stdcontext.Background(), root, "inspect private docs", nil, DefaultPacketLimits())
 	if err != nil {
 		t.Fatalf("selectPacketContext returned error: %v", err)
 	}
@@ -48,7 +49,7 @@ func TestSelectionExcludesSecretContentWithoutSerializingIt(t *testing.T) {
 	const secret = "private-material-must-not-leak"
 	writeFile(t, root, "src/auth.go", "-----BEGIN PRIVATE KEY-----\n"+secret+"\n")
 
-	selection, err := selectPacketContext(stdcontext.Background(), root, "review auth", nil)
+	selection, err := selectPacketContextWithLimits(stdcontext.Background(), root, "review auth", nil, DefaultPacketLimits())
 	if err != nil {
 		t.Fatalf("selectPacketContext returned error: %v", err)
 	}
@@ -96,7 +97,7 @@ func TestSelectionExcludesNULBinary(t *testing.T) {
 	root := initSelectionRepo(t)
 	writeFile(t, root, "binary.dat", "text\x00binary")
 
-	selection, err := selectPacketContext(stdcontext.Background(), root, "inspect binary", nil)
+	selection, err := selectPacketContextWithLimits(stdcontext.Background(), root, "inspect binary", nil, DefaultPacketLimits())
 	if err != nil {
 		t.Fatalf("selectPacketContext returned error: %v", err)
 	}
@@ -121,7 +122,7 @@ func TestSelectionClassifiesMatchingPortableTask(t *testing.T) {
 	root := initSelectionRepo(t)
 	writeFile(t, root, ".struktly/tasks/add-timeout.md", validTaskDocument)
 
-	selection, err := selectPacketContext(stdcontext.Background(), root, "add timeout", nil)
+	selection, err := selectPacketContextWithLimits(stdcontext.Background(), root, "add timeout", nil, DefaultPacketLimits())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +138,7 @@ func TestSelectionExcludesSymlink(t *testing.T) {
 		t.Fatalf("create symlink: %v", err)
 	}
 
-	selection, err := selectPacketContext(stdcontext.Background(), root, "inspect linked docs", nil)
+	selection, err := selectPacketContextWithLimits(stdcontext.Background(), root, "inspect linked docs", nil, DefaultPacketLimits())
 	if err != nil {
 		t.Fatalf("selectPacketContext returned error: %v", err)
 	}
@@ -150,7 +151,7 @@ func TestSelectionTruncatesOversizedUTF8AtValidBoundary(t *testing.T) {
 	content := strings.Repeat("a", maxPacketFileBytes-1) + "€" + "tail"
 	writeFile(t, root, "oversized.txt", content)
 
-	selection, err := selectPacketContext(stdcontext.Background(), root, "inspect oversized file", nil)
+	selection, err := selectPacketContextWithLimits(stdcontext.Background(), root, "inspect oversized file", nil, DefaultPacketLimits())
 	if err != nil {
 		t.Fatalf("selectPacketContext returned error: %v", err)
 	}
@@ -167,6 +168,210 @@ func TestSelectionTruncatesOversizedUTF8AtValidBoundary(t *testing.T) {
 		t.Fatalf("content hash = %q, want %q", item.ContentHash, wantHash)
 	}
 	assertDecision(t, selection.truncations, "oversized.txt", "content_limit")
+}
+
+func TestSelectionDoesNotMatchGenericRepositoryWords(t *testing.T) {
+	root := initSelectionRepo(t)
+	writeFile(t, root, "repository-overview.md", "# Repository overview\n")
+	writeFile(t, root, "repo-summary.md", "# Repo summary\n")
+	writeFile(t, root, ".struktly/tasks/repository-task.md", "# repository task\n")
+	runGit(t, root, "add", "repository-overview.md", "repo-summary.md", ".struktly/tasks/repository-task.md")
+	runGit(t, root, "commit", "-qm", "add repository words")
+
+	selection, err := selectPacketContextWithLimits(
+		stdcontext.Background(),
+		root,
+		"What does this repository do?",
+		nil,
+		DefaultPacketLimits(),
+	)
+	if err != nil {
+		t.Fatalf("selectPacketContext returned error: %v", err)
+	}
+	for _, item := range selection.items {
+		if item.Path == "repository-overview.md" || item.Path == "repo-summary.md" || item.Path == ".struktly/tasks/repository-task.md" {
+			t.Fatalf("generic request words incorrectly matched %s", item.Path)
+		}
+		if item.Reason == "task_match" {
+			t.Fatalf("generic words should not drive task_match selection: %#v", item)
+		}
+	}
+}
+
+func TestSelectionDoesNotMatchDockerfileFromDockWord(t *testing.T) {
+	root := initSelectionRepo(t)
+	writeFile(t, root, "Dockerfile", "# docker image\n")
+	writeFile(t, root, ".dockerignore", "tmp/\n")
+	runGit(t, root, "add", "Dockerfile", ".dockerignore")
+	runGit(t, root, "commit", "-qm", "add docker files")
+
+	selection, err := selectPacketContextWithLimits(stdcontext.Background(), root, "terminal dock", nil, DefaultPacketLimits())
+	if err != nil {
+		t.Fatalf("selectPacketContext returned error: %v", err)
+	}
+	assertItemAbsent(t, selection.items, "Dockerfile")
+	assertItemAbsent(t, selection.items, ".dockerignore")
+}
+
+func TestSelectionPrefersImplementationForCamelCaseQuickSwitcherUnderItemLimit(t *testing.T) {
+	root := initSelectionRepo(t)
+	writeFile(t, root, ".struktly/config.json", `{"schema":"struktly/config/v1","context":{"exclude":["README.md",".struktly/config.json"]},"checks":{}}`)
+	writeFile(t, root, "app/src/app/shell/QuickSwitcher.tsx", "export const quickSwitch = true\n")
+	writeFile(t, root, "app/src/app/shell/QuickSwitcher.test.tsx", "export const quickSwitch = true\n")
+	writeFile(t, root, "e2e/quick-switcher.md", "# E2E quick switcher\n")
+	writeFile(t, root, ".struktly/tasks/quick-switcher.md", validTaskDocument)
+	runGit(t, root, "add", ".struktly/config.json", "app/src/app/shell/QuickSwitcher.tsx", "app/src/app/shell/QuickSwitcher.test.tsx", "e2e/quick-switcher.md", ".struktly/tasks/quick-switcher.md")
+	runGit(t, root, "commit", "-qm", "add timeout candidates")
+
+	selection, err := selectPacketContextWithLimits(
+		stdcontext.Background(),
+		root,
+		"quick switcher",
+		nil,
+		PacketLimits{
+			MaxItems:      1,
+			MaxFileBytes:  maxPacketFileBytes,
+			MaxTotalBytes: maxPacketTotalBytes,
+		},
+	)
+	if err != nil {
+		t.Fatalf("selectPacketContext returned error: %v", err)
+	}
+	if len(selection.items) != 1 {
+		t.Fatalf("expected one selected item, got %d", len(selection.items))
+	}
+	item := requireItem(t, selection.items, "app/src/app/shell/QuickSwitcher.tsx")
+	if item.Reason != "task_match" {
+		t.Fatalf("expected task_match reason for ranked source file, got: %#v", item)
+	}
+	decision, ok := findDecision(selection.exclusions, "item_limit")
+	if !ok {
+		t.Fatalf("expected item_limit aggregate exclusion, got %v", selection.exclusions)
+	}
+	if decision.Path != "item_limit" || !strings.Contains(decision.Detail, "omitted 3") {
+		t.Fatalf("unexpected item-limit summary: %#v", decision)
+	}
+	if !strings.Contains(decision.Detail, "due to item limit") {
+		t.Fatalf("unexpected item-limit rationale: %#v", decision)
+	}
+	if strings.Contains(decision.Detail, "limit limit") {
+		t.Fatalf("unexpected duplicated limit wording: %#v", decision)
+	}
+}
+
+func TestSelectionAggregatesItemLimitExclusions(t *testing.T) {
+	root := initSelectionRepo(t)
+	writeFile(t, root, ".struktly/config.json", `{"schema":"struktly/config/v1","context":{"exclude":["README.md",".struktly/config.json"]},"checks":{}}`)
+	for i := 0; i < 8; i++ {
+		writeFile(t, root, fmt.Sprintf("app/file-%02d.txt", i), "x")
+	}
+	runGit(t, root, "add", ".struktly/config.json", "app")
+	runGit(t, root, "commit", "-qm", "add app files")
+
+	selection, err := selectPacketContextWithLimits(
+		stdcontext.Background(),
+		root,
+		"app",
+		nil,
+		PacketLimits{
+			MaxItems:      1,
+			MaxFileBytes:  maxPacketFileBytes,
+			MaxTotalBytes: maxPacketTotalBytes,
+		},
+	)
+	if err != nil {
+		t.Fatalf("selectPacketContext returned error: %v", err)
+	}
+	if len(selection.items) != 1 {
+		t.Fatalf("expected one selected item, got %d", len(selection.items))
+	}
+	decision, ok := findDecision(selection.exclusions, "item_limit")
+	if !ok {
+		t.Fatalf("expected item_limit aggregate exclusion, got %v", selection.exclusions)
+	}
+	if !strings.Contains(decision.Detail, "omitted 7") {
+		t.Fatalf("unexpected item-limit detail: %#v", decision)
+	}
+	if !strings.Contains(decision.Detail, "due to item limit") {
+		t.Fatalf("unexpected item-limit rationale: %#v", decision)
+	}
+	if strings.Contains(decision.Detail, "limit limit") {
+		t.Fatalf("unexpected duplicated limit wording: %#v", decision)
+	}
+}
+
+func TestSelectionAggregatesTotalLimitExclusions(t *testing.T) {
+	root := initSelectionRepo(t)
+	writeFile(t, root, ".struktly/config.json", `{"schema":"struktly/config/v1","context":{"exclude":["README.md",".struktly/config.json"]},"checks":{}}`)
+	for i := 0; i < 10; i++ {
+		writeFile(t, root, fmt.Sprintf("app/file-%02d.txt", i), "x")
+	}
+	runGit(t, root, "add", ".struktly/config.json", "app")
+	runGit(t, root, "commit", "-qm", "add many app files")
+
+	selection, err := selectPacketContextWithLimits(
+		stdcontext.Background(),
+		root,
+		"app",
+		nil,
+		PacketLimits{
+			MaxItems:      maxPacketItems,
+			MaxFileBytes:  maxPacketFileBytes,
+			MaxTotalBytes: 4,
+		},
+	)
+	if err != nil {
+		t.Fatalf("selectPacketContext returned error: %v", err)
+	}
+	if len(selection.items) != 4 {
+		t.Fatalf("expected total limit to include 4 files, got %d", len(selection.items))
+	}
+	decision, ok := findDecision(selection.exclusions, "total_limit")
+	if !ok {
+		t.Fatalf("expected total_limit aggregate exclusion, got %v", selection.exclusions)
+	}
+	if !strings.Contains(decision.Detail, "omitted 6") {
+		t.Fatalf("unexpected total-limit detail: %#v", decision)
+	}
+	if !strings.Contains(decision.Detail, "due to total limit") {
+		t.Fatalf("unexpected total-limit rationale: %#v", decision)
+	}
+	if strings.Contains(decision.Detail, "limit limit") {
+		t.Fatalf("unexpected duplicated limit wording: %#v", decision)
+	}
+}
+
+func TestBriefPacketHashIsDeterministicWithAggregatedLimitExclusions(t *testing.T) {
+	root := initSelectionRepo(t)
+	for i := 0; i < 8; i++ {
+		writeFile(t, root, fmt.Sprintf("app/file-%02d.txt", i), "x")
+	}
+	runGit(t, root, "add", "-A")
+	runGit(t, root, "commit", "-qm", "add app files")
+
+	first, err := Brief(BriefOptions{
+		Root:         root,
+		Task:         "app",
+		NoWrite:      true,
+		MaxItems:     1,
+		MaxFileBytes: maxPacketFileBytes,
+	})
+	if err != nil {
+		t.Fatalf("first brief returned error: %v", err)
+	}
+	second, err := Brief(BriefOptions{
+		Root:         root,
+		Task:         "app",
+		NoWrite:      true,
+		MaxItems:     1,
+		MaxFileBytes: maxPacketFileBytes,
+	})
+	if err != nil {
+		t.Fatalf("second brief returned error: %v", err)
+	}
+	if first.Packet.PacketHash != second.Packet.PacketHash {
+		t.Fatalf("packet hash changed for deterministic limit-excluded selection: %s != %s", first.Packet.PacketHash, second.Packet.PacketHash)
+	}
 }
 
 func TestPacketHashIgnoresGenerationTimeAndTracksSelectedContent(t *testing.T) {
@@ -243,6 +448,10 @@ func TestPacketHashTracksDeterministicCompatibilityFields(t *testing.T) {
 	}
 }
 
+func selectPacketContextWithLimits(ctx stdcontext.Context, requestedRoot, task string, detectedChecks []string, limits PacketLimits) (packetSelection, error) {
+	return selectPacketContext(ctx, requestedRoot, task, detectedChecks, limits)
+}
+
 func initSelectionRepo(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -268,6 +477,15 @@ func assertDecision(t *testing.T, decisions []PacketDecision, path, reason strin
 		}
 	}
 	t.Fatalf("no decision for %s in %+v", path, decisions)
+}
+
+func findDecision(decisions []PacketDecision, reason string) (PacketDecision, bool) {
+	for _, decision := range decisions {
+		if decision.Reason == reason {
+			return decision, true
+		}
+	}
+	return PacketDecision{}, false
 }
 
 func assertItemAbsent(t *testing.T, items []PacketItem, path string) {

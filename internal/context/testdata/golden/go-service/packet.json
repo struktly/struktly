@@ -97,6 +97,22 @@
     },
     {
       "kind": "source",
+      "path": "middleware/logger.go",
+      "content": "package middleware\n\nimport (\n\t\"log\"\n\t\"net/http\"\n)\n\n// Logger logs each request method and path.\nfunc Logger(h http.Handler) http.Handler {\n\treturn http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {\n\t\tlog.Printf(\"%s %s\", r.Method, r.URL.Path)\n\t\th.ServeHTTP(w, r)\n\t})\n}\n",
+      "content_hash": "sha256:79ab9481be7e91f1130665b0c50407af6c808a804d625e2d625837b3d517f21a",
+      "provenance": {
+        "source": "middleware/logger.go",
+        "revision": "983c7b8424a771fe26dbd36f266a305acf674d48",
+        "method": "task_match",
+        "confidence": "detected"
+      },
+      "reason": "task_match",
+      "original_bytes": 281,
+      "included_bytes": 281,
+      "truncated": false
+    },
+    {
+      "kind": "source",
       "path": "middleware/timeout.go",
       "content": "// Package middleware provides HTTP middleware for the service.\npackage middleware\n\nimport (\n\t\"net/http\"\n\t\"time\"\n)\n\n// Timeout wraps h with a fixed request timeout.\nfunc Timeout(h http.Handler, d time.Duration) http.Handler {\n\treturn http.TimeoutHandler(h, d, \"request timed out\")\n}\n",
       "content_hash": "sha256:1ddd4a28247cbd327889ea8e97584abab79c8074864dbc715869bcee82602f7d",
@@ -127,7 +143,7 @@
     "max_file_bytes": 65536,
     "max_total_bytes": 524288
   },
-  "packet_hash": "sha256:b167c155e8862f6ed24cb10f4d6320adeeace79f25ed36c2f46c237e37e83e57",
+  "packet_hash": "sha256:531e1a152851a953d8caf4c1ad52de87fe7eeece25b292ec4b55275c6adf844c",
   "task": "add request timeout middleware",
   "direction": "# Direction\n\nShip a reliable payments API with strict timeouts on every outbound call.\n\n## Non-goals\n\n- No new public endpoints until the middleware chain is hardened.",
   "constraints": "# Constraints\n\n- Keep handler latency under 200ms.\n- No new third-party dependencies without a decision record.",
