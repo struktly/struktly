@@ -54,6 +54,11 @@ type Task struct {
 	Contract           TaskContract `json:"contract"`
 	SHA256             string       `json:"sha256"`
 	CompatibilityNotes []string     `json:"compatibility_notes,omitempty"`
+	// Extensions carries frontmatter keys this parser does not define. OKF v0.2
+	// §4.1 requires consumers to tolerate unrecognized fields and asks them to
+	// preserve those fields when round-tripping; dropping them silently would
+	// make a producer's own annotations disappear on every read.
+	Extensions map[string]string `json:"extensions,omitempty"`
 }
 
 type InvalidTaskFile struct {
@@ -117,15 +122,15 @@ func DiscoverTasks(root string) (TasksDocument, error) {
 		if entry.IsDir() || filepath.Ext(entry.Name()) != ".md" {
 			continue
 		}
-		// A README beside the tasks, explaining how to write them, is the one
-		// file in this directory that is conventionally not a task. Reporting it
-		// as broken every time teaches readers to ignore the invalid list, which
-		// is exactly where real breakage hides.
+		// OKF v0.2 §8 and §9 reserve index.md and log.md: a directory listing
+		// and an update history. They are not concept documents, so they carry
+		// no `type` and conformance does not ask them to.
 		//
-		// Deliberately a named exception rather than "skip anything without
-		// frontmatter": an author who forgets frontmatter must still be told,
-		// because a task that silently fails to appear is the worse failure.
-		if strings.EqualFold(entry.Name(), "README.md") {
+		// Deliberately a fixed list rather than "skip anything without
+		// frontmatter": an author who forgets frontmatter on a real task must
+		// still be told, because a task that silently fails to appear is the
+		// worse failure of the two.
+		if isReservedOKFName(entry.Name()) {
 			continue
 		}
 		path := filepath.Join(dir, entry.Name())
@@ -140,6 +145,12 @@ func DiscoverTasks(root string) (TasksDocument, error) {
 	sort.Slice(document.Tasks, func(i, j int) bool { return document.Tasks[i].Path < document.Tasks[j].Path })
 	sort.Slice(document.Invalid, func(i, j int) bool { return document.Invalid[i].Path < document.Invalid[j].Path })
 	return document, nil
+}
+
+// isReservedOKFName reports whether a filename is reserved by OKF v0.2 rather
+// than being a concept document. §8 defines index.md, §9 defines log.md.
+func isReservedOKFName(name string) bool {
+	return strings.EqualFold(name, "index.md") || strings.EqualFold(name, "log.md")
 }
 
 func emptyTasksDocument() TasksDocument {
@@ -171,28 +182,37 @@ func loadTaskFile(root, path string, validateBody bool) (Task, error) {
 		return Task{}, invalidTask(rel, err)
 	}
 
-	allowed := map[string]struct{}{
+	// Unknown frontmatter keys are carried, not rejected. A task file is an OKF
+	// concept document, and OKF v0.2 §4.1 is explicit: producers may add keys,
+	// and consumers "MUST NOT reject documents with unrecognized fields" and
+	// SHOULD preserve them when round-tripping.
+	//
+	// This used to be an allowlist. It meant a repository could not annotate its
+	// own tasks with anything this parser had not been taught, and the failure
+	// was the worst kind: the file vanished from the task list rather than
+	// keeping the fields it did understand.
+	known := map[string]struct{}{
 		"type": {}, "schema": {}, "id": {}, "title": {}, "status": {},
 		"priority": {}, "created": {}, "updated": {}, "agent": {},
 		"agent_model": {}, "reasoning_effort": {},
 		"agent_session": {}, "resume_command": {},
 	}
-	for key := range metadata {
-		if _, ok := allowed[key]; !ok {
-			return Task{}, invalidTask(rel, fmt.Errorf("unknown frontmatter field %q", key))
+	extensions := map[string]string{}
+	for key, value := range metadata {
+		if _, ok := known[key]; !ok {
+			extensions[key] = value
 		}
 	}
 	// Required is what makes a file a task at all: what it is, which contract it
 	// speaks, its identity, what it is called, and where it stands. Everything
 	// else describes a task rather than constituting one.
 	//
-	// priority, created and agent were required until 2026-08-03. That forced
-	// every author to answer questions a fresh contract cannot honestly answer —
-	// an unstarted task has no agent, and "unassigned" is a magic string
-	// standing in for a field that should simply be absent. The cost was not
-	// worse metadata but invisible tasks: a file missing one is not a task at
-	// all, so a repository can carry a shelf of carefully written contracts that
-	// no tool will show. That is what happened, to 30 files out of 32.
+	// priority, created and agent used to be required. That forced every author
+	// to answer questions a fresh contract cannot honestly answer — an unstarted
+	// task has no agent, and "unassigned" is a magic string standing in for a
+	// field that should simply be absent. The cost was not worse metadata but
+	// invisible tasks: a file missing one is not a task at all, so a repository
+	// can carry a shelf of carefully written contracts that no tool will show.
 	for _, key := range []string{"type", "schema", "id", "title", "status"} {
 		if strings.TrimSpace(metadata[key]) == "" {
 			return Task{}, invalidTask(rel, fmt.Errorf("frontmatter field %q is required", key))
@@ -268,6 +288,7 @@ func loadTaskFile(root, path string, validateBody bool) (Task, error) {
 		Contract:           contract,
 		SHA256:             hex.EncodeToString(digest[:]),
 		CompatibilityNotes: compatibilityNotes,
+		Extensions:         extensions,
 	}, nil
 }
 

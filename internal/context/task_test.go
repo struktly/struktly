@@ -220,6 +220,30 @@ func TestDiscoverTasksRejectsSymlinkAsInvalid(t *testing.T) {
 	}
 }
 
+// OKF v0.2 §4.1: producers may add frontmatter keys, and a consumer "MUST NOT
+// reject documents with unrecognized fields" and SHOULD preserve them when
+// round-tripping. This asserted the opposite until a task file carrying one
+// extra key was found vanishing from the list entirely.
+func TestUnknownFrontmatterIsPreservedNotRejected(t *testing.T) {
+	root := t.TempDir()
+	content := strings.Replace(validTaskDocument, "agent: unassigned", "agent: unassigned\nowner: team-platform", 1)
+	writeFile(t, root, ".struktly/tasks/add-timeout.md", content)
+
+	tasks, err := LoadTasks(root)
+	if err != nil {
+		t.Fatalf("LoadTasks rejected an extension field: %v", err)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("expected the task to survive, got %d", len(tasks))
+	}
+	if got := tasks[0].Extensions["owner"]; got != "team-platform" {
+		t.Fatalf("extension dropped: Extensions = %#v", tasks[0].Extensions)
+	}
+	if tasks[0].Title == "" || tasks[0].Status == "" {
+		t.Fatalf("known fields lost alongside the extension: %#v", tasks[0])
+	}
+}
+
 func TestLoadTasksRejectsMalformedTasks(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -227,7 +251,6 @@ func TestLoadTasksRejectsMalformedTasks(t *testing.T) {
 		content string
 		want    string
 	}{
-		{name: "unknown field", path: "add-timeout.md", content: strings.Replace(validTaskDocument, "agent: unassigned", "agent: unassigned\nowner: team", 1), want: "unknown frontmatter field"},
 		{name: "noncanonical status", path: "add-timeout.md", content: strings.Replace(validTaskDocument, "status: ready", "status: completed", 1), want: "unsupported status"},
 		{name: "filename mismatch", path: "different.md", content: validTaskDocument, want: "must match filename"},
 		{name: "missing heading", path: "add-timeout.md", content: strings.Replace(validTaskDocument, "## Constraints", "## Notes", 1), want: "required heading"},

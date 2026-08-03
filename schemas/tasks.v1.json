@@ -50,7 +50,12 @@
         "resume_command": { "type": "string" },
         "contract": { "$ref": "#/$defs/contract" },
         "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-        "compatibility_notes": { "$ref": "#/$defs/strings" }
+        "compatibility_notes": { "$ref": "#/$defs/strings" },
+        "extensions": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Frontmatter keys this contract does not define, preserved verbatim. OKF v0.2 §4.1 requires consumers to tolerate unrecognized fields and asks them to preserve them when round-tripping."
+        }
       },
       "required": ["path", "id", "title", "status", "contract", "sha256"],
       "additionalProperties": true
