@@ -117,6 +117,17 @@ func DiscoverTasks(root string) (TasksDocument, error) {
 		if entry.IsDir() || filepath.Ext(entry.Name()) != ".md" {
 			continue
 		}
+		// A README beside the tasks, explaining how to write them, is the one
+		// file in this directory that is conventionally not a task. Reporting it
+		// as broken every time teaches readers to ignore the invalid list, which
+		// is exactly where real breakage hides.
+		//
+		// Deliberately a named exception rather than "skip anything without
+		// frontmatter": an author who forgets frontmatter must still be told,
+		// because a task that silently fails to appear is the worse failure.
+		if strings.EqualFold(entry.Name(), "README.md") {
+			continue
+		}
 		path := filepath.Join(dir, entry.Name())
 		rel := files.RelPath(root, path)
 		task, err := loadTaskFile(root, path, false)
@@ -171,7 +182,18 @@ func loadTaskFile(root, path string, validateBody bool) (Task, error) {
 			return Task{}, invalidTask(rel, fmt.Errorf("unknown frontmatter field %q", key))
 		}
 	}
-	for _, key := range []string{"type", "schema", "id", "title", "status", "priority", "created", "agent"} {
+	// Required is what makes a file a task at all: what it is, which contract it
+	// speaks, its identity, what it is called, and where it stands. Everything
+	// else describes a task rather than constituting one.
+	//
+	// priority, created and agent were required until 2026-08-03. That forced
+	// every author to answer questions a fresh contract cannot honestly answer —
+	// an unstarted task has no agent, and "unassigned" is a magic string
+	// standing in for a field that should simply be absent. The cost was not
+	// worse metadata but invisible tasks: a file missing one is not a task at
+	// all, so a repository can carry a shelf of carefully written contracts that
+	// no tool will show. That is what happened, to 30 files out of 32.
+	for _, key := range []string{"type", "schema", "id", "title", "status"} {
 		if strings.TrimSpace(metadata[key]) == "" {
 			return Task{}, invalidTask(rel, fmt.Errorf("frontmatter field %q is required", key))
 		}
@@ -196,7 +218,11 @@ func loadTaskFile(root, path string, validateBody bool) (Task, error) {
 	if !oneOf(metadata["status"], "draft", "ready", "in-progress", "blocked", "done", "canceled") {
 		return Task{}, invalidTask(rel, fmt.Errorf("unsupported status %q", metadata["status"]))
 	}
-	if !oneOf(metadata["priority"], "low", "normal", "high", "critical") {
+	// Absent priority is a task nobody has ranked, which is an ordinary state and
+	// not an error. "medium" replaces "normal": every author who reached for a
+	// middle rung unprompted wrote "medium", and low/medium/high is the ladder
+	// people already think in.
+	if metadata["priority"] != "" && !oneOf(metadata["priority"], "low", "medium", "high", "critical") {
 		return Task{}, invalidTask(rel, fmt.Errorf("unsupported priority %q", metadata["priority"]))
 	}
 	for _, key := range []string{"created", "updated"} {

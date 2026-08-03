@@ -40,7 +40,7 @@
         "id": { "type": "string" },
         "title": { "type": "string" },
         "status": { "enum": ["draft", "ready", "in-progress", "blocked", "done", "canceled"] },
-        "priority": { "enum": ["low", "normal", "high", "critical"] },
+        "priority": { "enum": ["low", "medium", "high", "critical"] },
         "created": { "type": "string", "format": "date" },
         "updated": { "type": "string", "format": "date" },
         "agent": { "type": "string" },
@@ -52,7 +52,7 @@
         "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
         "compatibility_notes": { "$ref": "#/$defs/strings" }
       },
-      "required": ["path", "id", "title", "status", "priority", "created", "agent", "contract", "sha256"],
+      "required": ["path", "id", "title", "status", "contract", "sha256"],
       "additionalProperties": true
     },
     "invalid": {

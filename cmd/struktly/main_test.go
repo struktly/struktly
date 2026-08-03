@@ -514,7 +514,7 @@ schema: struktly/task/v1
 id: ` + id + `
 title: "` + title + `"
 status: ready
-priority: normal
+priority: medium
 created: 2026-07-13
 agent: unassigned
 ---

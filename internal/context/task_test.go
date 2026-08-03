@@ -16,7 +16,7 @@ schema: struktly/task/v1
 id: add-timeout
 title: "Add request timeout"
 status: ready
-priority: normal
+priority: medium
 created: 2026-07-13
 agent: unassigned
 ---
