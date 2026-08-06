@@ -4,6 +4,17 @@ Notable changes will be recorded here.
 
 ## Unreleased
 
+- **Added symbol matching to context selection.** Go sources are now matched on
+  the identifiers they declare, not only on their paths, so a request naming
+  `WithTimeout` reaches the file declaring it even when nothing in the path says
+  so. Reported as the `symbol_match` reason with the matched declarations in
+  `provenance.location`, surfaced by `explain`, and advertised as
+  `context.symbol_matching`. Matching only adds candidates: excluded files are
+  never indexed, and a repository in another language is unaffected.
+- Dropped action verbs (`add`, `fix`, `update`, and similar) from request
+  matching. A request names an action and a subject, and only the subject
+  identifies code; without this, "add request timeout" matched every
+  `AddString` in the repository.
 - **Added declaration rendering for oversized Go files.** A Go source file that
   does not fit its byte budget is now included as its declarations — package
   clause, imports, types, values, and every function signature with its doc

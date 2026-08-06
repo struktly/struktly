@@ -280,6 +280,8 @@ func humanReason(value string) string {
 		return "repository instruction file"
 	case "task_match":
 		return "its filename matched the task"
+	case "symbol_match":
+		return "it declares an identifier the request names"
 	case "config_excluded":
 		return "excluded by repository configuration"
 	case "item_limit":
@@ -390,7 +392,7 @@ func (p *contextPacket) toPacket(ctx stdcontext.Context, limits PacketLimits) (P
 		VerificationCommands: verification,
 		Docs:                 files.LimitStrings(d.docs, 15),
 		SuggestedFiles:       d.suggestedFiles,
-		ReadWarnings:         p.readWarnings,
+		ReadWarnings:         append(append([]string{}, p.readWarnings...), selection.readWarnings...),
 		SourceRefs:           files.SortedStrings(p.sourceRefs),
 	}
 	if err := pkt.setHash(); err != nil {

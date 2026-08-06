@@ -27,6 +27,10 @@ const (
 	maxPacketTotalBytes = 512 * 1024
 )
 
+// stopWords are the words in a request that say nothing about which files it
+// concerns. The second group is verbs: a request names an action and a subject,
+// and only the subject identifies code. Without them "add request timeout"
+// matched every AddString and addOpenQuestion in the repository.
 var stopWords = map[string]struct{}{
 	"a":          {},
 	"about":      {},
@@ -55,6 +59,23 @@ var stopWords = map[string]struct{}{
 	"where":      {},
 	"which":      {},
 	"with":       {},
+
+	"add":       {},
+	"allow":     {},
+	"change":    {},
+	"create":    {},
+	"delete":    {},
+	"ensure":    {},
+	"fix":       {},
+	"handle":    {},
+	"implement": {},
+	"improve":   {},
+	"make":      {},
+	"refactor":  {},
+	"remove":    {},
+	"support":   {},
+	"update":    {},
+	"use":       {},
 }
 
 var ErrInvalidPacketLimit = errors.New("invalid packet limit")
@@ -163,6 +184,7 @@ type packetSelection struct {
 	requiredChecks  []string
 	suggestedChecks []string
 	instructions    []string
+	readWarnings    []string
 	limits          PacketLimits
 }
 
@@ -194,6 +216,7 @@ func selectPacketContext(ctx stdcontext.Context, requestedRoot, task string, det
 		requiredChecks:  append([]string{}, cfg.Checks.Required...),
 		suggestedChecks: uniqueSorted(append(append([]string(nil), cfg.Checks.Suggested...), detectedChecks...)),
 		instructions:    []string{},
+		readWarnings:    []string{},
 		limits:          limits,
 	}
 	limitOmissions := map[string]limitDecision{
@@ -201,11 +224,27 @@ func selectPacketContext(ctx stdcontext.Context, requestedRoot, task string, det
 		"total_limit": {},
 	}
 
+	// Symbol matching only adds candidates: a repository in another language,
+	// or one where nothing parses, selects exactly what it selected before.
+	notSelectable := func(rel string) bool {
+		return ignoredDirPath(rel) || matchesAny(rel, cfg.Context.Exclude)
+	}
+	symbols := buildSymbolIndex(repo.absoluteRoot, paths, selectionTaskWords(task), notSelectable)
+	if symbols.skipped > 0 {
+		result.readWarnings = append(result.readWarnings, fmt.Sprintf(
+			"Symbol matching covered %d files and stopped at the %d-file limit; %d were not indexed.",
+			symbols.indexed, maxIndexedSymbolFiles, symbols.skipped))
+	}
+
 	candidates := make([]packetCandidate, 0, len(paths))
 	for _, rel := range paths {
 		reason := selectionReason(rel, task, cfg.Context.Include)
+		symbol := symbols.match(rel)
 		if reason == "" {
-			continue
+			if symbol.score == 0 {
+				continue
+			}
+			reason = "symbol_match"
 		}
 		// A tracked file under a directory named build/ or dist/ used to vanish
 		// before selection, so a packet omitted it with nothing recording that
@@ -224,9 +263,13 @@ func selectPacketContext(ctx stdcontext.Context, requestedRoot, task string, det
 			continue
 		}
 		candidates = append(candidates, packetCandidate{
-			path:        rel,
+			path: rel,
+			// Path and symbol evidence add up, so a file both named for the
+			// request and declaring what it names outranks one with only half
+			// the evidence.
 			reason:      reason,
-			relevance:   taskMatchScore(task, rel, reason),
+			relevance:   taskMatchScore(task, rel, reason) + symbol.score,
+			symbols:     symbol.names,
 			kindPenalty: pathPriority(rel),
 		})
 	}
@@ -270,6 +313,9 @@ func selectPacketContext(ctx stdcontext.Context, requestedRoot, task string, det
 			continue
 		}
 		item := inspection.item
+		if len(candidate.symbols) > 0 {
+			item.Provenance.Location = "declares:" + strings.Join(candidate.symbols, ",")
+		}
 		if inspection.truncatedBy != "" {
 			result.truncations = append(result.truncations, PacketDecision{
 				Path: rel, Reason: inspection.truncatedBy,
@@ -308,6 +354,7 @@ type packetCandidate struct {
 	path        string
 	reason      string
 	relevance   int
+	symbols     []string
 	kindPenalty int
 }
 
@@ -330,6 +377,10 @@ func selectionReasonPriority(reason string) int {
 	switch reason {
 	case "selection_rule", "repository_instruction":
 		return 0
+	// A file that declares what the request names is stronger evidence than one
+	// merely named like it.
+	case "symbol_match":
+		return 1
 	case "task_match":
 		return 2
 	default:
@@ -807,9 +858,18 @@ func ExplainSelection(ctx stdcontext.Context, requestedRoot, requestedPath, task
 		return explanation, nil
 	}
 	reason := selectionReason(rel, task, cfg.Context.Include)
+	symbolDetail := ""
 	if reason == "" {
-		explanation.Reason = "not_selected"
-		return explanation, nil
+		// One path, so this parses one file rather than building an index.
+		// A selection nobody can justify is worse than a selection nobody
+		// makes, so the matched declarations are named in the answer.
+		match, ok := fileSymbolMatch(repo.absoluteRoot, rel, selectionTaskWords(task))
+		if !ok || match.score == 0 {
+			explanation.Reason = "not_selected"
+			return explanation, nil
+		}
+		reason = "symbol_match"
+		symbolDetail = "declares " + strings.Join(match.names, ", ")
 	}
 	inspection, err := inspectSelectedFile(repo, rel, reason, maxPacketTotalBytes, maxPacketFileBytes, false)
 	if err != nil {
@@ -822,6 +882,7 @@ func ExplainSelection(ctx stdcontext.Context, requestedRoot, requestedPath, task
 	}
 	explanation.Decision = "included"
 	explanation.Reason = reason
+	explanation.Detail = symbolDetail
 	return explanation, nil
 }
 

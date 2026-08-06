@@ -119,6 +119,7 @@
       "provenance": {
         "source": "middleware/timeout.go",
         "revision": "983c7b8424a771fe26dbd36f266a305acf674d48",
+        "location": "declares:Timeout",
         "method": "task_match",
         "confidence": "detected"
       },
@@ -143,7 +144,7 @@
     "max_file_bytes": 65536,
     "max_total_bytes": 524288
   },
-  "packet_hash": "sha256:531e1a152851a953d8caf4c1ad52de87fe7eeece25b292ec4b55275c6adf844c",
+  "packet_hash": "sha256:f861cf65b548504f75ff1db4838619cb09dd8ebbb85dab5f920cfb60ca7723e6",
   "task": "add request timeout middleware",
   "direction": "# Direction\n\nShip a reliable payments API with strict timeouts on every outbound call.\n\n## Non-goals\n\n- No new public endpoints until the middleware chain is hardened.",
   "constraints": "# Constraints\n\n- Keep handler latency under 200ms.\n- No new third-party dependencies without a decision record.",

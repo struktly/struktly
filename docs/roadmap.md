@@ -28,6 +28,8 @@ Those are Platform concerns.
 - Portable repository declarations and task handoffs under `.struktly/`.
 - Declaration rendering for Go sources that exceed their byte budget, so a large
   file is summarized by its API rather than cut at an offset.
+- Symbol matching for Go sources, so a request reaches the file declaring what it
+  names rather than only the file named after it.
 
 ## Next context-quality slices
 
@@ -37,12 +39,11 @@ Those are Platform concerns.
    without weakening repository identity or security rules.
 3. **Explicit seeds.** Let a caller supply reviewed starting paths alongside the
    request, with each seed recorded in packet provenance.
-4. **Code-aware deterministic selection.** Add language-specific import and
-   symbol-neighbor expansion behind stable reason codes; keep filename matching
-   as the portable baseline. Declaration rendering has landed the Go parsing
-   foundation this needs; the selection signals themselves are still to come,
-   and slice 5 should come first so their effect can be measured rather than
-   assumed.
+4. **Code-aware deterministic selection.** Symbol matching has landed behind the
+   `symbol_match` reason code, with filename matching still the portable
+   baseline. Import-neighbor expansion is the remaining half. Slice 5 should
+   come first: symbol matching was tuned twice against measured output on real
+   requests, and the untuned version selected mostly noise.
 5. **Quality corpus and budgets.** Measure selection relevance, secret exclusion,
    determinism, latency, and packet size on representative repositories before
    adding caching or more heuristics.

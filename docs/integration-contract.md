@@ -146,8 +146,25 @@ The context selector asks Git for tracked and non-ignored files using
 always active; `.struktly/config.json` adds include rules and declares excludes.
 Request matching tokenizes normalized relative paths and file names across
 path separators, punctuation, snake/kebab boundaries, and camel case before
-scoring overlap. Candidates are ranked deterministically by reason and relevance,
-then item count and byte limits are applied.
+scoring overlap. Common words and action verbs — `add`, `fix`, `update` and
+similar — are dropped, because a request names an action and a subject and only
+the subject identifies code.
+
+Go sources are additionally matched on the identifiers they declare, reported as
+the `symbol_match` reason: functions and methods, method receiver types, and
+named types, constants and variables. A request word must account for at least
+half of an identifier's tokens to count, so `Validate` matches a validation
+request and `TestMCPSurvivesAnOversizeRequest` does not match a request about
+requests. The matched declarations are recorded in the item's
+`provenance.location` as `declares:<names>` and reported by
+`explain --json <path>`, so every symbol-driven selection can be justified.
+Matching only ever adds candidates: files already excluded are never indexed, and
+a repository in another language selects exactly what it selected before.
+Advertised as the `context.symbol_matching` capability.
+
+Candidates are ranked deterministically by reason and relevance, then item count
+and byte limits are applied. Path and symbol evidence add up, and symbol
+evidence outranks a filename match alone.
 
 The CLI never emits the content of:
 
@@ -211,6 +228,9 @@ history are Platform state and are never created or read by this CLI.
 Git enumeration is linear in the number of tracked and non-ignored paths. The
 classifier reads only selected candidates, retains at most 512 KiB of text, and
 streams complete selected files once to compute hashes. A Go candidate that
-exceeds its byte budget is additionally read and parsed once, bounded at 1 MiB. `scan` walks the repository
+exceeds its byte budget is additionally read and parsed once, bounded at 1 MiB.
+Symbol matching parses every eligible Go source once per request, bounded at
+5000 files; reaching that bound is reported as a packet warning. Measured on a
+147-file Go repository this adds roughly 50 ms. `scan` walks the repository
 outside ignored and deprioritized directories. No context command performs a
 network request or model call.
