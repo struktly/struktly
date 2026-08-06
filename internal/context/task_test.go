@@ -3,6 +3,8 @@ package context
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -160,10 +162,19 @@ func TestDiscoverTasksDisclosesHistoricalBodyMappings(t *testing.T) {
 		t.Fatalf("unexpected tasks document: %#v", discovery)
 	}
 	notes := strings.Join(discovery.Tasks[0].CompatibilityNotes, "\n")
-	for _, want := range []string{"Mapped historical Mission", "Mapped historical Success Criteria", "canonical task/v1 validation"} {
+	for _, want := range []string{"Mapped historical Mission", "Mapped historical Success Criteria"} {
 		if !strings.Contains(notes, want) {
 			t.Fatalf("compatibility notes %q do not contain %q", notes, want)
 		}
+	}
+	// Mission and Success criteria are accepted spellings, not defects, so the
+	// mapping is disclosed without also claiming strict validation would reject
+	// the body. Strict validation accepts it too.
+	if strings.Contains(notes, "canonical task/v1 validation") {
+		t.Fatalf("accepted historical headings reported as a validation failure: %q", notes)
+	}
+	if _, err := LoadTasks(root); err != nil {
+		t.Fatalf("LoadTasks rejected accepted historical headings: %v", err)
 	}
 }
 
@@ -244,6 +255,86 @@ func TestUnknownFrontmatterIsPreservedNotRejected(t *testing.T) {
 	}
 }
 
+// OKF v0.2 reserves index.md (§8) and log.md (§9). DiscoverTasks skipped them
+// while LoadTasks strict-validated them, so a conforming task bundle failed
+// `struktly validate` on files the format says are not tasks.
+func TestLoadTasksSkipsReservedOKFFiles(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, ".struktly/tasks/add-timeout.md", validTaskDocument)
+	writeFile(t, root, ".struktly/tasks/index.md", "---\ntype: index\n---\n\n# Tasks\n")
+	writeFile(t, root, ".struktly/tasks/log.md", "---\ntype: log\n---\n\n# Log\n")
+
+	tasks, err := LoadTasks(root)
+	if err != nil {
+		t.Fatalf("LoadTasks rejected an OKF-conforming bundle: %v", err)
+	}
+	if len(tasks) != 1 || tasks[0].ID != "add-timeout" {
+		t.Fatalf("unexpected tasks: %#v", tasks)
+	}
+}
+
+// One malformed file used to abort the whole load, so `validate` disclosed the
+// first problem and hid both the remaining problems and every valid sibling.
+func TestLoadTasksReportsEveryInvalidFile(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, ".struktly/tasks/add-timeout.md", validTaskDocument)
+	writeFile(t, root, ".struktly/tasks/broken-one.md", "no frontmatter\n")
+	writeFile(t, root, ".struktly/tasks/broken-two.md", "also no frontmatter\n")
+
+	_, err := LoadTasks(root)
+	if err == nil {
+		t.Fatal("LoadTasks accepted malformed tasks")
+	}
+	for _, want := range []string{"broken-one.md", "broken-two.md"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error %q does not report %q", err, want)
+		}
+	}
+	if !errors.Is(err, ErrInvalidTask) {
+		t.Fatalf("aggregated error lost its ErrInvalidTask identity: %v", err)
+	}
+}
+
+// schemas/tasks.v1.json constrains priority to an enum and created to a date.
+// Emitting "" for an absent optional field produced JSON the CLI's own schema
+// rejects.
+func TestTaskJSONOmitsAbsentOptionalFields(t *testing.T) {
+	root := t.TempDir()
+	minimal := `---
+type: task
+schema: struktly/task/v1
+id: minimal
+title: "Minimal"
+status: ready
+---
+
+# Minimal
+
+## Mission
+
+Do the thing.
+
+## Done when
+
+- It is done.
+`
+	writeFile(t, root, ".struktly/tasks/minimal.md", minimal)
+
+	document, err := DiscoverTasks(root)
+	if err != nil {
+		t.Fatalf("DiscoverTasks returned error: %v", err)
+	}
+	encoded, err := json.Marshal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, absent := range []string{`"priority":""`, `"created":""`, `"agent":""`} {
+		if strings.Contains(string(encoded), absent) {
+			t.Fatalf("emitted %s, which schemas/tasks.v1.json rejects: %s", absent, encoded)
+		}
+	}
+}
+
 func TestLoadTasksRejectsMalformedTasks(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -253,7 +344,10 @@ func TestLoadTasksRejectsMalformedTasks(t *testing.T) {
 	}{
 		{name: "noncanonical status", path: "add-timeout.md", content: strings.Replace(validTaskDocument, "status: ready", "status: completed", 1), want: "unsupported status"},
 		{name: "filename mismatch", path: "different.md", content: validTaskDocument, want: "must match filename"},
-		{name: "missing heading", path: "add-timeout.md", content: strings.Replace(validTaskDocument, "## Constraints", "## Notes", 1), want: "required heading"},
+		{name: "no objective section", path: "add-timeout.md", content: strings.Replace(validTaskDocument, "## Objective", "## Background", 1), want: "needs an \"Objective\" section"},
+		// Both accepted outcome spellings have to go: "Definition of done" is
+		// as good a done-condition as "Required outcomes".
+		{name: "no outcome section", path: "add-timeout.md", content: strings.NewReplacer("## Required outcomes", "## Notes", "## Definition of done", "## Background").Replace(validTaskDocument), want: "needs a \"Required outcomes\" section"},
 		{name: "partial handoff", path: "add-timeout.md", content: strings.Replace(validTaskDocument, "agent: unassigned", "agent: codex\nagent_session: session-1", 1), want: "declared together"},
 	}
 	for _, test := range tests {

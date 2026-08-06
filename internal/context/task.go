@@ -31,6 +31,20 @@ var (
 	taskCodeSpan        = regexp.MustCompile("`([^`\n]+)`")
 )
 
+// A task contract needs two things to be checkable: what the work is for, and
+// how anyone can tell it is finished. These are the spellings repositories
+// actually use for those two sections, canonical name first. Validation and
+// contract parsing both read this list, so the reader and the checker cannot
+// drift apart again — they did, and the result was a validator that rejected
+// almost every real task in the corpus it was written for.
+var (
+	taskObjectiveHeadings = []string{"objective", "mission", "outcome"}
+	taskOutcomeHeadings   = []string{
+		"required outcomes", "success", "success criteria",
+		"acceptance criteria", "done when", "definition of done", "requirements",
+	}
+)
+
 type TaskContract struct {
 	Outcome        string   `json:"outcome"`
 	DoneWhen       []string `json:"done_when"`
@@ -39,14 +53,17 @@ type TaskContract struct {
 }
 
 type Task struct {
-	Path               string       `json:"path"`
-	ID                 string       `json:"id"`
-	Title              string       `json:"title"`
-	Status             string       `json:"status"`
-	Priority           string       `json:"priority"`
-	Created            string       `json:"created"`
+	Path   string `json:"path"`
+	ID     string `json:"id"`
+	Title  string `json:"title"`
+	Status string `json:"status"`
+	// priority, created and agent are optional, so they are omitted rather
+	// than emitted empty: schemas/tasks.v1.json constrains priority to an
+	// enum and created to a date, and "" satisfies neither.
+	Priority           string       `json:"priority,omitempty"`
+	Created            string       `json:"created,omitempty"`
 	Updated            string       `json:"updated,omitempty"`
-	Agent              string       `json:"agent"`
+	Agent              string       `json:"agent,omitempty"`
 	AgentModel         string       `json:"agent_model,omitempty"`
 	Reasoning          string       `json:"reasoning_effort,omitempty"`
 	AgentSession       string       `json:"agent_session,omitempty"`
@@ -82,12 +99,26 @@ func LoadTasks(root string) ([]Task, error) {
 	}
 	sort.Strings(paths)
 	tasks := make([]Task, 0, len(paths))
+	// Every failure is reported, not just the first. A bundle with two bad
+	// files used to disclose one of them, so fixing it revealed the next —
+	// and a single bad file hid every valid sibling from the report.
+	var problems []error
 	for _, path := range paths {
+		// index.md and log.md are reserved by OKF v0.2 §8 and §9 and are not
+		// task documents. DiscoverTasks already skips them; validate rejecting
+		// what discovery deliberately tolerates made a conforming bundle fail.
+		if isReservedOKFName(filepath.Base(path)) {
+			continue
+		}
 		task, err := loadTask(root, path)
 		if err != nil {
-			return nil, err
+			problems = append(problems, err)
+			continue
 		}
 		tasks = append(tasks, task)
+	}
+	if len(problems) > 0 {
+		return nil, errors.Join(problems...)
 	}
 	return tasks, nil
 }
@@ -300,26 +331,9 @@ func parseTaskContract(body string) (TaskContract, []string) {
 		NonGoals:       []string{},
 		RequiredChecks: []string{},
 	}
-	contract.Outcome = firstTaskSection(sections, "objective")
-	if contract.Outcome == "" {
-		if mission := firstTaskSection(sections, "mission"); mission != "" {
-			contract.Outcome = mission
-			notes = append(notes, "Mapped historical Mission heading to Objective.")
-		} else if outcome := firstTaskSection(sections, "outcome"); outcome != "" {
-			contract.Outcome = outcome
-			notes = append(notes, "Mapped historical Outcome heading to Objective.")
-		}
-	}
-	done := firstTaskSection(sections, "required outcomes")
-	if done == "" {
-		for _, historical := range []string{"success", "success criteria", "acceptance criteria", "done when", "definition of done", "requirements"} {
-			if value := firstTaskSection(sections, historical); value != "" {
-				done = value
-				notes = append(notes, "Mapped historical "+taskHeading(historical)+" heading to Required outcomes.")
-				break
-			}
-		}
-	}
+	contract.Outcome, notes = resolveTaskSection(sections, notes, taskObjectiveHeadings, "Objective")
+	var done string
+	done, notes = resolveTaskSection(sections, notes, taskOutcomeHeadings, "Required outcomes")
 	if done != "" {
 		contract.DoneWhen = taskItemsOrText(done)
 	}
@@ -342,6 +356,23 @@ func parseTaskContract(body string) (TaskContract, []string) {
 	return contract, notes
 }
 
+// resolveTaskSection returns the first present spelling of a contract section.
+// Anything but the canonical heading (element 0) is recorded as a mapping so a
+// reader can see which heading the value actually came from.
+func resolveTaskSection(sections map[string]string, notes []string, headings []string, canonical string) (string, []string) {
+	for i, heading := range headings {
+		value := firstTaskSection(sections, heading)
+		if value == "" {
+			continue
+		}
+		if i > 0 {
+			notes = append(notes, "Mapped historical "+taskHeading(heading)+" heading to "+canonical+".")
+		}
+		return value, notes
+	}
+	return "", notes
+}
+
 func taskHeading(value string) string {
 	words := strings.Fields(value)
 	for i := range words {
@@ -351,11 +382,23 @@ func taskHeading(value string) string {
 }
 
 func parseTaskSections(body string) map[string]string {
+	sections, _ := parseTaskSectionsWithDuplicates(body)
+	return sections
+}
+
+// parseTaskSectionsWithDuplicates also reports headings that appear more than
+// once. Sections are keyed by heading, so a repeat silently wins over the
+// earlier one; where the contract reads that section, that ambiguity matters.
+func parseTaskSectionsWithDuplicates(body string) (map[string]string, map[string]bool) {
 	sections := map[string]string{}
+	duplicate := map[string]bool{}
 	current := ""
 	lines := []string{}
 	flush := func() {
 		if current != "" {
+			if _, seen := sections[current]; seen {
+				duplicate[current] = true
+			}
 			sections[current] = strings.TrimSpace(strings.Join(lines, "\n"))
 		}
 	}
@@ -371,7 +414,7 @@ func parseTaskSections(body string) map[string]string {
 		}
 	}
 	flush()
-	return sections
+	return sections, duplicate
 }
 
 func firstTaskSection(sections map[string]string, names ...string) string {
@@ -455,39 +498,54 @@ func taskFrontmatterValue(raw string) (string, error) {
 	return value, nil
 }
 
+// validateTaskBody requires the two sections that make a task a contract rather
+// than a note, and accepts any spelling the corpus uses for them.
+//
+// This used to demand six fixed headings in a fixed order. Measured against the
+// 58 task files in the Platform repository — the same format, at scale, written
+// by a different author — two conformed and 56 did not, while 56 used
+// "Non-goals" and "Done when" and 53 used "Mission". The template was not the
+// format; it was one author's house style, and enforcing it made `validate`
+// reject the format's dominant real usage. Prose sections a task happens to
+// need — constraints, an execution plan, notes — are the author's business.
 func validateTaskBody(body string) error {
-	required := []string{
-		"## Pick up this task",
-		"## Objective",
-		"## Constraints",
-		"## Required outcomes",
-		"## Execution plan",
-		"## Definition of done",
-	}
-	positions := make(map[string]int, len(required))
-	for lineNumber, line := range strings.Split(body, "\n") {
-		line = strings.TrimSpace(line)
-		for _, heading := range required {
-			if line == heading {
-				if _, duplicate := positions[heading]; duplicate {
-					return fmt.Errorf("heading %q must appear once", heading)
-				}
-				positions[heading] = lineNumber
+	sections, duplicate := parseTaskSectionsWithDuplicates(body)
+	for _, group := range []struct {
+		article  string
+		headings []string
+	}{
+		{article: "an", headings: taskObjectiveHeadings},
+		{article: "a", headings: taskOutcomeHeadings},
+	} {
+		if firstTaskSection(sections, group.headings...) == "" {
+			return fmt.Errorf("body needs %s %q section; accepted headings: %s",
+				group.article, sentenceCase(group.headings[0]), taskHeadingList(group.headings))
+		}
+		for _, heading := range group.headings {
+			if duplicate[heading] {
+				return fmt.Errorf("heading %q must appear once", "## "+sentenceCase(heading))
 			}
 		}
 	}
-	previous := -1
-	for _, heading := range required {
-		position, ok := positions[heading]
-		if !ok {
-			return fmt.Errorf("required heading %q is missing", heading)
-		}
-		if position < previous {
-			return errors.New("required task headings are out of order")
-		}
-		previous = position
-	}
 	return nil
+}
+
+func taskHeadingList(headings []string) string {
+	quoted := make([]string, 0, len(headings))
+	for _, heading := range headings {
+		quoted = append(quoted, `"## `+sentenceCase(heading)+`"`)
+	}
+	return strings.Join(quoted, ", ")
+}
+
+// sentenceCase renders a heading key the way task files actually write it —
+// "Required outcomes", not "Required Outcomes" — so an error naming a missing
+// heading names one the author can paste.
+func sentenceCase(value string) string {
+	if value == "" {
+		return value
+	}
+	return strings.ToUpper(value[:1]) + value[1:]
 }
 
 func invalidTask(path string, err error) error {

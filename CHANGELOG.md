@@ -4,6 +4,22 @@ Notable changes will be recorded here.
 
 ## Unreleased
 
+- **Changed `struktly/task/v1` validation without bumping the schema version.**
+  `priority: normal` is no longer accepted; the ladder is `low`, `medium`,
+  `high`, `critical`. This shipped unrecorded and is a breaking change for any
+  task file that used `normal`. Whether it should instead have become
+  `struktly/task/v2` is an open compatibility decision; see below.
+- Relaxed `struktly/task/v1` so `priority`, `created` and `agent` are optional,
+  and so unknown frontmatter keys are preserved under `extensions` rather than
+  rejected. Both widen what validates and break no existing valid file.
+- Replaced the six fixed required body headings with two required sections —
+  an objective and a done-condition — each accepting the spellings repositories
+  actually use. Measured against the 58-file task corpus in the Platform
+  repository, the previous rule rejected 56 of them.
+- Fixed `validate` rejecting the `index.md` and `log.md` names OKF v0.2 reserves,
+  and made it report every invalid task file instead of only the first.
+- Fixed emitted task JSON carrying `"priority": ""`, `"created": ""` and
+  `"agent": ""`, which `schemas/tasks.v1.json` rejects.
 - Improved context selection with token-aware path ranking (including camel-case
   matching) and caller-tightened packet limits with deterministic aggregated
   truncation exclusions.

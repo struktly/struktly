@@ -29,6 +29,13 @@ jobs:
         run: go test ./...
       - name: build
         run: go build ./...
+      # Struktly's own .struktly/ declarations are the CLI's largest real
+      # corpus. Running the CLI against them is what catches a contract that
+      # this repository itself no longer satisfies.
+      - name: validate this repository
+        run: go run ./cmd/struktly validate
+      - name: doctor this repository
+        run: go run ./cmd/struktly doctor
       - name: vulnerability check
         if: matrix.os == 'ubuntu-latest' && matrix.go == 'stable'
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...

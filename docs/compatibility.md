@@ -10,8 +10,27 @@ Every versioned context document Struktly generates carries a schema identifier:
 - JSON documents: a top-level `"schema"` field, e.g. `"schema": "struktly/snapshot/v1"`.
 
 Portable task Markdown under `.struktly/tasks/` uses `struktly/task/v1`; its
-frontmatter and required headings are defined in [task-format.md](task-format.md).
-Task discovery uses the separate `struktly/tasks/v1` JSON document.
+frontmatter and required body sections are defined in
+[task-format.md](task-format.md). Task discovery uses the separate
+`struktly/tasks/v1` JSON document.
+
+### Open decision: the `task/v1` priority break
+
+`struktly/task/v1` stopped accepting `priority: normal` without a schema bump,
+which the breaking-change rule below does not permit. The change is recorded in
+[`CHANGELOG.md`](../CHANGELOG.md) but the contract question is unresolved, and
+this document should not pretend otherwise. Two ways to close it:
+
+- **Bump to `struktly/task/v2` and accept `v1` for one transition release.**
+  Keeps the rule below literally true. Costs a `schema:` line change in every
+  existing task file, a two-version reader, a `schemas/tasks.v2.json`, and a new
+  entry in the capabilities document.
+- **Amend the rule with a pre-1.0 carve-out** for input declarations — formats
+  Struktly reads rather than emits — allowing them to tighten within a version
+  when the change is recorded in the changelog. Costs nothing in files, but
+  weakens the guarantee for every future break.
+
+Pick one before v1.0. Until then `priority: normal` fails validation.
 
 JSON Schema definitions live in [`schemas/`](../schemas/). Current schemas are
 `struktly/packet/v2`, `struktly/tasks/v1`, and
