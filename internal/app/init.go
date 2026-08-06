@@ -1,13 +1,13 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	repoctx "github.com/struktly/struktly/internal/context"
-	"github.com/struktly/struktly/internal/files"
 )
 
 type InitOptions struct {
@@ -15,6 +15,9 @@ type InitOptions struct {
 }
 
 type InitResult struct {
+	// Root is the anchored repository root, which is not necessarily the
+	// requested one. Callers report paths relative to it.
+	Root           string
 	CreatedPaths   []string
 	SkippedPaths   []string
 	ScanOutputPath string
@@ -22,7 +25,9 @@ type InitResult struct {
 
 // Init creates repository configuration and runs an initial scan.
 func Init(opts InitOptions) (InitResult, error) {
-	root, err := files.CleanRoot(opts.Root)
+	// Anchored at the Git top level so the config init writes is the config
+	// every other command reads. See repoctx.AnchorRoot.
+	root, err := repoctx.AnchorRoot(context.Background(), opts.Root)
 	if err != nil {
 		return InitResult{}, err
 	}
@@ -34,7 +39,7 @@ func Init(opts InitOptions) (InitResult, error) {
 		return InitResult{}, fmt.Errorf("marshal config.json: %w", err)
 	}
 
-	result := InitResult{}
+	result := InitResult{Root: root}
 	configPath := filepath.Join(root, ".struktly", "config.json")
 	if _, err := os.Stat(configPath); err == nil {
 		result.SkippedPaths = append(result.SkippedPaths, configPath)

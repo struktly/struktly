@@ -4,7 +4,9 @@ package mcp
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -17,21 +19,34 @@ import (
 const (
 	protocolVersion = "2025-06-18"
 	serverName      = "struktly"
+	maxMessageBytes = 4 * 1024 * 1024
 )
 
 // Serve reads newline-delimited JSON-RPC messages from in and writes responses
 // to out until in reaches EOF. root is the default repository root for tool
 // calls that do not pass their own.
 func Serve(root string, in io.Reader, out io.Writer) error {
-	scanner := bufio.NewScanner(in)
-	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	reader := bufio.NewReaderSize(in, 64*1024)
 	w := bufio.NewWriter(out)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
+	for {
+		line, oversize, err := readMessage(reader)
+		if errors.Is(err, io.EOF) {
+			return nil
 		}
-		resp := handleMessage(root, []byte(line))
+		if err != nil {
+			return err
+		}
+		var resp *response
+		switch {
+		case oversize:
+			// The request is discarded, so its id is unknown; JSON-RPC 2.0
+			// specifies a null id when the request cannot be identified.
+			resp = errResponse(nil, -32600, fmt.Sprintf("request exceeds the %d-byte message limit", maxMessageBytes))
+		case len(bytes.TrimSpace(line)) == 0:
+			continue
+		default:
+			resp = handleMessage(root, bytes.TrimSpace(line))
+		}
 		if resp == nil {
 			continue
 		}
@@ -47,7 +62,33 @@ func Serve(root string, in io.Reader, out io.Writer) error {
 			return err
 		}
 	}
-	return scanner.Err()
+}
+
+// readMessage returns the next newline-delimited message. A message longer than
+// maxMessageBytes is consumed and discarded rather than buffered, and reported
+// as oversize so the caller can answer it.
+//
+// bufio.Scanner cannot do this: it fails the whole stream with ErrTooLong and
+// leaves no way to resynchronise, so one over-broad request killed the server
+// and every later request on the same connection went unanswered with no
+// JSON-RPC error returned for any of them.
+func readMessage(r *bufio.Reader) (line []byte, oversize bool, err error) {
+	var buf []byte
+	for {
+		chunk, isPrefix, err := r.ReadLine()
+		if err != nil {
+			return nil, false, err
+		}
+		if !oversize && len(buf)+len(chunk) <= maxMessageBytes {
+			buf = append(buf, chunk...)
+		} else {
+			oversize = true
+			buf = nil
+		}
+		if !isPrefix {
+			return buf, oversize, nil
+		}
+	}
 }
 
 type request struct {

@@ -4,6 +4,23 @@ Notable changes will be recorded here.
 
 ## Unreleased
 
+- **Fixed the exit-code contract for invalid invocations.** An invalid flag
+  value such as `--max-items abc` or `--json=bogus` exited 1 as
+  `operation_failed` where the contract promises 2 and `invalid_invocation`.
+  Classification now uses typed errors rather than searching the message text.
+- **Changed `init`, `scan` and `suggest-instructions` to anchor `--root` at the
+  Git repository top level**, matching every other command. In a monorepo,
+  `init --root services/api` previously wrote a configuration that
+  `context --root services/api` never read. Directories outside Git are
+  unaffected.
+- Fixed `init`, `scan`, `suggest-instructions` and `mcp` silently accepting
+  stray positional arguments: `struktly scan repo-b` scanned the working
+  directory. They now exit 2 like their siblings.
+- Fixed root-anchored `.gitignore` patterns such as `/generated` being dead in
+  the non-Git scan, which claimed to apply root-level patterns.
+- Fixed an over-broad MCP request killing the server with no JSON-RPC error;
+  an oversize message is now answered and the server keeps serving.
+- Fixed a config file that cannot be read being reported as `invalid_config`.
 - **Closed a secret-disclosure hole in `.struktly/` guidance files.**
   `direction.md`, `constraints.md` and `decisions.md` were read whole and copied
   into the packet's corresponding fields without a secret scan, while the

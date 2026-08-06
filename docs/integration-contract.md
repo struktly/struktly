@@ -6,7 +6,11 @@ the machine interface.
 
 ## Invocation and streams
 
-All commands accept `--root <path>` and run without prompts. `context`, `status`,
+All commands accept `--root <path>` and run without prompts, and reject
+positional arguments they do not define. `--root` inside a Git working tree
+resolves to the repository top level for every command, including `init`,
+`scan` and `suggest-instructions`, so the files one command writes are the files
+another reads. Outside Git, `--root` is used literally. `context`, `status`,
 `explain`, `validate`, and `doctor` require a Git repository. `context` also
 requires a commit at `HEAD`; it collects live context and does not consume
 rendered scan Markdown. `brief` is a compatibility alias for `context`.
@@ -102,7 +106,9 @@ finishes its current operation before returning. A signal received during a file
 replacement can leave an already-written generated artifact; callers may safely
 rerun the command. `--no-write` avoids this artifact case.
 The experimental MCP server currently accepts cancellation notifications but
-does not interrupt an in-flight tool call.
+does not interrupt an in-flight tool call. A request longer than 4 MiB is
+answered with a JSON-RPC `-32600` error and a null id; the server keeps serving
+subsequent requests.
 
 ## Packet determinism and versioning
 

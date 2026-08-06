@@ -35,6 +35,35 @@ func (r Repository) AbsoluteRoot() string {
 	return r.absoluteRoot
 }
 
+// AnchorRoot resolves a requested root to the Git repository top level when
+// there is one, and to the cleaned literal path otherwise.
+//
+// Commands that write repository-owned files have to agree with the commands
+// that read them. `init` and `scan` anchored at the literal --root while every
+// Git-backed command resolves to the top level, so in a monorepo
+// `init --root services/api` wrote a config that `context --root services/api`
+// never looked at. The top level is canonical: a packet describes a repository,
+// selection is driven by `git ls-files`, and packet identity is the repository's.
+// Directories outside Git are unaffected, which is what keeps `scan` working
+// on a plain folder.
+func AnchorRoot(ctx stdcontext.Context, requestedRoot string) (string, error) {
+	root, err := files.CleanRoot(requestedRoot)
+	if err != nil {
+		return "", err
+	}
+	// Deliberately not ResolveRepository: that also requires a commit at HEAD,
+	// and both callers must work in a repository that has none yet.
+	top, err := gitOutput(ctx, root, "rev-parse", "--show-toplevel")
+	if err != nil || top == "" {
+		return root, nil
+	}
+	resolved, err := filepath.EvalSymlinks(top)
+	if err != nil {
+		return root, nil
+	}
+	return resolved, nil
+}
+
 func ResolveRepository(ctx stdcontext.Context, requestedRoot string) (Repository, error) {
 	root, err := files.CleanRoot(requestedRoot)
 	if err != nil {

@@ -41,5 +41,8 @@ type SuggestInstructionsOptions struct {
 }
 
 type SuggestInstructionsResult struct {
+	// Root is the anchored repository root, which is not necessarily the
+	// requested one. Callers report paths relative to it.
+	Root        string
 	OutputPaths []string
 }

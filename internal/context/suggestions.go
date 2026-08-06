@@ -1,6 +1,7 @@
 package context
 
 import (
+	stdcontext "context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -22,7 +23,9 @@ var agentInstructionTargets = []struct {
 }
 
 func SuggestInstructions(opts SuggestInstructionsOptions) (SuggestInstructionsResult, error) {
-	root, err := files.CleanRoot(opts.Root)
+	// Anchored at the Git top level, because the project-context.md this reads
+	// and the drafts it writes both live at the repository root. See AnchorRoot.
+	root, err := AnchorRoot(stdcontext.Background(), opts.Root)
 	if err != nil {
 		return SuggestInstructionsResult{}, err
 	}
@@ -52,7 +55,7 @@ func SuggestInstructions(opts SuggestInstructionsOptions) (SuggestInstructionsRe
 		return SuggestInstructionsResult{}, fmt.Errorf("create agent instructions dir: %w", err)
 	}
 
-	result := SuggestInstructionsResult{OutputPaths: make([]string, 0, len(agentInstructionTargets))}
+	result := SuggestInstructionsResult{Root: root, OutputPaths: make([]string, 0, len(agentInstructionTargets))}
 	for _, target := range agentInstructionTargets {
 		outputPath := filepath.Join(outputDir, target.filename)
 		content := draft.renderMarkdown(target.target)

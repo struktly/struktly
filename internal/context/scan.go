@@ -42,7 +42,9 @@ type repositoryScan struct {
 }
 
 func Scan(opts ScanOptions) (ScanResult, error) {
-	root, err := files.CleanRoot(opts.Root)
+	// Anchored at the Git top level so scan writes .struktly/ where every
+	// Git-backed command reads it. See AnchorRoot.
+	root, err := AnchorRoot(stdcontext.Background(), opts.Root)
 	if err != nil {
 		return ScanResult{}, err
 	}

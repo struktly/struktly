@@ -16,6 +16,12 @@ const ConfigSchema = "struktly/config/v1"
 
 const configPath = ".struktly/config.json"
 
+// ErrInvalidConfig marks a configuration file that exists but is not valid.
+// A file that cannot be read — permissions, a bad mount — is an operational
+// failure, not an invalid declaration, and classifying by searching the error
+// text for the config path could not tell the two apart.
+var ErrInvalidConfig = errors.New("invalid repository configuration")
+
 var defaultIncludePatterns = []string{
 	"README.md",
 	"AGENTS.md",
@@ -75,13 +81,13 @@ func LoadConfig(root string) (Config, bool, error) {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&declared); err != nil {
-		return Config{}, true, fmt.Errorf("parse %s: %w", configPath, err)
+		return Config{}, true, fmt.Errorf("%w: parse %s: %v", ErrInvalidConfig, configPath, err)
 	}
 	if err := ensureJSONEOF(dec); err != nil {
-		return Config{}, true, fmt.Errorf("parse %s: %w", configPath, err)
+		return Config{}, true, fmt.Errorf("%w: parse %s: %v", ErrInvalidConfig, configPath, err)
 	}
 	if err := ValidateConfig(declared); err != nil {
-		return Config{}, true, fmt.Errorf("validate %s: %w", configPath, err)
+		return Config{}, true, fmt.Errorf("%w: validate %s: %v", ErrInvalidConfig, configPath, err)
 	}
 
 	defaults := DefaultConfig()

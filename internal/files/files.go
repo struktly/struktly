@@ -64,7 +64,8 @@ var sensitivePatterns = []string{
 }
 
 type IgnoreMatcher struct {
-	rootPatterns []string
+	rootPatterns     []string
+	anchoredPatterns []string
 }
 
 func NewIgnoreMatcher(root string) IgnoreMatcher {
@@ -78,7 +79,16 @@ func NewIgnoreMatcher(root string) IgnoreMatcher {
 		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "!") {
 			continue
 		}
-		m.rootPatterns = append(m.rootPatterns, strings.TrimSuffix(filepath.ToSlash(line), "/"))
+		line = strings.TrimSuffix(filepath.ToSlash(line), "/")
+		// A leading slash anchors a pattern to the repository root. The slash
+		// used to be kept in the pattern, which can never match a
+		// repository-relative path, so an entry like `/generated` was silently
+		// dead while the scan reported that root-level patterns were applied.
+		if anchored, ok := strings.CutPrefix(line, "/"); ok {
+			m.anchoredPatterns = append(m.anchoredPatterns, anchored)
+			continue
+		}
+		m.rootPatterns = append(m.rootPatterns, line)
 	}
 	return m
 }
@@ -113,6 +123,21 @@ func (m IgnoreMatcher) ShouldSkip(rel string, isDir bool) bool {
 			return true
 		}
 		if isDir && (rel == pattern || strings.HasPrefix(rel, pattern+"/")) {
+			return true
+		}
+	}
+
+	// Anchored patterns match against the repository-relative path only, never
+	// the base name: `/generated` covers `generated/out.txt` but not
+	// `src/generated/out.txt`.
+	for _, pattern := range m.anchoredPatterns {
+		if pattern == "" {
+			continue
+		}
+		if rel == pattern || strings.HasPrefix(rel, pattern+"/") {
+			return true
+		}
+		if matched, _ := filepath.Match(pattern, rel); matched {
 			return true
 		}
 	}

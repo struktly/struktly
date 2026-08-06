@@ -58,9 +58,41 @@ func runCLI(ctx stdcontext.Context, args []string, stdin io.Reader, stdout, stde
 	return exitCode
 }
 
+// errInvalidInvocation marks every failure that is the caller's fault rather
+// than the repository's: a bad flag value, a wrong argument count, an
+// unsupported command, a pair of flags that cannot be combined.
+//
+// This used to be decided by searching the error text for markers like
+// "accepts " and "unknown flag". Matching on prose is the underlying defect,
+// not the missing marker: pflag says `invalid argument "abc" for "--max-items"
+// flag`, which matched nothing, so a bad flag value exited 1 as
+// `operation_failed` against a contract that promises 2 and
+// `invalid_invocation`. Marker lists also misfile the opposite way — a config
+// file that cannot be read for permissions is not an invalid config. Errors now
+// carry their classification instead of having it guessed back out of them.
+var errInvalidInvocation = errors.New("invalid invocation")
+
+func invalidInvocation(err error) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("%w: %v", errInvalidInvocation, err)
+}
+
+// invalidInvocationArgs wraps a cobra positional-argument validator so an
+// argument-count failure carries its exit code.
+func invalidInvocationArgs(validator cobra.PositionalArgs) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		return invalidInvocation(validator(cmd, args))
+	}
+}
+
 func classifyError(err error) (int, string) {
 	if errors.Is(err, stdcontext.Canceled) {
 		return 130, "canceled"
+	}
+	if errors.Is(err, errInvalidInvocation) || errors.Is(err, repoctx.ErrInvalidPacketLimit) {
+		return 2, "invalid_invocation"
 	}
 	if errors.Is(err, repoctx.ErrNotGitRepository) {
 		return 1, "not_git_repository"
@@ -71,19 +103,13 @@ func classifyError(err error) (int, string) {
 	if errors.Is(err, repoctx.ErrInvalidTask) {
 		return 1, "invalid_task"
 	}
-	if errors.Is(err, repoctx.ErrInvalidPacketLimit) {
-		return 2, "invalid_invocation"
-	}
-	message := err.Error()
-	if strings.Contains(message, ".struktly/config.json") {
+	if errors.Is(err, repoctx.ErrInvalidConfig) {
 		return 1, "invalid_config"
 	}
-	for _, marker := range []string{
-		"unknown command", "unknown flag", "required flag", "accepts ", "requires ", "cannot be used", "use either --stdout or --json",
-	} {
-		if strings.Contains(message, marker) {
-			return 2, "invalid_invocation"
-		}
+	// Cobra reports an unknown subcommand from Find, before any hook this
+	// program can install, so this one classification still reads the message.
+	if strings.HasPrefix(err.Error(), "unknown command") {
+		return 2, "invalid_invocation"
 	}
 	return 1, "operation_failed"
 }
@@ -114,6 +140,12 @@ func newRootCmd() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
+	// Inherited by every subcommand, so a flag-parsing failure anywhere in the
+	// tree carries its exit-code classification instead of being recognised
+	// from its wording.
+	cmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
+		return invalidInvocation(err)
+	})
 	cmd.PersistentFlags().StringVar(&repoRoot, "root", ".", "Repository root to inspect")
 	cmd.PersistentFlags().Bool("json-errors", false, "Emit structured errors on stderr")
 
@@ -176,7 +208,7 @@ func newTasksCmd(repoRoot *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "tasks",
 		Short: "List repository task declarations",
-		Args:  cobra.NoArgs,
+		Args:  invalidInvocationArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			document, err := repoctx.DiscoverTasks(*repoRoot)
 			if err != nil {
@@ -207,7 +239,7 @@ func newCapabilitiesCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "capabilities",
 		Short: "Report supported machine interfaces",
-		Args:  cobra.NoArgs,
+		Args:  invalidInvocationArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			capabilities := currentCapabilities()
 			if toJSON {
@@ -229,7 +261,7 @@ func newVersionCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "Print Struktly version and build metadata",
-		Args:  cobra.NoArgs,
+		Args:  invalidInvocationArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			info := buildinfo.Current()
 			if toJSON {
@@ -259,7 +291,7 @@ func newStatusCmd(repoRoot *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Experimental: inspect repository context status",
-		Args:  cobra.NoArgs,
+		Args:  invalidInvocationArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			report, err := app.Status(cmd.Context(), *repoRoot)
 			if err != nil {
@@ -288,7 +320,7 @@ func newExplainCmd(repoRoot *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "explain <path>",
 		Short: "Experimental: explain context inclusion or exclusion",
-		Args:  cobra.ExactArgs(1),
+		Args:  invalidInvocationArgs(cobra.ExactArgs(1)),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			explanation, err := repoctx.ExplainSelection(cmd.Context(), *repoRoot, args[0], task)
 			if err != nil {
@@ -311,7 +343,7 @@ func newValidateCmd(repoRoot *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "validate",
 		Short: "Experimental: validate configuration and task files",
-		Args:  cobra.NoArgs,
+		Args:  invalidInvocationArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			report, err := app.Validate(cmd.Context(), *repoRoot)
 			if err != nil {
@@ -333,7 +365,7 @@ func newDoctorCmd(repoRoot *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "doctor",
 		Short: "Experimental: diagnose repository and installation problems",
-		Args:  cobra.NoArgs,
+		Args:  invalidInvocationArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			report, err := app.Doctor(cmd.Context(), *repoRoot)
 			if err != nil {
@@ -376,6 +408,7 @@ func newInitCmd(repoRoot *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "init",
 		Short: "Create repository configuration and write project context",
+		Args:  invalidInvocationArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runInit(cmd, *repoRoot)
 		},
@@ -388,10 +421,7 @@ func runInit(cmd *cobra.Command, repoRoot string) error {
 		return err
 	}
 
-	root, err := filepath.Abs(repoRoot)
-	if err != nil {
-		return fmt.Errorf("resolve root: %w", err)
-	}
+	root := result.Root
 
 	for _, path := range result.CreatedPaths {
 		if _, err := fmt.Fprintf(cmd.OutOrStdout(), "created %s\n", relToRoot(root, path)); err != nil {
@@ -413,9 +443,10 @@ func newScanCmd(repoRoot *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "scan",
 		Short: "Write .struktly/project-context.md for a repository",
+		Args:  invalidInvocationArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if noWrite && !toJSON {
-				return fmt.Errorf("--no-write requires --json")
+				return invalidInvocation(errors.New("--no-write requires --json"))
 			}
 			result, err := repoctx.Scan(repoctx.ScanOptions{Root: *repoRoot, NoWrite: noWrite})
 			if err != nil {
@@ -453,13 +484,13 @@ func newBriefCmd(repoRoot *string) *cobra.Command {
 		Use:     "context <request>",
 		Aliases: []string{"brief"},
 		Short:   "Build a context packet for one coding request",
-		Args:    cobra.ExactArgs(1),
+		Args:    invalidInvocationArgs(cobra.ExactArgs(1)),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if toStdout && toJSON {
-				return fmt.Errorf("use either --stdout or --json, not both")
+				return invalidInvocation(errors.New("use --stdout for Markdown or --json for the structured packet, not both"))
 			}
 			if noWrite && !toJSON {
-				return fmt.Errorf("--no-write requires --json")
+				return invalidInvocation(errors.New("--no-write requires --json"))
 			}
 			flags := cmd.Flags()
 			maxItemsSet := flags.Lookup("max-items").Changed
@@ -535,6 +566,7 @@ func newSuggestInstructionsCmd(repoRoot *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "suggest-instructions",
 		Short: "Write suggested agent instruction drafts under .struktly/agent-instructions/",
+		Args:  invalidInvocationArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runSuggestInstructions(cmd, *repoRoot)
 		},
@@ -549,10 +581,7 @@ func runSuggestInstructions(cmd *cobra.Command, repoRoot string) error {
 		return err
 	}
 
-	root, err := filepath.Abs(repoRoot)
-	if err != nil {
-		return fmt.Errorf("resolve root: %w", err)
-	}
+	root := result.Root
 
 	for _, path := range result.OutputPaths {
 		_, err = fmt.Fprintf(cmd.OutOrStdout(), "wrote %s\n", relToRoot(root, path))

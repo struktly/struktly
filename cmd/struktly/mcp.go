@@ -10,6 +10,7 @@ func newMCPCmd(repoRoot *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "mcp",
 		Short: "Serve struktly over the Model Context Protocol (stdio)",
+		Args:  invalidInvocationArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return mcp.Serve(*repoRoot, cmd.InOrStdin(), cmd.OutOrStdout())
 		},
