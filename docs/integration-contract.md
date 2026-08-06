@@ -11,7 +11,10 @@ positional arguments they do not define. `--root` inside a Git working tree
 resolves to the repository top level for every command, including `init`,
 `scan` and `suggest-instructions`, so the files one command writes are the files
 another reads. Outside Git, `--root` is used literally. `context`, `status`,
-`explain`, `validate`, and `doctor` require a Git repository. `context` also
+`explain`, and `validate` require a Git repository. `doctor` runs anywhere and
+reports what it found: it writes its report, then exits 1 if any check has
+status `fail`, so a missing repository or an invalid configuration is visible
+both in the document and in the exit code. `context` also
 requires a commit at `HEAD`; it collects live context and does not consume
 rendered scan Markdown. `brief` is a compatibility alias for `context`.
 
@@ -27,6 +30,7 @@ Machine modes write one JSON document to stdout:
 | `validate --json` | `struktly/validation/v1` |
 | `doctor --json` | `struktly/doctor/v1` |
 | `capabilities --json` | `struktly/capabilities/v1` |
+| `version --json` | `struktly/version/v1` |
 
 In machine mode, successful diagnostics such as a generated packet path go to
 stderr. With `--no-write`, successful commands leave stderr empty. stdout never
@@ -89,8 +93,8 @@ document on stderr for a failed invocation:
 ```
 
 Stable error codes currently include `not_git_repository`, `repository_changed`,
-`invalid_config`, `invalid_task`, `invalid_invocation`, `canceled`, and
-`operation_failed`. Messages are for people;
+`invalid_config`, `invalid_task`, `invalid_invocation`, `diagnostic_failed`,
+`canceled`, and `operation_failed`. Messages are for people;
 automation must branch on `error.code` and the process exit code.
 
 | Exit | Meaning |
@@ -148,7 +152,9 @@ then item count and byte limits are applied.
 The CLI never emits the content of:
 
 - Git-ignored files or `.git` internals;
-- dependency, build, cache, generated runtime, or local state paths;
+- dependency, build, cache, generated runtime, or local state paths — a tracked
+  file under one of these that would otherwise have been selected is recorded as
+  a `default_excluded` exclusion rather than omitted silently;
 - sensitive filenames or high-confidence detected secret content;
 - symlinks, non-regular files, binary files, or invalid UTF-8.
 

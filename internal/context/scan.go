@@ -188,6 +188,10 @@ func (s *repositoryScan) collectGitFiles() error {
 		files.AddString(s.ignored, ".git")
 	}
 	for _, rel := range paths {
+		if defaultRuntimePath(rel) {
+			files.AddString(s.ignored, rel)
+			continue
+		}
 		if stale := stalePathAncestor(rel); stale != "" {
 			files.AddString(s.stale, stale)
 			continue
@@ -652,7 +656,9 @@ func excerptMarkdown(text string, maxChars int) string {
 		out = append(out, line)
 		joined := strings.Join(out, "\n")
 		if len(joined) >= maxChars {
-			return strings.TrimSpace(joined[:maxChars]) + "\n\n..."
+			// truncateUTF8, not joined[:maxChars]: a byte index lands inside a
+			// multi-byte rune for any non-ASCII text and emits invalid UTF-8.
+			return strings.TrimSpace(truncateUTF8(joined, maxChars)) + "\n\n..."
 		}
 	}
 	return strings.TrimSpace(strings.Join(out, "\n"))

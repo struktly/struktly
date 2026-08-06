@@ -7,6 +7,13 @@ on:
         description: Semantic version to publish (for example, v0.1.1)
         required: true
         type: string
+      allow_missing_secret_scan:
+        description: >-
+          Publish even though GITLEAKS_LICENSE is not configured and the secret
+          history scan cannot run. The release notes will say so.
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -26,16 +33,26 @@ jobs:
       - name: test with race detector
         run: go test -race ./...
       - name: vulnerability check
-        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
+      # Without this gate a release could ship having never been scanned, with
+      # nothing anywhere recording that it had not been. Publishing unscanned is
+      # now a deliberate, logged choice rather than a silent default.
+      - name: require the secret history scan
+        if: ${{ env.GITLEAKS_LICENSE == '' && !inputs.allow_missing_secret_scan }}
+        run: |
+          echo "::error::GITLEAKS_LICENSE is not configured, so the secret history scan cannot run." >&2
+          echo "Re-run with allow_missing_secret_scan=true to publish anyway; the release notes will record it." >&2
+          exit 1
       - name: secret history scan
         if: ${{ env.GITLEAKS_LICENSE != '' }}
         uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         with:
           config: .gitleaks.toml
-      - name: skip secret history scan (missing license)
+      - name: record skipped secret history scan
         if: ${{ env.GITLEAKS_LICENSE == '' }}
         run: |
-          echo "Skipping gitleaks scan: GITLEAKS_LICENSE secret is not configured."
+          echo "::warning::Secret history scan skipped: GITLEAKS_LICENSE is not configured."
+          echo "> **Secret history scan skipped.** GITLEAKS_LICENSE is not configured, so gitleaks did not run for this release." >> "$GITHUB_STEP_SUMMARY"
 
   install-smoke:
     runs-on: ubuntu-latest
@@ -69,6 +86,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ inputs.version }}
+          ALLOW_MISSING_SECRET_SCAN: ${{ inputs.allow_missing_secret_scan }}
         run: |
           if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "version must use the form vMAJOR.MINOR.PATCH" >&2
@@ -85,4 +103,18 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "$VERSION" \
             --generate-notes
+
+          # A release published without the history scan says so on its own
+          # page, so the gap travels with the artifact rather than living only
+          # in a workflow log that expires.
+          if [[ "$ALLOW_MISSING_SECRET_SCAN" == "true" ]]; then
+            gh release view "$VERSION" --json body -q .body > notes.md
+            {
+              printf '\n---\n\n'
+              printf '> **Secret history scan skipped.** `GITLEAKS_LICENSE` was not configured '
+              printf 'when this release was built, so the gitleaks history scan did not run.\n'
+            } >> notes.md
+            gh release edit "$VERSION" --notes-file notes.md
+          fi
+
           gh release edit "$VERSION" --draft=false --latest

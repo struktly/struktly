@@ -4,6 +4,29 @@ Notable changes will be recorded here.
 
 ## Unreleased
 
+- **Changed `doctor` to report failures instead of refusing to run.** Its
+  `git_repository` check could only ever report "pass", because the command
+  returned an error before producing a report whenever the repository would not
+  resolve. It now writes its report anywhere and exits 1 if any check failed,
+  which also fixes an invalid configuration being reported with exit 0.
+  The new error code is `diagnostic_failed`.
+- Added a `schema` field to `version --json` (`struktly/version/v1`, with a
+  JSON Schema file); it was the only machine output without one.
+- Added the missing identifiers to `capabilities --json`: the `init`, `mcp`,
+  `suggest-instructions` and `version` commands, and the Markdown-only
+  `struktly/project-context/v1` and `struktly/agent-instructions/v1` schemas.
+- Fixed tracked files under `build/` or `dist/` being dropped from a packet with
+  nothing recording it; they are now reported as `default_excluded`.
+- Fixed excerpt truncation splitting multi-byte UTF-8 runes.
+- Pinned `govulncheck` to v1.6.0, the last unpinned supply-chain input in
+  otherwise SHA-pinned CI.
+- The release workflow now fails when `GITLEAKS_LICENSE` is unset instead of
+  silently skipping the secret history scan. Publishing without it requires the
+  explicit `allow_missing_secret_scan` input, and the release notes record it.
+- Git-ignored the generated `.struktly/project-context.md` and
+  `.struktly/agent-instructions/`, and dropped stale ignore entries for the
+  `run` and `memory` features removed in v0.2.0.
+- Added `status` to the README command table.
 - **Fixed the exit-code contract for invalid invocations.** An invalid flag
   value such as `--max-items abc` or `--json=bogus` exited 1 as
   `operation_failed` where the contract promises 2 and `invalid_invocation`.
@@ -59,9 +82,14 @@ Notable changes will be recorded here.
   and made it report every invalid task file instead of only the first.
 - Fixed emitted task JSON carrying `"priority": ""`, `"created": ""` and
   `"agent": ""`, which `schemas/tasks.v1.json` rejects.
-- Improved context selection with token-aware path ranking (including camel-case
-  matching) and caller-tightened packet limits with deterministic aggregated
-  truncation exclusions.
+
+## v0.2.1 - 2026-08-04
+
+- Bounded and ranked context packets: token-aware path ranking including
+  camel-case matching, caller-tightened `--max-items`, `--max-file-bytes` and
+  `--max-total-bytes` overrides, and deterministic aggregated truncation
+  exclusions. This release shipped without a changelog entry; recorded here
+  after the fact.
 
 ## v0.2.0 - 2026-08-01
 

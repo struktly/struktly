@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 // leakMarker stands in for secret material everywhere in this file. Tests pair
@@ -243,4 +244,23 @@ func TestSecretPatternsCoverCommonProviderTokens(t *testing.T) {
 			t.Errorf("benign content classified as a secret: %q", benign)
 		}
 	}
+}
+
+// Truncation used byte indexes, which land inside a multi-byte rune for any
+// non-ASCII text and emit invalid UTF-8 into the packet.
+func TestExcerptsTruncateOnRuneBoundaries(t *testing.T) {
+	for name, got := range map[string]string{
+		"excerptMarkdown": excerptMarkdown(strings.Repeat("é", 50), 11),
+		"sectionExcerpt":  sectionExcerptFor(strings.Repeat("é", 50), 11),
+	} {
+		if !utf8.ValidString(got) {
+			t.Errorf("%s produced invalid UTF-8: %q", name, got)
+		}
+	}
+}
+
+func sectionExcerptFor(body string, maxChars int) string {
+	var b strings.Builder
+	writeSectionExcerpt(&b, "## Repository\n\n"+body+"\n", []string{"## Repository"}, maxChars)
+	return b.String()
 }

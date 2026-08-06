@@ -72,6 +72,10 @@ func runCLI(ctx stdcontext.Context, args []string, stdin io.Reader, stdout, stde
 // carry their classification instead of having it guessed back out of them.
 var errInvalidInvocation = errors.New("invalid invocation")
 
+// errDoctorFailed reports that doctor ran and something it checked is wrong.
+// The report has already been written; this only carries the exit code.
+var errDoctorFailed = errors.New("doctor reported a failing check")
+
 func invalidInvocation(err error) error {
 	if err == nil {
 		return nil
@@ -105,6 +109,9 @@ func classifyError(err error) (int, string) {
 	}
 	if errors.Is(err, repoctx.ErrInvalidConfig) {
 		return 1, "invalid_config"
+	}
+	if errors.Is(err, errDoctorFailed) {
+		return 1, "diagnostic_failed"
 	}
 	// Cobra reports an unknown subcommand from Find, before any hook this
 	// program can install, so this one classification still reads the message.
@@ -165,7 +172,18 @@ func newRootCmd() *cobra.Command {
 	return cmd
 }
 
-const capabilitiesSchema = "struktly/capabilities/v1"
+const (
+	capabilitiesSchema = "struktly/capabilities/v1"
+	versionSchema      = "struktly/version/v1"
+)
+
+// versionDocument wraps build metadata so `version --json` names its schema
+// like every other machine output. buildinfo.Info is embedded, so the existing
+// fields keep their names and positions.
+type versionDocument struct {
+	Schema string `json:"schema"`
+	buildinfo.Info
+}
 
 type capabilitiesDocument struct {
 	Schema   string         `json:"schema"`
@@ -177,11 +195,18 @@ type capabilitiesDocument struct {
 
 func currentCapabilities() capabilitiesDocument {
 	return capabilitiesDocument{
-		Schema:   capabilitiesSchema,
-		Build:    buildinfo.Current(),
-		Commands: []string{"capabilities", "context", "doctor", "explain", "scan", "status", "tasks", "validate"},
+		Schema: capabilitiesSchema,
+		Build:  buildinfo.Current(),
+		Commands: []string{
+			"capabilities", "context", "doctor", "explain", "init", "mcp", "scan",
+			"status", "suggest-instructions", "tasks", "validate", "version",
+		},
 		Schemas: []string{
 			capabilitiesSchema,
+			// Markdown-only presentation identifiers, carried in OKF
+			// frontmatter rather than as JSON Schema files.
+			"struktly/agent-instructions/v1",
+			"struktly/project-context/v1",
 			"struktly/doctor/v1",
 			"struktly/error/v1",
 			"struktly/explanation/v1",
@@ -190,6 +215,7 @@ func currentCapabilities() capabilitiesDocument {
 			repoctx.TasksSchema,
 			"struktly/status/v1",
 			"struktly/validation/v1",
+			versionSchema,
 		},
 		Features: []string{
 			"context.cancellation",
@@ -265,7 +291,7 @@ func newVersionCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			info := buildinfo.Current()
 			if toJSON {
-				return writeJSON(cmd.OutOrStdout(), info)
+				return writeJSON(cmd.OutOrStdout(), versionDocument{Schema: versionSchema, Info: info})
 			}
 			_, err := fmt.Fprintf(cmd.OutOrStdout(), "struktly %s\n", info.Version)
 			if err != nil {
@@ -372,16 +398,24 @@ func newDoctorCmd(repoRoot *string) *cobra.Command {
 				return err
 			}
 			if toJSON {
-				return writeJSON(cmd.OutOrStdout(), report)
-			}
-			for _, check := range report.Checks {
-				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "[%s] %s", check.Status, check.Name); err != nil {
+				if err := writeJSON(cmd.OutOrStdout(), report); err != nil {
 					return err
 				}
-				if check.Message != "" {
-					fmt.Fprintf(cmd.OutOrStdout(), ": %s", check.Message)
+			} else {
+				for _, check := range report.Checks {
+					if _, err := fmt.Fprintf(cmd.OutOrStdout(), "[%s] %s", check.Status, check.Name); err != nil {
+						return err
+					}
+					if check.Message != "" {
+						fmt.Fprintf(cmd.OutOrStdout(), ": %s", check.Message)
+					}
+					fmt.Fprintln(cmd.OutOrStdout())
 				}
-				fmt.Fprintln(cmd.OutOrStdout())
+			}
+			// The report is the payload, so it is always written; the exit code
+			// then tells a caller branching on it whether anything failed.
+			if report.HasFailure() {
+				return errDoctorFailed
 			}
 			return nil
 		},

@@ -115,24 +115,54 @@ func Validate(ctx context.Context, root string) (ValidationReport, error) {
 	}, nil
 }
 
+// Doctor diagnoses the repository and reports each check.
+//
+// It used to return early when the repository would not resolve, so
+// `git_repository` could only ever report "pass" — the one outcome that told a
+// reader nothing the command's own success had not already told them. A
+// diagnostic that refuses to run when something is wrong cannot diagnose it, so
+// the failure is now a check result. Callers keep the exit code they had:
+// HasFailure reports whether any check failed, and the command exits 1 when it
+// does, which also fixes a failing config check exiting 0.
 func Doctor(ctx context.Context, root string) (DoctorReport, error) {
+	report := DoctorReport{Schema: doctorSchema}
+
 	repository, err := repoctx.ResolveRepository(ctx, root)
 	if err != nil {
-		return DoctorReport{}, err
+		if ctx.Err() != nil {
+			return DoctorReport{}, ctx.Err()
+		}
+		report.Checks = append(report.Checks, DoctorCheck{
+			Name: "git_repository", Status: "fail", Message: err.Error(),
+		})
+		return report, nil
 	}
+	report.Repository = repository
+	report.Checks = append(report.Checks, DoctorCheck{
+		Name: "git_repository", Status: "pass", Message: repository.Identity,
+	})
 
-	checks := []DoctorCheck{{Name: "git_repository", Status: "pass"}}
 	_, declared, configErr := repoctx.LoadConfig(repository.AbsoluteRoot())
 	switch {
 	case configErr != nil:
-		checks = append(checks, DoctorCheck{Name: "config", Status: "fail", Message: configErr.Error()})
+		report.Checks = append(report.Checks, DoctorCheck{Name: "config", Status: "fail", Message: configErr.Error()})
 	case declared:
-		checks = append(checks, DoctorCheck{Name: "config", Status: "pass"})
+		report.Checks = append(report.Checks, DoctorCheck{Name: "config", Status: "pass"})
 	default:
-		checks = append(checks, DoctorCheck{Name: "config", Status: "pass", Message: "using built-in defaults"})
+		report.Checks = append(report.Checks, DoctorCheck{Name: "config", Status: "pass", Message: "using built-in defaults"})
 	}
 
-	return DoctorReport{Schema: doctorSchema, Repository: repository, Checks: checks}, nil
+	return report, nil
+}
+
+// HasFailure reports whether any diagnostic check failed.
+func (r DoctorReport) HasFailure() bool {
+	for _, check := range r.Checks {
+		if check.Status == "fail" {
+			return true
+		}
+	}
+	return false
 }
 
 func inspectFile(root, path string) (FileStatus, error) {

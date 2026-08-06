@@ -108,13 +108,47 @@ func TestInspectCommandsRejectNonGitDirectory(t *testing.T) {
 	for name, inspect := range map[string]func(context.Context, string) error{
 		"status":   func(ctx context.Context, root string) error { _, err := Status(ctx, root); return err },
 		"validate": func(ctx context.Context, root string) error { _, err := Validate(ctx, root); return err },
-		"doctor":   func(ctx context.Context, root string) error { _, err := Doctor(ctx, root); return err },
 	} {
 		t.Run(name, func(t *testing.T) {
 			if err := inspect(context.Background(), t.TempDir()); err == nil {
 				t.Fatal("expected non-Git repository error")
 			}
 		})
+	}
+}
+
+// Doctor is the exception: a diagnostic that refuses to run when something is
+// wrong cannot report it. Returning early left `git_repository` able only to
+// pass, which told a reader nothing. It now reports the failure as a check, and
+// HasFailure carries the exit code the command had before.
+func TestDoctorReportsANonGitDirectoryAsAFailedCheck(t *testing.T) {
+	report, err := Doctor(context.Background(), t.TempDir())
+	if err != nil {
+		t.Fatalf("Doctor returned error instead of a report: %v", err)
+	}
+	if len(report.Checks) == 0 || report.Checks[0].Name != "git_repository" {
+		t.Fatalf("unexpected checks: %#v", report.Checks)
+	}
+	if report.Checks[0].Status != "fail" {
+		t.Fatalf("git_repository = %q, want fail", report.Checks[0].Status)
+	}
+	if !report.HasFailure() {
+		t.Fatal("HasFailure did not report the failed check")
+	}
+}
+
+// A failing config check used to exit 0, so a caller branching on the exit code
+// never learned about it.
+func TestDoctorFailureIsVisibleToCallersBranchingOnExitCode(t *testing.T) {
+	root := newGitRepository(t)
+	writeFile(t, root, ".struktly/config.json", "{ not json")
+
+	report, err := Doctor(context.Background(), root)
+	if err != nil {
+		t.Fatalf("Doctor returned error: %v", err)
+	}
+	if !report.HasFailure() {
+		t.Fatalf("invalid config did not register as a failure: %#v", report.Checks)
 	}
 }
 

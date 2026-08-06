@@ -173,8 +173,10 @@ func firstMarkdownHeading(text string) string {
 }
 
 // gitRevision resolves the repository HEAD commit by reading git metadata
-// files directly; internal/context must stay exec-free. Returns "" when the
-// revision cannot be determined.
+// files directly rather than invoking git, so a scan can identify a revision
+// without a git binary on PATH and without paying for a subprocess. The rest of
+// this package does shell out; the claim that it must not was never true.
+// Returns "" when the revision cannot be determined.
 func gitRevision(root string) string {
 	gitPath := filepath.Join(root, ".git")
 	info, err := os.Stat(gitPath)

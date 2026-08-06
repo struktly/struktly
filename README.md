@@ -81,9 +81,10 @@ its permissions and execution behavior.
 | `context <request>` | Build a request-specific packet from live repository state. |
 | `scan` | Write a general repository summary. It is optional and not a prerequisite for `context`. |
 | `tasks` | Emit safely readable repository task declarations and per-file invalid results. |
+| `status` | Report repository, configuration, and portable-file state. |
 | `explain <path>` | Diagnose why one path would be included or excluded. |
 | `validate` | Validate configuration and portable task files. |
-| `doctor` | Check the repository and local CLI setup. |
+| `doctor` | Check the repository and local CLI setup; exits 1 if a check fails. |
 | `capabilities` | Report supported schemas and machine-interface features. |
 | `suggest-instructions` | Draft agent instruction files for human review. |
 | `mcp` | Expose repository scanning and request-specific context over MCP stdio. |
@@ -109,7 +110,8 @@ Repository-owned files live under `.struktly/`:
 - `config.json` adds context include/exclude rules and check commands.
 - `direction.md`, `constraints.md`, and `decisions.md` are optional project
   guidance written by people.
-- `project-context.md` and `context-packets/` are generated output.
+- `project-context.md`, `context-packets/` and `agent-instructions/` are
+  generated output, and are Git-ignored by default.
 - `tasks/` contains optional portable task handoffs.
 
 Runtime and product state is deliberately absent from this CLI.

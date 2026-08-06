@@ -464,7 +464,7 @@ func (p *contextPacket) taskMatchedFiles(limit int) []string {
 		return nil
 	}
 	for _, rel := range paths {
-		if strings.Count(rel, "/") > 2 || stalePathAncestor(rel) != "" {
+		if strings.Count(rel, "/") > 2 || stalePathAncestor(rel) != "" || defaultRuntimePath(rel) {
 			continue
 		}
 		lower := strings.ToLower(files.PathBase(rel))
@@ -564,7 +564,7 @@ func writeSectionExcerpt(b *strings.Builder, markdown string, headings []string,
 	}
 	excerpt := strings.Join(parts, "\n\n")
 	if len(excerpt) > maxChars {
-		excerpt = excerpt[:maxChars] + "\n\n..."
+		excerpt = truncateUTF8(excerpt, maxChars) + "\n\n..."
 	}
 	b.WriteString(strings.TrimSpace(excerpt) + "\n")
 }

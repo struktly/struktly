@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "struktly/version/v1",
+  "title": "Struktly build identity",
+  "description": "Version and build metadata of the running Struktly binary.",
+  "type": "object",
+  "properties": {
+    "schema": { "const": "struktly/version/v1" },
+    "version": { "type": "string" },
+    "revision": { "type": "string" },
+    "date": { "type": "string" }
+  },
+  "required": ["schema", "version"],
+  "additionalProperties": true
+}

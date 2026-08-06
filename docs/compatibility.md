@@ -14,6 +14,18 @@ frontmatter and required body sections are defined in
 [task-format.md](task-format.md). Task discovery uses the separate
 `struktly/tasks/v1` JSON document.
 
+JSON Schema definitions live in [`schemas/`](../schemas/). Current schemas are
+`struktly/packet/v2`, `struktly/tasks/v1`, and
+`struktly/{snapshot,config,error,status,validation,doctor,explanation,capabilities,version}/v1`.
+
+Two identifiers are Markdown-only and have no JSON Schema file, because the
+documents they name are presentation rather than a machine surface:
+`struktly/project-context/v1` for the scan summary and
+`struktly/agent-instructions/v1` for instruction drafts. Both are reported by
+`capabilities --json` so a consumer can see every identifier this build emits.
+The historical `packet.v1.json` remains available to verify already-pinned
+packet provenance, but current binaries generate and advertise packet/v2.
+
 ### Open decision: the `task/v1` priority break
 
 `struktly/task/v1` stopped accepting `priority: normal` without a schema bump,
@@ -31,12 +43,6 @@ this document should not pretend otherwise. Two ways to close it:
   weakens the guarantee for every future break.
 
 Pick one before v1.0. Until then `priority: normal` fails validation.
-
-JSON Schema definitions live in [`schemas/`](../schemas/). Current schemas are
-`struktly/packet/v2`, `struktly/tasks/v1`, and
-`struktly/{snapshot,config,error,status,validation,doctor,explanation,capabilities}/v1`.
-The historical `packet.v1.json` remains available to verify already-pinned
-packet provenance, but current binaries generate and advertise packet/v2.
 
 ## Change rules
 

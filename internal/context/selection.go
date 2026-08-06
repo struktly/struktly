@@ -202,6 +202,18 @@ func selectPacketContext(ctx stdcontext.Context, requestedRoot, task string, det
 		if reason == "" {
 			continue
 		}
+		// A tracked file under a directory named build/ or dist/ used to vanish
+		// before selection, so a packet omitted it with nothing recording that
+		// it had. It is excluded for the same reason as before, but the reason
+		// is now in the packet. Only candidates that would otherwise have been
+		// selected are listed, so this does not flood the record.
+		if ignoredDirPath(rel) {
+			result.exclusions = append(result.exclusions, PacketDecision{
+				Path: rel, Reason: "default_excluded",
+				Detail: "dependency, build, cache, or local runtime path",
+			})
+			continue
+		}
 		if matchesAny(rel, cfg.Context.Exclude) {
 			result.exclusions = append(result.exclusions, PacketDecision{Path: rel, Reason: "config_excluded"})
 			continue
@@ -344,7 +356,10 @@ func gitContextFiles(ctx stdcontext.Context, root string) ([]string, error) {
 			continue
 		}
 		rel := filepath.ToSlash(string(part))
-		if rel == ".git" || strings.HasPrefix(rel, ".git/") || defaultRuntimePath(rel) {
+		// Git internals and generated runtime state are dropped here.
+		// Directory conventions like build/ and dist/ are not: those can hold
+		// tracked source, so the selector records them as exclusions instead.
+		if rel == ".git" || strings.HasPrefix(rel, ".git/") || runtimeStatePath(rel) {
 			continue
 		}
 		paths = append(paths, rel)
@@ -639,12 +654,24 @@ func packetItemKind(rel string) string {
 	}
 }
 
-func defaultRuntimePath(rel string) bool {
+// runtimeStatePath reports generated or provider-owned state that is never
+// repository context: Struktly's own exports and scans, and agent session
+// directories. These are filtered before selection rather than recorded,
+// because recording them would make a packet's contents depend on the packets
+// generated before it.
+func runtimeStatePath(rel string) bool {
 	for _, prefix := range files.DefaultIgnoredPaths {
 		if rel == prefix || strings.HasPrefix(rel, prefix+"/") {
 			return true
 		}
 	}
+	return false
+}
+
+// ignoredDirPath reports a path under a dependency, build output, or cache
+// directory convention. Unlike runtimeStatePath these can hold tracked source,
+// so an omission here is recorded rather than silent.
+func ignoredDirPath(rel string) bool {
 	for _, dir := range files.DefaultIgnoredDirs {
 		for _, part := range strings.Split(rel, "/") {
 			if part == dir {
@@ -653,6 +680,10 @@ func defaultRuntimePath(rel string) bool {
 		}
 	}
 	return false
+}
+
+func defaultRuntimePath(rel string) bool {
+	return runtimeStatePath(rel) || ignoredDirPath(rel)
 }
 
 func sortDecisions(values []PacketDecision) {
