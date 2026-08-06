@@ -163,7 +163,18 @@ The current fixed limits are 40 items, 64 KiB per selected text file, and
 content bytes, not packet JSON size. Oversized UTF-8 text is truncated on a valid
 rune boundary; `content_hash` still hashes the complete source file. A truncation
 names the limit that caused it: `content_limit` for the per-file limit and
-`total_limit` for the packet budget. Exclusions from item and total limits are
+`total_limit` for the packet budget.
+
+A Go source file that does not fit is rendered as declarations rather than cut
+at a byte offset: package clause, imports, types, values, and every function
+signature with its doc comment, with function bodies omitted. Such an item
+carries `"rendering": "declarations"`, and a consumer must branch on that field
+before reading a body-less function as one that does nothing. The field is
+absent for verbatim content. Rendering declarations reads and secret-scans the
+whole file rather than the per-file prefix, so a file with a secret anywhere in
+it is excluded rather than summarized. Files that do not parse, are not Go, or
+exceed 1 MiB fall back to byte truncation. Advertised as the
+`context.declaration_rendering` capability. Exclusions from item and total limits are
 summarized with counts and stable reason codes in the packet, and count only
 candidates that were otherwise includable — a file excluded as a secret or a
 sensitive name is reported under its own reason, not as one that did not fit.
@@ -199,6 +210,7 @@ history are Platform state and are never created or read by this CLI.
 
 Git enumeration is linear in the number of tracked and non-ignored paths. The
 classifier reads only selected candidates, retains at most 512 KiB of text, and
-streams complete selected files once to compute hashes. `scan` walks the repository
+streams complete selected files once to compute hashes. A Go candidate that
+exceeds its byte budget is additionally read and parsed once, bounded at 1 MiB. `scan` walks the repository
 outside ignored and deprioritized directories. No context command performs a
 network request or model call.

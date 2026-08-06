@@ -219,6 +219,7 @@ func currentCapabilities() capabilitiesDocument {
 		},
 		Features: []string{
 			"context.cancellation",
+			"context.declaration_rendering",
 			"context.limits",
 			"context.expect_base_revision",
 			"context.no_write",

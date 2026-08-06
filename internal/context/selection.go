@@ -129,15 +129,20 @@ type PacketDecision struct {
 }
 
 type PacketItem struct {
-	Kind          string     `json:"kind"`
-	Path          string     `json:"path"`
-	Content       string     `json:"content"`
-	ContentHash   string     `json:"content_hash"`
-	Provenance    Provenance `json:"provenance"`
-	Reason        string     `json:"reason"`
-	OriginalBytes int64      `json:"original_bytes"`
-	IncludedBytes int        `json:"included_bytes"`
-	Truncated     bool       `json:"truncated"`
+	Kind        string     `json:"kind"`
+	Path        string     `json:"path"`
+	Content     string     `json:"content"`
+	ContentHash string     `json:"content_hash"`
+	Provenance  Provenance `json:"provenance"`
+	Reason      string     `json:"reason"`
+	// Rendering names the form Content takes when it is not verbatim source.
+	// Absent means verbatim; "declarations" means function bodies were omitted,
+	// which a consumer must know before reading a body-less function as one
+	// that does nothing.
+	Rendering     string `json:"rendering,omitempty"`
+	OriginalBytes int64  `json:"original_bytes"`
+	IncludedBytes int    `json:"included_bytes"`
+	Truncated     bool   `json:"truncated"`
 }
 
 type SelectionExplanation struct {
@@ -441,6 +446,9 @@ func splitToken(value string) []string {
 // had nothing to do with it.
 func truncationDetail(truncatedBy string, item PacketItem, limits PacketLimits) string {
 	detail := fmt.Sprintf("included %d of %d bytes", item.IncludedBytes, item.OriginalBytes)
+	if item.Rendering == declarationRendering {
+		detail += " as declarations, function bodies omitted"
+	}
 	if truncatedBy == "total_limit" {
 		return fmt.Sprintf("%s; the %d-byte packet budget was exhausted", detail, limits.MaxTotalBytes)
 	}
@@ -573,6 +581,39 @@ func inspectSelectedFile(repo Repository, rel, reason string, remaining, maxFile
 		truncatedBy = "content_limit"
 	}
 	if len(content) > remaining {
+		truncatedBy = "total_limit"
+	}
+	// A file that does not fit is worth more as declarations than as its first
+	// N bytes. Only attempted when the content would be cut anyway: when the
+	// whole file fits, verbatim source beats a summary of it.
+	rendering := ""
+	if truncatedBy != "" {
+		skeleton, err := declarationSkeleton(rel, f, info.Size())
+		if err != nil {
+			return fileInspection{}, fmt.Errorf("read %s: %w", rel, err)
+		}
+		switch {
+		case skeleton.secret:
+			// Reading the whole file to parse it also scans the whole file, so
+			// this catches secrets past the per-file prefix that the check
+			// above could not see. Emitting anything from this file would break
+			// the rule that the packet never carries unscanned bytes.
+			return excluded("secret_detected", "")
+		case skeleton.text != "":
+			content = skeleton.text
+			rendering = declarationRendering
+		}
+	}
+	// The skeleton is built from the whole file, so unlike the prefix it is not
+	// already inside the per-file budget. A caller who tightens --max-file-bytes
+	// is bounding what they will be charged for, and a summary that ignores the
+	// bound is still over the bound. Truncating declarations still beats
+	// truncating source: the same bytes carry signatures instead of one body.
+	if len(content) > maxFileBytes {
+		content = truncateUTF8(content, maxFileBytes)
+		truncatedBy = "content_limit"
+	}
+	if len(content) > remaining {
 		content = truncateUTF8(content, remaining)
 		truncatedBy = "total_limit"
 	}
@@ -593,12 +634,51 @@ func inspectSelectedFile(repo Repository, rel, reason string, remaining, maxFile
 				Source: rel, Revision: repo.HeadRevision, Method: reason, Confidence: "detected",
 			},
 			Reason:        reason,
+			Rendering:     rendering,
 			OriginalBytes: info.Size(),
 			IncludedBytes: len(content),
 			Truncated:     int64(len(content)) < info.Size(),
 		},
 		truncatedBy: truncatedBy,
 	}, nil
+}
+
+// declarationSkeleton reads f whole and renders its declarations, for the Go
+// sources small enough to parse. It reports secret detection over the entire
+// file rather than the prefix, because rendering declarations draws on bytes
+// the prefix scan never saw.
+//
+// An empty text with no secret means "not applicable": not Go, too large, not
+// valid UTF-8, or it did not parse. The caller falls back to byte truncation.
+func declarationSkeleton(rel string, f *os.File, size int64) (struct {
+	text   string
+	secret bool
+}, error) {
+	var result struct {
+		text   string
+		secret bool
+	}
+	if !isGoSource(rel) || size > maxDeclarationParseBytes {
+		return result, nil
+	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return result, err
+	}
+	src, err := io.ReadAll(io.LimitReader(f, maxDeclarationParseBytes))
+	if err != nil {
+		return result, err
+	}
+	if bytes.ContainsRune(src, 0) || !utf8.Valid(src) {
+		return result, nil
+	}
+	if containsSecret(string(src)) {
+		result.secret = true
+		return result, nil
+	}
+	if rendered, ok := goDeclarations(src); ok {
+		result.text = rendered
+	}
+	return result, nil
 }
 
 func safeTextPrefix(data []byte, size int64, maxFileBytes int) (string, bool) {

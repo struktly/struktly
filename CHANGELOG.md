@@ -4,6 +4,18 @@ Notable changes will be recorded here.
 
 ## Unreleased
 
+- **Added declaration rendering for oversized Go files.** A Go source file that
+  does not fit its byte budget is now included as its declarations — package
+  clause, imports, types, values, and every function signature with its doc
+  comment — instead of being cut at a byte offset. Measured on this
+  repository's own sources the skeleton is 69% to 82% smaller than the file, so
+  files that previously arrived as a truncated fragment now arrive complete.
+  Such items carry `"rendering": "declarations"` in `struktly/packet/v2`, which
+  a consumer must check before reading a body-less function as one that does
+  nothing, and the capability is advertised as
+  `context.declaration_rendering`. Rendering reads and secret-scans the whole
+  file, so a secret anywhere in it excludes the file rather than summarizing
+  it. Files that do not parse fall back to byte truncation.
 - **Changed `doctor` to report failures instead of refusing to run.** Its
   `git_repository` check could only ever report "pass", because the command
   returned an error before producing a report whenever the repository would not

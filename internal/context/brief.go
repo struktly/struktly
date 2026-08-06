@@ -241,6 +241,9 @@ func (p *contextPacket) writeSelectedContext(b *strings.Builder, pkt Packet) {
 			b.WriteString("### `" + item.Path + "`\n\n")
 			b.WriteString("- Type: " + humanLabel(item.Kind) + "\n")
 			b.WriteString("- Why it was included: " + humanReason(item.Reason) + "\n")
+			if item.Rendering == declarationRendering {
+				b.WriteString("- Content: declarations only; function bodies are omitted\n")
+			}
 			b.WriteString("- Content hash: `" + item.ContentHash + "`\n")
 			fmt.Fprintf(b, "- Bytes: `%d/%d`\n\n", item.IncludedBytes, item.OriginalBytes)
 			fence := markdownFence(item.Content)

@@ -108,6 +108,10 @@
         "content_hash": { "$ref": "#/$defs/hash" },
         "provenance": { "$ref": "#/$defs/provenance" },
         "reason": { "type": "string" },
+        "rendering": {
+          "enum": ["declarations"],
+          "description": "Form of `content` when it is not verbatim source. Absent means verbatim. \"declarations\" means function bodies were omitted to fit the byte budget, so a body-less function must not be read as one that does nothing."
+        },
         "original_bytes": { "type": "integer", "minimum": 0 },
         "included_bytes": { "type": "integer", "minimum": 0 },
         "truncated": { "type": "boolean" }

@@ -26,6 +26,8 @@ Those are Platform concerns.
 - Secret, binary, ignored-file, symlink, and size protections.
 - Side-effect-free machine invocation and structured errors.
 - Portable repository declarations and task handoffs under `.struktly/`.
+- Declaration rendering for Go sources that exceed their byte budget, so a large
+  file is summarized by its API rather than cut at an offset.
 
 ## Next context-quality slices
 
@@ -37,7 +39,10 @@ Those are Platform concerns.
    request, with each seed recorded in packet provenance.
 4. **Code-aware deterministic selection.** Add language-specific import and
    symbol-neighbor expansion behind stable reason codes; keep filename matching
-   as the portable baseline.
+   as the portable baseline. Declaration rendering has landed the Go parsing
+   foundation this needs; the selection signals themselves are still to come,
+   and slice 5 should come first so their effect can be measured rather than
+   assumed.
 5. **Quality corpus and budgets.** Measure selection relevance, secret exclusion,
    determinism, latency, and packet size on representative repositories before
    adding caching or more heuristics.
