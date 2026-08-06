@@ -23,33 +23,37 @@ documents they name are presentation rather than a machine surface:
 `struktly/project-context/v1` for the scan summary and
 `struktly/agent-instructions/v1` for instruction drafts. Both are reported by
 `capabilities --json` so a consumer can see every identifier this build emits.
-The historical `packet.v1.json` remains available to verify already-pinned
-packet provenance, but current binaries generate and advertise packet/v2.
 
-### Open decision: the `task/v1` priority break
+## One live version per format
 
-`struktly/task/v1` stopped accepting `priority: normal` without a schema bump,
-which the breaking-change rule below does not permit. The change is recorded in
-[`CHANGELOG.md`](../CHANGELOG.md) but the contract question is unresolved, and
-this document should not pretend otherwise. Two ways to close it:
+Pre-1.0, exactly one version of each format is supported: the one the current
+binary emits and reads. Struktly does not ship transition readers, does not keep
+superseded schema files, and does not accept a format it no longer emits.
 
-- **Bump to `struktly/task/v2` and accept `v1` for one transition release.**
-  Keeps the rule below literally true. Costs a `schema:` line change in every
-  existing task file, a two-version reader, a `schemas/tasks.v2.json`, and a new
-  entry in the capabilities document.
-- **Amend the rule with a pre-1.0 carve-out** for input declarations — formats
-  Struktly reads rather than emits — allowing them to tighten within a version
-  when the change is recorded in the changelog. Costs nothing in files, but
-  weakens the guarantee for every future break.
+The reason is that there is nothing on the other side of the contract yet. A
+version bump buys a consumer the ability to negotiate, and a retained schema
+buys someone the ability to check a document they pinned earlier. With no
+external consumers and nothing pinned, both cost real work — a two-version
+reader to maintain, a `schema:` line to change in every existing file — and buy
+nothing. Carrying them anyway would be compatibility theatre: the appearance of
+a guarantee, with no one holding the other end.
 
-Pick one before v1.0. Until then `priority: normal` fails validation.
+So a breaking change is made in place, and the version identifier only moves
+when keeping the old name would make a document's meaning ambiguous. That is
+what happened to `struktly/task/v1`, which stopped accepting `priority: normal`
+in place; the break is recorded in [`CHANGELOG.md`](../CHANGELOG.md) rather than
+absorbed by a `task/v2`.
+
+**This rule expires at 1.0, or at the first external consumer, whichever comes
+first.** From that point a breaking change needs a new version and a transition
+window, because from that point the guarantee is real.
 
 ## Change rules
 
 - **Within an output version**: changes are additive only (new fields, new optional
   sections). Consumers must ignore unknown fields. Repository configuration is an
   input declaration and rejects unknown keys so misspellings fail validation.
-- **Breaking changes** (removing/renaming fields, changing meaning): bump the schema version (`v1` → `v2`) and document the change in [`CHANGELOG.md`](../CHANGELOG.md). Where cheap, readers tolerate the previous version for one transition release.
+- **Breaking changes** (removing/renaming fields, changing meaning): pre-1.0, made in place and documented in [`CHANGELOG.md`](../CHANGELOG.md); the version identifier moves only when the old name would otherwise be ambiguous. See the section above for when this stops applying.
 - **JSON is the stable machine surface.** Markdown rendering is presentation and may evolve within a schema version; do not parse markdown when a JSON form exists.
 - **CLI surface**: versioned machine commands and flags change only with an explicit schema or capability update.
 - **Command language**: `context` is the primary name for request-scoped packet generation. `brief` remains a compatibility alias.
@@ -59,7 +63,7 @@ Pick one before v1.0. Until then `priority: normal` fails validation.
 
 `struktly/packet/v2` contains repository context only. It removed the experimental
 `evidence` and `approved_memory` fields from v1 because Platform owns those
-records. Each item has repository-relative provenance and a SHA-256 content hash.
+records; the v1 schema file is not retained. Each item has repository-relative provenance and a SHA-256 content hash.
 `packet_hash` covers all deterministic packet fields and excludes
 `generated_at`, `metadata.generated_at`, the legacy
 `metadata.absolute_git_root` field, the repository display name, and presentation

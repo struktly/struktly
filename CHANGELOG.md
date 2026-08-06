@@ -10,6 +10,9 @@ Notable changes will be recorded here.
   resolve. It now writes its report anywhere and exits 1 if any check failed,
   which also fixes an invalid configuration being reported with exit 0.
   The new error code is `diagnostic_failed`.
+- Removed the retained `schemas/packet.v1.json`. It existed to verify
+  already-pinned packet provenance, which nothing has pinned, and it was the
+  last place carrying a superseded format alongside the live one.
 - Added a `schema` field to `version --json` (`struktly/version/v1`, with a
   JSON Schema file); it was the only machine output without one.
 - Added the missing identifiers to `capabilities --json`: the `init`, `mcp`,
@@ -66,11 +69,13 @@ Notable changes will be recorded here.
   included for another reason.
 - Added `github_pat_`, Slack, Stripe and Google API token shapes to secret
   detection.
-- **Changed `struktly/task/v1` validation without bumping the schema version.**
-  `priority: normal` is no longer accepted; the ladder is `low`, `medium`,
-  `high`, `critical`. This shipped unrecorded and is a breaking change for any
-  task file that used `normal`. Whether it should instead have become
-  `struktly/task/v2` is an open compatibility decision; see below.
+- **`struktly/task/v1` no longer accepts `priority: normal`;** the ladder is
+  `low`, `medium`, `high`, `critical`. This is a breaking change for any task
+  file that used `normal`, and it shipped unrecorded. It stays inside `task/v1`
+  rather than becoming `task/v2`: pre-1.0 with no external consumers, Struktly
+  supports exactly one version of each format and makes breaking changes in
+  place. See [`docs/compatibility.md`](docs/compatibility.md), which now states
+  that rule and when it expires.
 - Relaxed `struktly/task/v1` so `priority`, `created` and `agent` are optional,
   and so unknown frontmatter keys are preserved under `extensions` rather than
   rejected. Both widen what validates and break no existing valid file.

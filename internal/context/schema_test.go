@@ -62,18 +62,6 @@ func TestPacketSchema(t *testing.T) {
 	assertRequired(t, doc.Required, "packet_hash", "limits")
 }
 
-func TestHistoricalPacketV1SchemaRemainsAvailable(t *testing.T) {
-	doc := readSchema(t, "packet.v1.json")
-	if doc.ID != "struktly/packet/v1" {
-		t.Fatalf("historical packet schema id = %q", doc.ID)
-	}
-	for _, field := range []string{"evidence", "approved_memory"} {
-		if _, ok := doc.Properties[field]; !ok {
-			t.Fatalf("historical packet/v1 schema lost %q", field)
-		}
-	}
-}
-
 func TestTasksSchema(t *testing.T) {
 	doc := readSchema(t, "tasks.v1.json")
 	value := TasksDocument{
