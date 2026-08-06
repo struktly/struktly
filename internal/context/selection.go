@@ -63,6 +63,11 @@ var secretContentPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----`),
 	regexp.MustCompile(`\bAKIA[0-9A-Z]{16}\b`),
 	regexp.MustCompile(`\bgh[pousr]_[A-Za-z0-9]{20,}\b`),
+	// GitHub fine-grained tokens do not use the gh?_ shape at all.
+	regexp.MustCompile(`\bgithub_pat_[A-Za-z0-9_]{36,}\b`),
+	regexp.MustCompile(`\bxox[abprs]-[A-Za-z0-9-]{10,}\b`),
+	regexp.MustCompile(`\b[sr]k_(?:live|test)_[A-Za-z0-9]{16,}\b`),
+	regexp.MustCompile(`\bAIza[0-9A-Za-z_-]{35}\b`),
 	regexp.MustCompile(`(?i)(?:api[_-]?key|client[_-]?secret|access[_-]?token|password|passwd)\s*[:=]\s*["']?[A-Za-z0-9_./+=-]{12,}`),
 }
 
@@ -211,42 +216,47 @@ func selectPacketContext(ctx stdcontext.Context, requestedRoot, task string, det
 
 	sort.Slice(candidates, func(i, j int) bool { return rankCandidates(candidates[i], candidates[j]) })
 
+	countOmission := func(limit, rel string) {
+		entry := limitOmissions[limit]
+		entry.count++
+		if entry.count == 1 {
+			entry.first = rel
+		}
+		entry.last = rel
+		limitOmissions[limit] = entry
+	}
+
 	total := 0
 	for _, candidate := range candidates {
 		rel := candidate.path
 		reason := candidate.reason
-		if len(result.items) >= limits.MaxItems {
-			entry := limitOmissions["item_limit"]
-			entry.count++
-			if entry.count == 1 {
-				entry.first = rel
-			}
-			entry.last = rel
-			limitOmissions["item_limit"] = entry
-			continue
-		}
-		decision, item, err := inspectSelectedFile(repo, rel, reason, limits.MaxTotalBytes-total, limits.MaxFileBytes)
+		// Past the item limit a candidate is still classified, because
+		// "omitted 40 candidates that did not fit" is a different claim from
+		// "omitted 40 candidates, some of which were secrets and could never
+		// have been included". Classification stops before hashing, so the
+		// honest count does not cost a full read of every remaining file.
+		atItemLimit := len(result.items) >= limits.MaxItems
+		inspection, err := inspectSelectedFile(repo, rel, reason, limits.MaxTotalBytes-total, limits.MaxFileBytes, atItemLimit)
 		if err != nil {
 			return packetSelection{}, err
 		}
-		if decision.Reason != "" {
-			if decision.Reason == "total_limit" {
-				entry := limitOmissions["total_limit"]
-				entry.count++
-				if entry.count == 1 {
-					entry.first = rel
-				}
-				entry.last = rel
-				limitOmissions["total_limit"] = entry
+		if inspection.decision.Reason != "" {
+			if inspection.decision.Reason == "total_limit" {
+				countOmission("total_limit", rel)
 				continue
 			}
-			result.exclusions = append(result.exclusions, decision)
+			result.exclusions = append(result.exclusions, inspection.decision)
 			continue
 		}
-		if item.Truncated {
+		if atItemLimit {
+			countOmission("item_limit", rel)
+			continue
+		}
+		item := inspection.item
+		if inspection.truncatedBy != "" {
 			result.truncations = append(result.truncations, PacketDecision{
-				Path: rel, Reason: "content_limit",
-				Detail: fmt.Sprintf("included %d of %d bytes", item.IncludedBytes, item.OriginalBytes),
+				Path: rel, Reason: inspection.truncatedBy,
+				Detail: truncationDetail(inspection.truncatedBy, item, limits),
 			})
 		}
 		total += item.IncludedBytes
@@ -410,6 +420,18 @@ func splitToken(value string) []string {
 	return []string{value}
 }
 
+// truncationDetail names the limit that actually cut the file short. A file
+// stopped by the packet budget used to be reported as `content_limit`, which
+// humanReason renders as "per-file size limit reached" — a limit that may have
+// had nothing to do with it.
+func truncationDetail(truncatedBy string, item PacketItem, limits PacketLimits) string {
+	detail := fmt.Sprintf("included %d of %d bytes", item.IncludedBytes, item.OriginalBytes)
+	if truncatedBy == "total_limit" {
+		return fmt.Sprintf("%s; the %d-byte packet budget was exhausted", detail, limits.MaxTotalBytes)
+	}
+	return fmt.Sprintf("%s; the per-file limit is %d bytes", detail, limits.MaxFileBytes)
+}
+
 func limitExclusionDetail(reason string, count int, first, last string) string {
 	reasonLabel := strings.ReplaceAll(reason, "_", " ")
 	reasonLabel = strings.TrimSuffix(reasonLabel, " limit")
@@ -476,65 +498,92 @@ func selectionTaskWords(task string) map[string]struct{} {
 	return words
 }
 
-func inspectSelectedFile(repo Repository, rel, reason string, remaining, maxFileBytes int) (PacketDecision, PacketItem, error) {
+// fileInspection is the outcome of classifying one candidate. Exactly one of
+// decision and item is meaningful: a non-empty decision.Reason means the file
+// was excluded, otherwise item holds the selected content. truncatedBy names
+// which limit cut the content short, so the audit trail can say which one.
+type fileInspection struct {
+	decision    PacketDecision
+	item        PacketItem
+	truncatedBy string
+}
+
+// inspectSelectedFile classifies one candidate file. When countOnly is set it
+// stops after the exclusion checks: that is enough to tell whether the file
+// could have been included at all, without paying to hash a file that will not
+// be in the packet.
+func inspectSelectedFile(repo Repository, rel, reason string, remaining, maxFileBytes int, countOnly bool) (fileInspection, error) {
+	excluded := func(reason, detail string) (fileInspection, error) {
+		return fileInspection{decision: PacketDecision{Path: rel, Reason: reason, Detail: detail}}, nil
+	}
 	full := filepath.Join(repo.absoluteRoot, filepath.FromSlash(rel))
 	info, err := os.Lstat(full)
 	if err != nil {
-		return PacketDecision{Path: rel, Reason: "unreadable", Detail: "cannot inspect file"}, PacketItem{}, nil
+		return excluded("unreadable", "cannot inspect file")
 	}
 	if info.Mode()&os.ModeSymlink != 0 {
-		return PacketDecision{Path: rel, Reason: "symlink"}, PacketItem{}, nil
+		return excluded("symlink", "")
 	}
 	if !info.Mode().IsRegular() {
-		return PacketDecision{Path: rel, Reason: "non_regular"}, PacketItem{}, nil
+		return excluded("non_regular", "")
 	}
 	if files.IsSensitivePath(rel) {
-		return PacketDecision{Path: rel, Reason: "sensitive_path"}, PacketItem{}, nil
+		return excluded("sensitive_path", "")
 	}
 
 	f, err := os.Open(full)
 	if err != nil {
-		return PacketDecision{Path: rel, Reason: "unreadable", Detail: "cannot open file"}, PacketItem{}, nil
+		return excluded("unreadable", "cannot open file")
 	}
 	defer f.Close()
 	prefix, err := io.ReadAll(io.LimitReader(f, int64(maxFileBytes)+utf8.UTFMax))
 	if err != nil {
-		return PacketDecision{}, PacketItem{}, fmt.Errorf("read %s: %w", rel, err)
+		return fileInspection{}, fmt.Errorf("read %s: %w", rel, err)
 	}
 	content, binary := safeTextPrefix(prefix, info.Size(), maxFileBytes)
 	if binary {
-		return PacketDecision{Path: rel, Reason: "binary"}, PacketItem{}, nil
+		return excluded("binary", "")
 	}
 	if containsSecret(content) {
-		return PacketDecision{Path: rel, Reason: "secret_detected"}, PacketItem{}, nil
+		return excluded("secret_detected", "")
+	}
+	if countOnly {
+		return fileInspection{}, nil
 	}
 	if remaining <= 0 {
-		return PacketDecision{Path: rel, Reason: "total_limit"}, PacketItem{}, nil
+		return excluded("total_limit", "")
+	}
+	truncatedBy := ""
+	if int64(len(content)) < info.Size() {
+		truncatedBy = "content_limit"
 	}
 	if len(content) > remaining {
 		content = truncateUTF8(content, remaining)
+		truncatedBy = "total_limit"
 	}
 	if _, err := f.Seek(0, io.SeekStart); err != nil {
-		return PacketDecision{}, PacketItem{}, fmt.Errorf("hash %s: %w", rel, err)
+		return fileInspection{}, fmt.Errorf("hash %s: %w", rel, err)
 	}
 	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
-		return PacketDecision{}, PacketItem{}, fmt.Errorf("hash %s: %w", rel, err)
+		return fileInspection{}, fmt.Errorf("hash %s: %w", rel, err)
 	}
-	item := PacketItem{
-		Kind:        packetItemKind(rel),
-		Path:        rel,
-		Content:     content,
-		ContentHash: "sha256:" + hex.EncodeToString(h.Sum(nil)),
-		Provenance: Provenance{
-			Source: rel, Revision: repo.HeadRevision, Method: reason, Confidence: "detected",
+	return fileInspection{
+		item: PacketItem{
+			Kind:        packetItemKind(rel),
+			Path:        rel,
+			Content:     content,
+			ContentHash: "sha256:" + hex.EncodeToString(h.Sum(nil)),
+			Provenance: Provenance{
+				Source: rel, Revision: repo.HeadRevision, Method: reason, Confidence: "detected",
+			},
+			Reason:        reason,
+			OriginalBytes: info.Size(),
+			IncludedBytes: len(content),
+			Truncated:     int64(len(content)) < info.Size(),
 		},
-		Reason:        reason,
-		OriginalBytes: info.Size(),
-		IncludedBytes: len(content),
-		Truncated:     int64(len(content)) < info.Size(),
-	}
-	return PacketDecision{}, item, nil
+		truncatedBy: truncatedBy,
+	}, nil
 }
 
 func safeTextPrefix(data []byte, size int64, maxFileBytes int) (string, bool) {
@@ -651,13 +700,13 @@ func ExplainSelection(ctx stdcontext.Context, requestedRoot, requestedPath, task
 		explanation.Reason = "not_selected"
 		return explanation, nil
 	}
-	decision, _, err := inspectSelectedFile(repo, rel, reason, maxPacketTotalBytes, maxPacketFileBytes)
+	inspection, err := inspectSelectedFile(repo, rel, reason, maxPacketTotalBytes, maxPacketFileBytes, false)
 	if err != nil {
 		return SelectionExplanation{}, err
 	}
-	if decision.Reason != "" {
-		explanation.Reason = decision.Reason
-		explanation.Detail = decision.Detail
+	if inspection.decision.Reason != "" {
+		explanation.Reason = inspection.decision.Reason
+		explanation.Detail = inspection.decision.Detail
 		return explanation, nil
 	}
 	explanation.Decision = "included"

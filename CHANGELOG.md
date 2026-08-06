@@ -4,6 +4,28 @@ Notable changes will be recorded here.
 
 ## Unreleased
 
+- **Closed a secret-disclosure hole in `.struktly/` guidance files.**
+  `direction.md`, `constraints.md` and `decisions.md` were read whole and copied
+  into the packet's corresponding fields without a secret scan, while the
+  selection path scans only the first 64 KiB of a file. A secret past that offset
+  was neither detected nor excluded and shipped in full, while the packet's own
+  truncation record for the same file reported that only 64 KiB was included.
+  These fields now carry the selected item's content, so they inherit the secret
+  scan, the per-file limit, and the packet budget.
+- Added a secret scan to `suggest-instructions`, which excerpted the same
+  guidance files into draft instruction files on disk with no check at all.
+- Fixed sensitive-path matching missing directory conventions: `*secret*` could
+  not match `secrets/db.txt`, because `filepath.Match` does not cross `/`. The
+  Git-backed selection and the non-Git walk disagreed about the same tree; both
+  now exclude, which is what the walk already did.
+- Fixed the non-Git scan reading through symlinked files while reporting that
+  symlinks are excluded.
+- Fixed truncation caused by the packet budget being recorded as
+  `content_limit`, which reads as the per-file limit; it is now `total_limit`.
+  Item-limit omission counts no longer include files that could never have been
+  included for another reason.
+- Added `github_pat_`, Slack, Stripe and Google API token shapes to secret
+  detection.
 - **Changed `struktly/task/v1` validation without bumping the schema version.**
   `priority: normal` is no longer accepted; the ladder is `low`, `medium`,
   `high`, `critical`. This shipped unrecorded and is a breaking change for any

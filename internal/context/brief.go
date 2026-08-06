@@ -121,24 +121,23 @@ type contextPacket struct {
 	sourceRefs       map[string]struct{}
 }
 
+// readOptionalInputs records which repository guidance files exist and which
+// could not be read. It deliberately does not retain their text: the content
+// that reaches the packet comes from the selection, which scans for secrets and
+// counts bytes against the packet budget. See sanitizeLegacyFields.
 func (p *contextPacket) readOptionalInputs() {
-	for _, input := range []struct {
-		rel    string
-		assign func(string)
-	}{
-		{rel: ".struktly/direction.md", assign: func(text string) { p.currentDirection = text }},
-		{rel: ".struktly/constraints.md", assign: func(text string) { p.constraints = text }},
-		{rel: ".struktly/decisions.md", assign: func(text string) { p.decisions = text }},
+	for _, rel := range []string{
+		".struktly/direction.md",
+		".struktly/constraints.md",
+		".struktly/decisions.md",
 	} {
-		text, err := files.ReadSmallTextFile(filepath.Join(p.root, filepath.FromSlash(input.rel)), 512*1024)
-		if err != nil {
+		if _, err := os.Stat(filepath.Join(p.root, filepath.FromSlash(rel))); err != nil {
 			if !os.IsNotExist(err) {
-				p.readWarnings = append(p.readWarnings, fmt.Sprintf("Unable to read `%s`.", input.rel))
+				p.readWarnings = append(p.readWarnings, fmt.Sprintf("Unable to read `%s`.", rel))
 			}
 			continue
 		}
-		input.assign(files.StripFrontmatter(text))
-		files.AddString(p.sourceRefs, input.rel)
+		files.AddString(p.sourceRefs, rel)
 	}
 	sort.Strings(p.readWarnings)
 }
@@ -324,13 +323,21 @@ func emptyFallback(value, fallback string) string {
 	return value
 }
 
+// writeDirection renders repository direction from the selected guidance only.
+//
+// There used to be a fallback here that read a "## Repository Direction" section
+// out of the scan summary when the guidance field was empty. It never ran: the
+// scan writes that heading as "## Repository direction", and the lookup is an
+// exact match. Correcting the case would have been the wrong repair. The scan
+// populates that section from `.struktly/direction.md` and nothing else, so the
+// fallback can differ from the guidance field in exactly one situation — when
+// the selection excluded direction.md, for a detected secret, a sensitive name,
+// or a packet limit. Those are the cases where the content must not be rendered,
+// so the only times the fallback could have fired are the only times it must
+// not. It is deleted rather than fixed.
 func (p *contextPacket) writeDirection(b *strings.Builder) {
 	direction := strings.TrimSpace(p.currentDirection)
-	known := ""
-	if direction == "" {
-		known = strings.TrimSpace(sectionContent(p.projectContext, "## Repository Direction"))
-	}
-	if direction == "" && known == "" && strings.TrimSpace(p.decisions) == "" {
+	if direction == "" && strings.TrimSpace(p.decisions) == "" {
 		return
 	}
 
@@ -339,8 +346,6 @@ func (p *contextPacket) writeDirection(b *strings.Builder) {
 		b.WriteString("From `.struktly/direction.md`:\n\n")
 		b.WriteString(excerptMarkdown(p.currentDirection, 1600))
 		b.WriteString("\n\n")
-	} else if known != "" {
-		b.WriteString(known + "\n\n")
 	}
 
 	if strings.TrimSpace(p.decisions) != "" {
@@ -348,7 +353,6 @@ func (p *contextPacket) writeDirection(b *strings.Builder) {
 		b.WriteString(excerptMarkdown(p.decisions, 900))
 		b.WriteString("\n\n")
 	}
-
 }
 
 // toPacket builds the machine-readable counterpart to renderMarkdown from
@@ -392,22 +396,33 @@ func (p *contextPacket) toPacket(ctx stdcontext.Context, limits PacketLimits) (P
 	return pkt, nil
 }
 
+// sanitizeLegacyFields makes the packet's guidance fields report exactly what
+// the selection included.
+//
+// They used to be filled from readOptionalInputs' separate 512 KiB read, which
+// no secret scanner ever saw, and cleared only when the file was absent from the
+// selection entirely. A secret past the selector's 64 KiB per-file window was
+// therefore not detected, not excluded, and shipped in full — while the packet's
+// own truncation record for the same file claimed 64 KiB was all that went in.
+//
+// Deriving these fields from the selected item gives them every guarantee the
+// selection already makes: those bytes were scanned for secrets, they were
+// counted against the packet budget, and they are the bytes the item reports.
+// The invariant is that the packet never emits content the scanner did not read.
 func (p *contextPacket) sanitizeLegacyFields(selection packetSelection) {
-	selected := make(map[string]struct{}, len(selection.items))
+	included := make(map[string]string, len(selection.items))
 	for _, item := range selection.items {
-		selected[item.Path] = struct{}{}
+		included[item.Path] = item.Content
 	}
 	for _, input := range []struct {
-		path  string
-		clear func()
+		path   string
+		assign func(string)
 	}{
-		{path: ".struktly/direction.md", clear: func() { p.currentDirection = "" }},
-		{path: ".struktly/constraints.md", clear: func() { p.constraints = "" }},
-		{path: ".struktly/decisions.md", clear: func() { p.decisions = "" }},
+		{path: ".struktly/direction.md", assign: func(text string) { p.currentDirection = text }},
+		{path: ".struktly/constraints.md", assign: func(text string) { p.constraints = text }},
+		{path: ".struktly/decisions.md", assign: func(text string) { p.decisions = text }},
 	} {
-		if _, ok := selected[input.path]; !ok {
-			input.clear()
-		}
+		input.assign(files.StripFrontmatter(included[input.path]))
 	}
 }
 

@@ -120,15 +120,31 @@ func (m IgnoreMatcher) ShouldSkip(rel string, isDir bool) bool {
 	return false
 }
 
+// isSensitivePath reports whether any part of a path matches a credential or
+// secret naming convention.
+//
+// Every path segment is tested, not just the file name and the whole path,
+// because filepath.Match's `*` does not cross `/`: `*secret*` can never match
+// `secrets/db.txt` however the full path is presented to it. The non-Git walk
+// already behaved this way, since it tests each directory as it descends and
+// stops there — so the Git-backed selection was the path that disagreed, and it
+// disagreed in the unsafe direction. A directory named for credentials makes
+// what is under it sensitive; excluding is recorded and recoverable, and
+// `explain` reports `sensitive_path` for anything caught this way.
 func isSensitivePath(rel string) bool {
-	rel = filepath.ToSlash(rel)
-	base := strings.ToLower(PathBase(rel))
-	lowerRel := strings.ToLower(rel)
+	lowerRel := strings.ToLower(filepath.ToSlash(rel))
+	base := PathBase(lowerRel)
+	segments := strings.Split(lowerRel, "/")
 
 	for _, pattern := range sensitivePatterns {
 		pattern = strings.ToLower(pattern)
 		if matchSimplePattern(lowerRel, base, pattern) {
 			return true
+		}
+		for _, segment := range segments {
+			if matchSimplePattern(segment, segment, pattern) {
+				return true
+			}
 		}
 	}
 

@@ -94,6 +94,13 @@ func (d *instructionDraft) readOptionalInputs() {
 			}
 			continue
 		}
+		// These excerpts are written to files on disk, so they get the same
+		// secret guard the scan and the selection apply. This path had none:
+		// guidance went into a draft instruction file unscanned.
+		if containsSecret(text) {
+			d.readWarnings = append(d.readWarnings, fmt.Sprintf("Excluded `%s` because it contains a detected secret.", input.rel))
+			continue
+		}
 		input.assign(files.StripFrontmatter(text))
 		files.AddString(d.sourceRefs, input.rel)
 	}

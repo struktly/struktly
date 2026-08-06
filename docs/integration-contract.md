@@ -149,10 +149,19 @@ The CLI never emits the content of:
 The current fixed limits are 40 items, 64 KiB per selected text file, and
 512 KiB total selected content. `max_total_bytes` is enforced against selected
 content bytes, not packet JSON size. Oversized UTF-8 text is truncated on a valid
-rune boundary; `content_hash` still hashes the complete source file. Exclusions from
-item and total limits are summarized with counts and stable reason codes in the
-packet. `explain --json <path>` uses
-the same classifier and reports `included` or `excluded` with its reason.
+rune boundary; `content_hash` still hashes the complete source file. A truncation
+names the limit that caused it: `content_limit` for the per-file limit and
+`total_limit` for the packet budget. Exclusions from item and total limits are
+summarized with counts and stable reason codes in the packet, and count only
+candidates that were otherwise includable — a file excluded as a secret or a
+sensitive name is reported under its own reason, not as one that did not fit.
+`explain --json <path>` uses the same classifier and reports `included` or
+`excluded` with its reason.
+
+`direction`, `constraints` and `decisions` carry the selected content of the
+corresponding `.struktly/` file, so they are subject to the same secret scan,
+per-file limit, and packet budget as any other selected item. The CLI does not
+emit content it did not scan.
 
 There is no flag to include Git-ignored or security-excluded content.
 

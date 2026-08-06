@@ -159,6 +159,14 @@ func (s *repositoryScan) collect() error {
 			}
 			return nil
 		}
+		// WalkDir does not descend through symlinked directories, but it does
+		// report symlinked files, and inspectFile reads through them. The scan
+		// output claims symlinks are excluded, and a symlink named
+		// direction.md pointing at a dotfile in $HOME was excerpted into it.
+		if !entry.Type().IsRegular() {
+			files.AddString(s.ignored, rel)
+			return nil
+		}
 
 		s.inspectFile(rel, path)
 		return nil
