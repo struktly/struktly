@@ -30,7 +30,11 @@ type Packet struct {
 	// Scope is the repository-relative directory the request was narrowed to,
 	// absent when the whole repository was considered. It is part of packet
 	// identity: the same request at two scopes is two different contexts.
-	Scope                string   `json:"scope,omitempty"`
+	Scope string `json:"scope,omitempty"`
+	// Seeds are the starting paths the caller named. Recorded whether or not
+	// each one survived selection, so a caller can tell a seed that was
+	// excluded from a seed that was never asked for.
+	Seeds                []string `json:"seeds,omitempty"`
 	Direction            string   `json:"direction,omitempty"`
 	Constraints          string   `json:"constraints,omitempty"`
 	Decisions            string   `json:"decisions,omitempty"`

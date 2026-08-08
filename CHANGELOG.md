@@ -4,6 +4,16 @@ Notable changes will be recorded here.
 
 ## Unreleased
 
+- Added `declared` to the `provenance.confidence` vocabulary in
+  `struktly/packet/v2` and `struktly/snapshot/v1`. A caller-declared seed is
+  neither detected nor inferred, and the enum had no value for it.
+- **Added repeatable `--seed <path>` to `context`,** letting a caller name files
+  they already know are relevant. Seeds outrank every derived reason and are
+  recorded in the packet's `seeds` field and in each item's provenance as
+  `declared`. They cannot bypass any exclusion: a seed pointing at a sensitive
+  filename or a detected secret is refused and recorded like any other
+  candidate. The MCP `context_brief` tool accepts a matching `seeds` argument.
+  Advertised as `context.seeds`.
 - **Added `--scope <dir>` to `context` and `explain`,** narrowing a request to a
   repository-relative directory without weakening repository identity or any
   security rule. Repository identity, branch and revisions stay the

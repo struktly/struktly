@@ -34,20 +34,27 @@ Those are Platform concerns.
   itself can be read as a list of what moved.
 - Request scoping to a package or service, without changing what the packet says
   the repository is.
+- Caller-supplied seed paths, which outrank derived reasons and are still subject
+  to every exclusion.
 
 ## Next context-quality slices
 
-1. **Explicit seeds.** Let a caller supply reviewed starting paths alongside the
-   request, with each seed recorded in packet provenance.
-2. **Code-aware deterministic selection.** Symbol matching has landed behind the
+1. **Code-aware deterministic selection.** Symbol matching has landed behind the
    `symbol_match` reason code, with filename matching still the portable
-   baseline. Import-neighbor expansion is the remaining half. Slice 3 should
+   baseline. Import-neighbor expansion is the remaining half. Slice 2 should
    come first: symbol matching was tuned twice against measured output on real
    requests, and the untuned version selected mostly noise.
-3. **Quality corpus and budgets.** Measure selection relevance, secret exclusion,
+2. **Quality corpus and budgets.** Measure selection relevance, secret exclusion,
    determinism, latency, and packet size on representative repositories before
    adding caching or more heuristics. `diff` is the comparison half of this;
    what remains is a labelled corpus and recorded budgets.
+
+   It should also validate emitted documents against the schemas in
+   [`schemas/`](../schemas/). The Go tests compare schema field names
+   structurally but cannot enforce a JSON Schema without a dependency this
+   repository does not carry, so a value outside an `enum` currently reaches
+   output unnoticed — which is how `provenance.confidence` came to emit a
+   `declared` the schema did not list.
 
 Context quality work must remain inspectable and deterministic. No roadmap item
 requires an LLM, network call, or proprietary service inside the CLI.

@@ -78,7 +78,7 @@ its permissions and execution behavior.
 | Command | What it does |
 |---|---|
 | `init` | Create repository configuration and run the first scan. |
-| `context <request>` | Build a request-specific packet from live repository state. Use `--scope <dir>` to narrow it to one package or service. |
+| `context <request>` | Build a request-specific packet from live repository state. Use `--scope <dir>` to narrow it to one package or service, and `--seed <path>` to name files you already know matter. |
 | `scan` | Write a general repository summary. It is optional and not a prerequisite for `context`. |
 | `tasks` | Emit safely readable repository task declarations and per-file invalid results. |
 | `status` | Report repository, configuration, and portable-file state. |

@@ -40,6 +40,10 @@ func Brief(opts BriefOptions) (BriefResult, error) {
 	if err != nil {
 		return BriefResult{}, err
 	}
+	seeds, err := cleanSeeds(root, scope, opts.Seeds)
+	if err != nil {
+		return BriefResult{}, err
+	}
 	limits, err := resolvePacketLimits(PacketLimits{
 		MaxItems:      opts.MaxItems,
 		MaxFileBytes:  opts.MaxFileBytes,
@@ -65,6 +69,7 @@ func Brief(opts BriefOptions) (BriefResult, error) {
 		root:           root,
 		task:           task,
 		scope:          scope,
+		seeds:          seeds,
 		generatedAt:    now,
 		projectContext: scan.renderMarkdown(),
 		sourceRefs:     make(map[string]struct{}, len(scan.sourceRefs)),
@@ -117,6 +122,7 @@ type contextPacket struct {
 	root           string
 	task           string
 	scope          string
+	seeds          []string
 	generatedAt    time.Time
 	projectContext string
 
@@ -285,6 +291,8 @@ func humanReason(value string) string {
 		return "matched a repository context rule"
 	case "repository_instruction":
 		return "repository instruction file"
+	case "seed":
+		return "the caller named it as a starting point"
 	case "task_match":
 		return "its filename matched the task"
 	case "symbol_match":
@@ -371,7 +379,14 @@ func (p *contextPacket) writeDirection(b *strings.Builder) {
 // the same packet state.
 func (p *contextPacket) toPacket(ctx stdcontext.Context, limits PacketLimits) (Packet, error) {
 	d := p.derive()
-	selection, err := selectPacketContext(ctx, p.root, p.task, p.scope, d.detectedChecks, limits)
+	selection, err := selectPacketContext(ctx, selectionRequest{
+		root:   p.root,
+		task:   p.task,
+		scope:  p.scope,
+		seeds:  p.seeds,
+		checks: d.detectedChecks,
+		limits: limits,
+	})
 	if err != nil {
 		return Packet{}, err
 	}
@@ -394,6 +409,7 @@ func (p *contextPacket) toPacket(ctx stdcontext.Context, limits PacketLimits) (P
 		Limits:               selection.limits,
 		Task:                 p.task,
 		Scope:                p.scope,
+		Seeds:                p.seeds,
 		Direction:            strings.TrimSpace(p.currentDirection),
 		Constraints:          strings.TrimSpace(p.constraints),
 		Decisions:            strings.TrimSpace(p.decisions),
@@ -457,6 +473,9 @@ func (p *contextPacket) suggestedFiles(docs, adrs, agentFiles, topDirs []string)
 		files.AddString(suggested, rel+"/")
 	}
 	for _, rel := range p.taskMatchedFiles(8) {
+		files.AddString(suggested, rel)
+	}
+	for _, rel := range p.seeds {
 		files.AddString(suggested, rel)
 	}
 	scoped := make([]string, 0, len(suggested))

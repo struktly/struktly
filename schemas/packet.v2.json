@@ -84,6 +84,13 @@
     "scope": {
       "type": "string",
       "description": "Repository-relative directory the request was narrowed to. Absent when the whole repository was considered. Part of packet identity."
+    },
+    "seeds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Starting paths the caller named, recorded whether or not each survived selection. Part of packet identity."
     }
   },
   "required": [
@@ -132,6 +139,7 @@
         },
         "confidence": {
           "enum": [
+            "declared",
             "detected",
             "inferred",
             "uncertain"

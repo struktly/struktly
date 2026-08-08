@@ -88,6 +88,29 @@ A scope that is not a directory inside the repository fails with
 `invalid_invocation`. `explain --scope` reports `out_of_scope` for a path outside
 it. Advertised as the `context.scope` capability.
 
+`context` accepts `--seed <path>`, repeatable, naming files the caller already
+knows are relevant:
+
+```sh
+struktly context --seed internal/http/router.go --json --no-write "<request>"
+```
+
+A seed is the one selection reason the CLI does not derive, and it is checked
+hardest for that reason. Naming a file gets it considered, never included: every
+exclusion still applies, so a seed pointing at a sensitive filename or a
+detected secret is refused and recorded like any other candidate. "Reviewed"
+describes the caller's judgement about relevance, not a claim that a file is
+safe to disclose.
+
+Seeds are canonicalized, deduplicated and recorded in the packet's `seeds`
+field whether or not each survived selection, so a caller can distinguish a seed
+that was excluded from one that was never requested. They are part of packet
+identity. They outrank every derived reason, so a tight `--max-items` spends
+itself on what the caller named first. At most 40 may be given. A seed that is
+not a file inside the repository, or that falls outside `--scope`, fails with
+`invalid_invocation`; a directory seed is refused with a pointer to `--scope`.
+Advertised as the `context.seeds` capability.
+
 `context` also accepts optional limit overrides:
 
 ```sh

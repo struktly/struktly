@@ -186,6 +186,7 @@ type packetSelection struct {
 	instructions    []string
 	readWarnings    []string
 	scope           string
+	seeds           []string
 	limits          PacketLimits
 }
 
@@ -195,7 +196,20 @@ type limitDecision struct {
 	last  string
 }
 
-func selectPacketContext(ctx stdcontext.Context, requestedRoot, task, scope string, detectedChecks []string, limits PacketLimits) (packetSelection, error) {
+// selectionRequest is everything one selection depends on. It became a struct
+// when the parameter list reached seven; the fields are the request, not
+// options, so every one of them belongs to packet identity.
+type selectionRequest struct {
+	root   string
+	task   string
+	scope  string
+	seeds  []string
+	checks []string
+	limits PacketLimits
+}
+
+func selectPacketContext(ctx stdcontext.Context, req selectionRequest) (packetSelection, error) {
+	requestedRoot, task, scope, limits := req.root, req.task, req.scope, req.limits
 	repo, err := ResolveRepository(ctx, requestedRoot)
 	if err != nil {
 		return packetSelection{}, err
@@ -215,7 +229,7 @@ func selectPacketContext(ctx stdcontext.Context, requestedRoot, task, scope stri
 		truncations:     []PacketDecision{},
 		repository:      repo,
 		requiredChecks:  append([]string{}, cfg.Checks.Required...),
-		suggestedChecks: uniqueSorted(append(append([]string(nil), cfg.Checks.Suggested...), detectedChecks...)),
+		suggestedChecks: uniqueSorted(append(append([]string(nil), cfg.Checks.Suggested...), req.checks...)),
 		instructions:    []string{},
 		readWarnings:    []string{},
 		limits:          limits,
@@ -237,6 +251,11 @@ func selectPacketContext(ctx stdcontext.Context, requestedRoot, task, scope stri
 			symbols.indexed, maxIndexedSymbolFiles, symbols.skipped))
 	}
 
+	seeded := make(map[string]struct{}, len(req.seeds))
+	for _, rel := range req.seeds {
+		seeded[rel] = struct{}{}
+	}
+
 	candidates := make([]packetCandidate, 0, len(paths))
 	for _, rel := range paths {
 		// Out of scope is not an exclusion worth recording: the caller asked
@@ -247,7 +266,11 @@ func selectPacketContext(ctx stdcontext.Context, requestedRoot, task, scope stri
 		}
 		reason := selectionReason(rel, task, cfg.Context.Include)
 		symbol := symbols.match(rel)
-		if reason == "" {
+		if _, isSeed := seeded[rel]; isSeed {
+			// Naming a file gets it considered, not included: it still goes
+			// through every exclusion below, like any other candidate.
+			reason = "seed"
+		} else if reason == "" {
 			if symbol.score == 0 {
 				continue
 			}
@@ -320,6 +343,9 @@ func selectPacketContext(ctx stdcontext.Context, requestedRoot, task, scope stri
 			continue
 		}
 		item := inspection.item
+		if reason == "seed" {
+			item.Provenance.Confidence = "declared"
+		}
 		if len(candidate.symbols) > 0 {
 			item.Provenance.Location = "declares:" + strings.Join(candidate.symbols, ",")
 		}
@@ -355,6 +381,7 @@ func selectPacketContext(ctx stdcontext.Context, requestedRoot, task, scope stri
 	sort.Strings(result.instructions)
 	result.limits = limits
 	result.scope = scope
+	result.seeds = req.seeds
 	return result, nil
 }
 
@@ -383,16 +410,19 @@ func rankCandidates(left, right packetCandidate) bool {
 
 func selectionReasonPriority(reason string) int {
 	switch reason {
-	case "selection_rule", "repository_instruction":
+	// The caller said so, which outranks anything the CLI worked out.
+	case "seed":
 		return 0
+	case "selection_rule", "repository_instruction":
+		return 1
 	// A file that declares what the request names is stronger evidence than one
 	// merely named like it.
 	case "symbol_match":
-		return 1
-	case "task_match":
 		return 2
+	case "task_match":
+		return 3
 	default:
-		return 4
+		return 5
 	}
 }
 

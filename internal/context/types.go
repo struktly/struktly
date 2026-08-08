@@ -22,6 +22,7 @@ type BriefOptions struct {
 	Root                 string
 	Task                 string
 	Scope                string
+	Seeds                []string
 	Now                  time.Time
 	NoWrite              bool
 	ExpectedBaseRevision string

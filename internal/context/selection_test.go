@@ -449,7 +449,9 @@ func TestPacketHashTracksDeterministicCompatibilityFields(t *testing.T) {
 }
 
 func selectPacketContextWithLimits(ctx stdcontext.Context, requestedRoot, task string, detectedChecks []string, limits PacketLimits) (packetSelection, error) {
-	return selectPacketContext(ctx, requestedRoot, task, "", detectedChecks, limits)
+	return selectPacketContext(ctx, selectionRequest{
+		root: requestedRoot, task: task, checks: detectedChecks, limits: limits,
+	})
 }
 
 func initSelectionRepo(t *testing.T) string {

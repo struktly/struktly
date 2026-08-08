@@ -26,7 +26,7 @@ func selectedPaths(items []PacketItem) []string {
 
 func TestScopeNarrowsSelectionToTheNamedSubtree(t *testing.T) {
 	root := scopedRepo(t)
-	selection, err := selectPacketContext(stdcontext.Background(), root, "request timeout", "services/api", nil, DefaultPacketLimits())
+	selection, err := selectPacketContext(stdcontext.Background(), selectionRequest{root: root, task: "request timeout", scope: "services/api", limits: DefaultPacketLimits()})
 	if err != nil {
 		t.Fatalf("selectPacketContext returned error: %v", err)
 	}
@@ -50,7 +50,7 @@ func TestScopeKeepsRepositoryGovernanceFromAncestors(t *testing.T) {
 	root := scopedRepo(t)
 	writeFile(t, root, ".struktly/constraints.md", "# Constraints\n\n- Keep it small.\n")
 
-	selection, err := selectPacketContext(stdcontext.Background(), root, "request timeout", "services/api", nil, DefaultPacketLimits())
+	selection, err := selectPacketContext(stdcontext.Background(), selectionRequest{root: root, task: "request timeout", scope: "services/api", limits: DefaultPacketLimits()})
 	if err != nil {
 		t.Fatalf("selectPacketContext returned error: %v", err)
 	}
@@ -104,7 +104,7 @@ func TestScopeCannotAdmitExcludedFiles(t *testing.T) {
 	writeFile(t, root, "services/api/secrets/token.txt", "value\n")
 	writeFile(t, root, "services/api/.env", "TOKEN=value\n")
 
-	selection, err := selectPacketContext(stdcontext.Background(), root, "secrets token env", "services/api", nil, DefaultPacketLimits())
+	selection, err := selectPacketContext(stdcontext.Background(), selectionRequest{root: root, task: "secrets token env", scope: "services/api", limits: DefaultPacketLimits()})
 	if err != nil {
 		t.Fatalf("selectPacketContext returned error: %v", err)
 	}

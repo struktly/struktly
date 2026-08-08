@@ -97,7 +97,8 @@ func classifyError(err error) (int, string) {
 	}
 	if errors.Is(err, errInvalidInvocation) ||
 		errors.Is(err, repoctx.ErrInvalidPacketLimit) ||
-		errors.Is(err, repoctx.ErrInvalidScope) {
+		errors.Is(err, repoctx.ErrInvalidScope) ||
+		errors.Is(err, repoctx.ErrInvalidSeed) {
 		return 2, "invalid_invocation"
 	}
 	if errors.Is(err, repoctx.ErrNotGitRepository) {
@@ -228,6 +229,7 @@ func currentCapabilities() capabilitiesDocument {
 			"context.cancellation",
 			"context.declaration_rendering",
 			"context.scope",
+			"context.seeds",
 			"context.symbol_matching",
 			"context.limits",
 			"context.expect_base_revision",
@@ -627,6 +629,7 @@ func newBriefCmd(repoRoot *string) *cobra.Command {
 	var noWrite bool
 	var expectedBaseRevision string
 	var scope string
+	var seeds []string
 	var maxItems int
 	var maxFileBytes int
 	var maxTotalBytes int
@@ -669,6 +672,7 @@ func newBriefCmd(repoRoot *string) *cobra.Command {
 				Root:                 *repoRoot,
 				Task:                 args[0],
 				Scope:                scope,
+				Seeds:                seeds,
 				NoWrite:              noWrite,
 				ExpectedBaseRevision: expectedBaseRevision,
 				MaxItems:             maxItems,
@@ -708,6 +712,7 @@ func newBriefCmd(repoRoot *string) *cobra.Command {
 	cmd.Flags().BoolVar(&noWrite, "no-write", false, "Do not write generated files; requires --json")
 	cmd.Flags().StringVar(&expectedBaseRevision, "expect-base-revision", "", "Fail if Git HEAD does not match this revision")
 	cmd.Flags().StringVar(&scope, "scope", "", "Narrow selection to a repository-relative directory")
+	cmd.Flags().StringArrayVar(&seeds, "seed", nil, "Include a known-relevant file; repeatable")
 	cmd.Flags().IntVar(&maxItems, "max-items", 0, "Maximum selected files")
 	cmd.Flags().IntVar(&maxFileBytes, "max-file-bytes", 0, "Maximum bytes to read from each selected file")
 	cmd.Flags().IntVar(&maxTotalBytes, "max-total-bytes", 0, "Maximum total selected content bytes")

@@ -179,6 +179,10 @@ func toolDefs() []toolDef {
 					"root":  rootProp,
 					"task":  map[string]any{"type": "string", "description": "Task the context packet is for"},
 					"scope": map[string]any{"type": "string", "description": "Optional repository-relative directory to narrow selection to"},
+					"seeds": map[string]any{
+						"type": "array", "items": map[string]any{"type": "string"},
+						"description": "Optional known-relevant files to include; still subject to every exclusion rule",
+					},
 				},
 				"required": []string{"task"},
 			},
@@ -187,9 +191,10 @@ func toolDefs() []toolDef {
 }
 
 type toolArgs struct {
-	Root  string `json:"root"`
-	Task  string `json:"task"`
-	Scope string `json:"scope"`
+	Root  string   `json:"root"`
+	Task  string   `json:"task"`
+	Scope string   `json:"scope"`
+	Seeds []string `json:"seeds"`
 }
 
 type toolResult struct {
@@ -249,7 +254,7 @@ func runScan(args toolArgs) toolResult {
 }
 
 func runBrief(args toolArgs) toolResult {
-	result, err := repoctx.Brief(repoctx.BriefOptions{Root: args.Root, Task: args.Task, Scope: args.Scope})
+	result, err := repoctx.Brief(repoctx.BriefOptions{Root: args.Root, Task: args.Task, Scope: args.Scope, Seeds: args.Seeds})
 	if err != nil {
 		return errorResult(err.Error())
 	}
