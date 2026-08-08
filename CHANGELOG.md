@@ -4,6 +4,19 @@ Notable changes will be recorded here.
 
 ## Unreleased
 
+- **Added a selection quality corpus** under `internal/context/testdata/corpus/`.
+  Labelled requests assert which files must be selected, which must at least be
+  surfaced, and which must not appear; each case also checks determinism and
+  schema conformance, and secret exclusion is asserted against every fixture.
+  Measured item counts and packet sizes are recorded in `report.json` and
+  regenerated with `-update`, so a change in selection quality shows up as a
+  reviewable diff rather than drifting.
+- **Added `internal/schema`,** a checker for the JSON Schema subset `schemas/`
+  uses, so emitted documents are validated in the ordinary test run. It refuses
+  any keyword it does not implement rather than ignoring it. This immediately
+  found that `struktly/validation/v1` still required `priority`, `created` and
+  `agent` on tasks and still allowed `priority: normal`, none of which had been
+  true since the task contract changed.
 - Added `declared` to the `provenance.confidence` vocabulary in
   `struktly/packet/v2` and `struktly/snapshot/v1`. A caller-declared seed is
   neither detected nor inferred, and the enum had no value for it.

@@ -36,25 +36,20 @@ Those are Platform concerns.
   the repository is.
 - Caller-supplied seed paths, which outrank derived reasons and are still subject
   to every exclusion.
+- A labelled selection corpus with a recorded report, per-case determinism, and
+  schema conformance for every emitted document.
 
 ## Next context-quality slices
 
-1. **Code-aware deterministic selection.** Symbol matching has landed behind the
-   `symbol_match` reason code, with filename matching still the portable
-   baseline. Import-neighbor expansion is the remaining half. Slice 2 should
-   come first: symbol matching was tuned twice against measured output on real
-   requests, and the untuned version selected mostly noise.
-2. **Quality corpus and budgets.** Measure selection relevance, secret exclusion,
-   determinism, latency, and packet size on representative repositories before
-   adding caching or more heuristics. `diff` is the comparison half of this;
-   what remains is a labelled corpus and recorded budgets.
-
-   It should also validate emitted documents against the schemas in
-   [`schemas/`](../schemas/). The Go tests compare schema field names
-   structurally but cannot enforce a JSON Schema without a dependency this
-   repository does not carry, so a value outside an `enum` currently reaches
-   output unnoticed — which is how `provenance.confidence` came to emit a
-   `declared` the schema did not list.
+1. **Decision records as selectable context.** The scan classifies
+   `docs/adr/` files as decision records and the packet points at them, but
+   selection does not use that knowledge, so an ADR's content is never carried.
+   Measured, not assumed: the corpus records it as a reachability case rather
+   than a recall failure.
+2. **Import-neighbor expansion.** The remaining half of code-aware selection:
+   once a file is selected, the repository files it imports are strong
+   candidates. The corpus exists to measure whether that is true before it
+   ships.
 
 Context quality work must remain inspectable and deterministic. No roadmap item
 requires an LLM, network call, or proprietary service inside the CLI.

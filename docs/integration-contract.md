@@ -181,7 +181,9 @@ generated at different times or checkout paths.
 
 Within a schema version, fields are added only. Consumers must ignore unknown
 fields. Breaking meaning or field changes require a new schema version. JSON
-Schema files are under [`schemas/`](../schemas/).
+Schema files are under [`schemas/`](../schemas/), and every document this CLI
+emits is validated against them in the test suite, so a schema and the output it
+describes cannot drift apart unnoticed.
 
 `snapshot/v1` is deterministically ordered. Its repository root is always `.` so
 portable output does not disclose a local checkout path; `generated_at` and

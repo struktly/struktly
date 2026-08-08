@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/struktly/struktly/internal/schema"
 )
 
 // C1: the exit-code contract promises 2 / invalid_invocation for an invalid
@@ -211,4 +213,47 @@ func repoRootForTest(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return root
+}
+
+// The command-level documents, which internal/context cannot reach: they are
+// assembled here and were the ones with no conformance check at all.
+func TestCommandDocumentsConformToTheirSchemas(t *testing.T) {
+	root := repoRootForTest(t)
+	for name, test := range map[string]struct {
+		schema string
+		args   []string
+	}{
+		"capabilities": {schema: "capabilities.v1.json", args: []string{"capabilities", "--json"}},
+		"version":      {schema: "version.v1.json", args: []string{"version", "--json"}},
+		"status":       {schema: "status.v1.json", args: []string{"status", "--json", "--root", root}},
+		"validate":     {schema: "validation.v1.json", args: []string{"validate", "--json", "--root", root}},
+		"doctor":       {schema: "doctor.v1.json", args: []string{"doctor", "--json", "--root", root}},
+		"tasks":        {schema: "tasks.v1.json", args: []string{"tasks", "--json", "--root", root}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var stdout bytes.Buffer
+			if code := runCLI(stdcontext.Background(), test.args, strings.NewReader(""), &stdout, io.Discard); code != 0 {
+				t.Fatalf("%v exit %d", test.args, code)
+			}
+			assertDocumentConforms(t, test.schema, stdout.Bytes())
+		})
+	}
+
+	t.Run("error", func(t *testing.T) {
+		var stderr bytes.Buffer
+		runCLI(stdcontext.Background(), []string{"context", "--json-errors", "--root", t.TempDir(), "x"},
+			strings.NewReader(""), io.Discard, &stderr)
+		assertDocumentConforms(t, "error.v1.json", stderr.Bytes())
+	})
+}
+
+func assertDocumentConforms(t *testing.T, schemaName string, document []byte) {
+	t.Helper()
+	definition, err := os.ReadFile(filepath.Join("..", "..", "schemas", schemaName))
+	if err != nil {
+		t.Fatalf("read schema %s: %v", schemaName, err)
+	}
+	if err := schema.ValidateJSON(definition, document); err != nil {
+		t.Fatalf("output does not conform to %s: %v", schemaName, err)
+	}
 }

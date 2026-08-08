@@ -1,0 +1,62 @@
+{
+  "flat-package / fix the config parser": {
+    "items": 4,
+    "packet_bytes": 2883,
+    "reasons": [
+      "selection_rule",
+      "task_match"
+    ],
+    "exclusions": 0,
+    "truncations": 0
+  },
+  "go-service / add request timeout middleware": {
+    "items": 7,
+    "packet_bytes": 5474,
+    "reasons": [
+      "selection_rule",
+      "task_match"
+    ],
+    "exclusions": 0,
+    "truncations": 0
+  },
+  "go-service / add request timeout middleware @middleware": {
+    "items": 4,
+    "packet_bytes": 4135,
+    "reasons": [
+      "selection_rule",
+      "task_match"
+    ],
+    "exclusions": 0,
+    "truncations": 0
+  },
+  "go-service / document the architecture decisions": {
+    "items": 6,
+    "packet_bytes": 4581,
+    "reasons": [
+      "selection_rule",
+      "task_match"
+    ],
+    "exclusions": 0,
+    "truncations": 0
+  },
+  "go-service / unrelated request about billing +seeds": {
+    "items": 6,
+    "packet_bytes": 4766,
+    "reasons": [
+      "seed",
+      "selection_rule"
+    ],
+    "exclusions": 0,
+    "truncations": 0
+  },
+  "noisy-legacy / update the current documentation": {
+    "items": 4,
+    "packet_bytes": 2692,
+    "reasons": [
+      "selection_rule",
+      "task_match"
+    ],
+    "exclusions": 0,
+    "truncations": 0
+  }
+}

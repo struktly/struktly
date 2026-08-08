@@ -5,52 +5,21 @@
   "description": "A local summary of repository structure, commands, and guidance.",
   "type": "object",
   "properties": {
-    "schema": {
-      "const": "struktly/snapshot/v1"
-    },
-    "generated_at": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "repository": {
-      "$ref": "#/$defs/repository"
-    },
-    "top_dirs": {
-      "$ref": "#/$defs/items"
-    },
-    "languages": {
-      "$ref": "#/$defs/items"
-    },
-    "commands": {
-      "$ref": "#/$defs/items"
-    },
-    "docs": {
-      "$ref": "#/$defs/items"
-    },
-    "adrs": {
-      "$ref": "#/$defs/items"
-    },
-    "instruction_files": {
-      "$ref": "#/$defs/items"
-    },
-    "direction": {
-      "$ref": "#/$defs/direction"
-    },
-    "ignored": {
-      "$ref": "#/$defs/strings"
-    },
-    "deprioritized": {
-      "$ref": "#/$defs/strings"
-    },
-    "open_questions": {
-      "$ref": "#/$defs/strings"
-    },
-    "source_refs": {
-      "$ref": "#/$defs/strings"
-    },
-    "stats": {
-      "$ref": "#/$defs/stats"
-    }
+    "schema": { "const": "struktly/snapshot/v1" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "repository": { "$ref": "#/$defs/repository" },
+    "top_dirs": { "$ref": "#/$defs/items" },
+    "languages": { "$ref": "#/$defs/items" },
+    "commands": { "$ref": "#/$defs/items" },
+    "docs": { "$ref": "#/$defs/items" },
+    "adrs": { "$ref": "#/$defs/items" },
+    "instruction_files": { "$ref": "#/$defs/items" },
+    "direction": { "$ref": "#/$defs/direction" },
+    "ignored": { "$ref": "#/$defs/strings" },
+    "deprioritized": { "$ref": "#/$defs/strings" },
+    "open_questions": { "$ref": "#/$defs/strings" },
+    "source_refs": { "$ref": "#/$defs/strings" },
+    "stats": { "$ref": "#/$defs/stats" }
   },
   "required": [
     "schema",
@@ -68,122 +37,64 @@
   "$defs": {
     "strings": {
       "type": "array",
-      "items": {
-        "type": "string"
-      }
+      "items": { "type": "string" }
     },
     "provenance": {
       "type": "object",
       "properties": {
-        "source": {
-          "type": "string"
-        },
-        "revision": {
-          "type": "string"
-        },
-        "location": {
-          "type": "string"
-        },
-        "method": {
-          "type": "string"
-        },
-        "confidence": {
-          "enum": [
-            "declared",
-            "detected",
-            "inferred",
-            "uncertain"
-          ]
-        }
+        "source": { "type": "string" },
+        "revision": { "type": "string" },
+        "location": { "type": "string" },
+        "method": { "type": "string" },
+        "confidence": { "enum": ["declared", "detected", "inferred", "uncertain"] }
       },
-      "required": [
-        "source",
-        "method",
-        "confidence"
-      ],
+      "required": ["source", "method", "confidence"],
       "additionalProperties": true
     },
     "item": {
       "type": "object",
       "properties": {
-        "value": {
-          "type": "string"
-        },
-        "kind": {
-          "type": "string"
-        },
+        "value": { "type": "string" },
+        "kind": { "type": "string" },
         "provenance": {
           "type": "array",
-          "items": {
-            "$ref": "#/$defs/provenance"
-          }
+          "items": { "$ref": "#/$defs/provenance" }
         }
       },
-      "required": [
-        "value"
-      ],
+      "required": ["value"],
       "additionalProperties": true
     },
     "items": {
       "type": "array",
-      "items": {
-        "$ref": "#/$defs/item"
-      }
+      "items": { "$ref": "#/$defs/item" }
     },
     "repository": {
       "type": "object",
       "properties": {
-        "name": {
-          "type": "string"
-        },
-        "root": {
-          "type": "string"
-        },
-        "revision": {
-          "type": "string"
-        },
-        "vcs": {
-          "type": "string"
-        }
+        "name": { "type": "string" },
+        "root": { "type": "string" },
+        "revision": { "type": "string" },
+        "vcs": { "type": "string" }
       },
-      "required": [
-        "name",
-        "root"
-      ],
+      "required": ["name", "root"],
       "additionalProperties": true
     },
     "direction": {
       "type": "object",
       "properties": {
-        "excerpt": {
-          "type": "string"
-        },
-        "provenance": {
-          "$ref": "#/$defs/provenance"
-        }
+        "excerpt": { "type": "string" },
+        "provenance": { "$ref": "#/$defs/provenance" }
       },
-      "required": [
-        "excerpt",
-        "provenance"
-      ],
+      "required": ["excerpt", "provenance"],
       "additionalProperties": true
     },
     "stats": {
       "type": "object",
       "properties": {
-        "files_scanned": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "duration_ms": {
-          "type": "integer",
-          "minimum": 0
-        }
+        "files_scanned": { "type": "integer", "minimum": 0 },
+        "duration_ms": { "type": "integer", "minimum": 0 }
       },
-      "required": [
-        "files_scanned",
-        "duration_ms"
-      ],
+      "required": ["files_scanned", "duration_ms"],
       "additionalProperties": true
     }
   }
