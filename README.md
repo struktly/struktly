@@ -83,6 +83,7 @@ its permissions and execution behavior.
 | `tasks` | Emit safely readable repository task declarations and per-file invalid results. |
 | `status` | Report repository, configuration, and portable-file state. |
 | `explain <path>` | Diagnose why one path would be included or excluded. |
+| `diff <before> <after>` | Report what changed between two context packets. |
 | `validate` | Validate configuration and portable task files. |
 | `doctor` | Check the repository and local CLI setup; exits 1 if a check fails. |
 | `capabilities` | Report supported schemas and machine-interface features. |

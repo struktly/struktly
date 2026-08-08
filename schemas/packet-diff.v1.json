@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "struktly/packet-diff/v1",
+  "title": "Struktly context packet comparison",
+  "description": "What changed between two struktly/packet/v2 documents. Names selected files, reasons, hashes and byte counts; never carries file content.",
+  "type": "object",
+  "properties": {
+    "schema": { "const": "struktly/packet-diff/v1" },
+    "identical": { "type": "boolean" },
+    "packet_hash": { "$ref": "#/$defs/change" },
+    "repository": { "$ref": "#/$defs/changes" },
+    "limits": { "$ref": "#/$defs/changes" },
+    "items": {
+      "type": "object",
+      "properties": {
+        "added": { "type": "array", "items": { "$ref": "#/$defs/summary" } },
+        "removed": { "type": "array", "items": { "$ref": "#/$defs/summary" } },
+        "changed": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": { "type": "string" },
+              "changes": { "$ref": "#/$defs/changes" }
+            },
+            "required": ["path", "changes"],
+            "additionalProperties": true
+          }
+        },
+        "unchanged": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["added", "removed", "changed", "unchanged"],
+      "additionalProperties": true
+    },
+    "required_checks": { "$ref": "#/$defs/stringSet" },
+    "suggested_checks": { "$ref": "#/$defs/stringSet" },
+    "exclusions": { "$ref": "#/$defs/decisionSet" },
+    "truncations": { "$ref": "#/$defs/decisionSet" }
+  },
+  "required": [
+    "schema",
+    "identical",
+    "packet_hash",
+    "repository",
+    "limits",
+    "items",
+    "required_checks",
+    "suggested_checks",
+    "exclusions",
+    "truncations"
+  ],
+  "additionalProperties": true,
+  "$defs": {
+    "change": {
+      "type": "object",
+      "properties": {
+        "field": { "type": "string" },
+        "before": { "type": "string" },
+        "after": { "type": "string" }
+      },
+      "required": ["field", "before", "after"],
+      "additionalProperties": true
+    },
+    "changes": { "type": "array", "items": { "$ref": "#/$defs/change" } },
+    "summary": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string" },
+        "reason": { "type": "string" },
+        "rendering": { "enum": ["declarations"] },
+        "included_bytes": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["path", "reason", "included_bytes"],
+      "additionalProperties": true
+    },
+    "stringSet": {
+      "type": "object",
+      "properties": {
+        "added": { "type": "array", "items": { "type": "string" } },
+        "removed": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["added", "removed"],
+      "additionalProperties": true
+    },
+    "decision": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string" },
+        "reason": { "type": "string" },
+        "detail": { "type": "string" }
+      },
+      "required": ["path", "reason"],
+      "additionalProperties": true
+    },
+    "decisionSet": {
+      "type": "object",
+      "properties": {
+        "added": { "type": "array", "items": { "$ref": "#/$defs/decision" } },
+        "removed": { "type": "array", "items": { "$ref": "#/$defs/decision" } }
+      },
+      "required": ["added", "removed"],
+      "additionalProperties": true
+    }
+  }
+}

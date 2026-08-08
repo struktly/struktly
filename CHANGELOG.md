@@ -4,6 +4,12 @@ Notable changes will be recorded here.
 
 ## Unreleased
 
+- **Added `struktly diff <before.json> <after.json>`,** reporting what changed
+  between two context packets: packet hash, repository revisions, limits,
+  selected items added, removed or changed, checks, exclusions and truncations.
+  Emits `struktly/packet-diff/v1`. It needs no repository, and it never
+  reproduces file content. A document that is not a `struktly/packet/v2` fails
+  with the new `invalid_packet` error code.
 - **Added symbol matching to context selection.** Go sources are now matched on
   the identifiers they declare, not only on their paths, so a request naming
   `WithTimeout` reaches the file declaring it even when nothing in the path says

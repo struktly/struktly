@@ -11,7 +11,9 @@ positional arguments they do not define. `--root` inside a Git working tree
 resolves to the repository top level for every command, including `init`,
 `scan` and `suggest-instructions`, so the files one command writes are the files
 another reads. Outside Git, `--root` is used literally. `context`, `status`,
-`explain`, and `validate` require a Git repository. `doctor` runs anywhere and
+`explain`, and `validate` require a Git repository. `diff` requires none: a
+packet is self-describing, so comparing two of them is a pure function of the
+two documents and works wherever they can be read. `doctor` runs anywhere and
 reports what it found: it writes its report, then exits 1 if any check has
 status `fail`, so a missing repository or an invalid configuration is visible
 both in the document and in the exit code. `context` also
@@ -30,6 +32,7 @@ Machine modes write one JSON document to stdout:
 | `validate --json` | `struktly/validation/v1` |
 | `doctor --json` | `struktly/doctor/v1` |
 | `capabilities --json` | `struktly/capabilities/v1` |
+| `diff --json <before> <after>` | `struktly/packet-diff/v1` |
 | `version --json` | `struktly/version/v1` |
 
 In machine mode, successful diagnostics such as a generated packet path go to
@@ -93,8 +96,8 @@ document on stderr for a failed invocation:
 ```
 
 Stable error codes currently include `not_git_repository`, `repository_changed`,
-`invalid_config`, `invalid_task`, `invalid_invocation`, `diagnostic_failed`,
-`canceled`, and `operation_failed`. Messages are for people;
+`invalid_config`, `invalid_task`, `invalid_packet`, `invalid_invocation`,
+`diagnostic_failed`, `canceled`, and `operation_failed`. Messages are for people;
 automation must branch on `error.code` and the process exit code.
 
 | Exit | Meaning |
@@ -204,6 +207,20 @@ per-file limit, and packet budget as any other selected item. The CLI does not
 emit content it did not scan.
 
 There is no flag to include Git-ignored or security-excluded content.
+
+## Comparing packets
+
+`diff <before.json> <after.json>` reports what changed between two
+`struktly/packet/v2` documents: packet hash, repository identity and revisions,
+limits, selected items added, removed or changed, required and suggested checks,
+exclusions and truncations. A changed item names the fields that moved —
+`content_hash`, `reason`, `rendering`, byte counts, and the matched declarations
+in `provenance.location`.
+
+The diff names what was selected and why and never reproduces file content, so
+comparing two packets cannot disclose what reading either of them would not.
+Both inputs must declare `struktly/packet/v2`; anything else fails with
+`invalid_packet`.
 
 ## Portable and runtime state
 

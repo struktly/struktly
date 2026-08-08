@@ -107,6 +107,9 @@ func classifyError(err error) (int, string) {
 	if errors.Is(err, repoctx.ErrInvalidTask) {
 		return 1, "invalid_task"
 	}
+	if errors.Is(err, repoctx.ErrInvalidPacket) {
+		return 1, "invalid_packet"
+	}
 	if errors.Is(err, repoctx.ErrInvalidConfig) {
 		return 1, "invalid_config"
 	}
@@ -163,6 +166,7 @@ func newRootCmd() *cobra.Command {
 	cmd.AddCommand(newSuggestInstructionsCmd(&repoRoot))
 	cmd.AddCommand(newStatusCmd(&repoRoot))
 	cmd.AddCommand(newExplainCmd(&repoRoot))
+	cmd.AddCommand(newDiffCmd())
 	cmd.AddCommand(newValidateCmd(&repoRoot))
 	cmd.AddCommand(newDoctorCmd(&repoRoot))
 	cmd.AddCommand(newMCPCmd(&repoRoot))
@@ -198,8 +202,8 @@ func currentCapabilities() capabilitiesDocument {
 		Schema: capabilitiesSchema,
 		Build:  buildinfo.Current(),
 		Commands: []string{
-			"capabilities", "context", "doctor", "explain", "init", "mcp", "scan",
-			"status", "suggest-instructions", "tasks", "validate", "version",
+			"capabilities", "context", "diff", "doctor", "explain", "init", "mcp",
+			"scan", "status", "suggest-instructions", "tasks", "validate", "version",
 		},
 		Schemas: []string{
 			capabilitiesSchema,
@@ -211,6 +215,7 @@ func currentCapabilities() capabilitiesDocument {
 			"struktly/error/v1",
 			"struktly/explanation/v1",
 			repoctx.PacketSchema,
+			repoctx.PacketDiffSchema,
 			repoctx.SnapshotSchema,
 			repoctx.TasksSchema,
 			"struktly/status/v1",
@@ -364,6 +369,109 @@ func newExplainCmd(repoRoot *string) *cobra.Command {
 	cmd.Flags().StringVar(&task, "task", "", "Optional task used for task-match selection")
 	cmd.Flags().BoolVar(&toJSON, "json", false, "Print structured explanation to stdout")
 	return cmd
+}
+
+// newDiffCmd compares two packet files. It is the only context command that
+// needs no repository: a packet is self-describing, so the comparison is a pure
+// function of the two documents and works anywhere they can be read.
+func newDiffCmd() *cobra.Command {
+	var toJSON bool
+	cmd := &cobra.Command{
+		Use:   "diff <before.json> <after.json>",
+		Short: "Compare two context packets",
+		Args:  invalidInvocationArgs(cobra.ExactArgs(2)),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			before, err := repoctx.LoadPacket(args[0])
+			if err != nil {
+				return err
+			}
+			after, err := repoctx.LoadPacket(args[1])
+			if err != nil {
+				return err
+			}
+			diff := repoctx.DiffPackets(before, after)
+			if toJSON {
+				return writeJSON(cmd.OutOrStdout(), diff)
+			}
+			return writePacketDiff(cmd.OutOrStdout(), diff)
+		},
+	}
+	cmd.Flags().BoolVar(&toJSON, "json", false, "Print the versioned packet diff to stdout")
+	return cmd
+}
+
+func writePacketDiff(w io.Writer, diff repoctx.PacketDiff) error {
+	if diff.Identical {
+		_, err := fmt.Fprintf(w, "identical packets (%s)\n", diff.PacketHash.Before)
+		return err
+	}
+	fmt.Fprintf(w, "packet hash: %s -> %s\n", diff.PacketHash.Before, diff.PacketHash.After)
+	for _, group := range []struct {
+		label   string
+		changes []repoctx.FieldChange
+	}{
+		{label: "repository", changes: diff.Repository},
+		{label: "limits", changes: diff.Limits},
+	} {
+		for _, change := range group.changes {
+			fmt.Fprintf(w, "%s %s: %s -> %s\n", group.label, change.Field,
+				emptyValue(change.Before, "(none)"), emptyValue(change.After, "(none)"))
+		}
+	}
+
+	fmt.Fprintf(w, "\nitems: %d unchanged, %d added, %d removed, %d changed\n",
+		diff.Items.Unchanged, len(diff.Items.Added), len(diff.Items.Removed), len(diff.Items.Changed))
+	for _, item := range diff.Items.Added {
+		fmt.Fprintf(w, "  + %s\t%s%s\t%d bytes\n", item.Path, item.Reason, renderingSuffix(item.Rendering), item.IncludedBytes)
+	}
+	for _, item := range diff.Items.Removed {
+		fmt.Fprintf(w, "  - %s\t%s\n", item.Path, item.Reason)
+	}
+	for _, item := range diff.Items.Changed {
+		fmt.Fprintf(w, "  ~ %s\n", item.Path)
+		for _, change := range item.Changes {
+			fmt.Fprintf(w, "      %s: %s -> %s\n", change.Field,
+				emptyValue(change.Before, "(none)"), emptyValue(change.After, "(none)"))
+		}
+	}
+
+	for _, group := range []struct {
+		label string
+		set   repoctx.StringSetDiff
+	}{
+		{label: "required checks", set: diff.RequiredChecks},
+		{label: "suggested checks", set: diff.SuggestedChecks},
+	} {
+		for _, value := range group.set.Added {
+			fmt.Fprintf(w, "%s + %s\n", group.label, value)
+		}
+		for _, value := range group.set.Removed {
+			fmt.Fprintf(w, "%s - %s\n", group.label, value)
+		}
+	}
+
+	for _, group := range []struct {
+		label string
+		set   repoctx.DecisionDiff
+	}{
+		{label: "exclusion", set: diff.Exclusions},
+		{label: "truncation", set: diff.Truncations},
+	} {
+		for _, decision := range group.set.Added {
+			fmt.Fprintf(w, "%s + %s\t%s\n", group.label, decision.Path, decision.Reason)
+		}
+		for _, decision := range group.set.Removed {
+			fmt.Fprintf(w, "%s - %s\t%s\n", group.label, decision.Path, decision.Reason)
+		}
+	}
+	return nil
+}
+
+func renderingSuffix(rendering string) string {
+	if rendering == "" {
+		return ""
+	}
+	return " (" + rendering + ")"
 }
 
 func newValidateCmd(repoRoot *string) *cobra.Command {

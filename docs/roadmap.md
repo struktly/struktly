@@ -30,23 +30,24 @@ Those are Platform concerns.
   file is summarized by its API rather than cut at an offset.
 - Symbol matching for Go sources, so a request reaches the file declaring what it
   names rather than only the file named after it.
+- Packet comparison, so a change to a repository, a configuration or the selector
+  itself can be read as a list of what moved.
 
 ## Next context-quality slices
 
-1. **Packet comparison.** Explain what changed between two packet files: Git
-   revision, selected files, content hashes, checks, exclusions, and packet hash.
-2. **Monorepo scope.** Let callers name a repository-relative package or service
+1. **Monorepo scope.** Let callers name a repository-relative package or service
    without weakening repository identity or security rules.
-3. **Explicit seeds.** Let a caller supply reviewed starting paths alongside the
+2. **Explicit seeds.** Let a caller supply reviewed starting paths alongside the
    request, with each seed recorded in packet provenance.
-4. **Code-aware deterministic selection.** Symbol matching has landed behind the
+3. **Code-aware deterministic selection.** Symbol matching has landed behind the
    `symbol_match` reason code, with filename matching still the portable
-   baseline. Import-neighbor expansion is the remaining half. Slice 5 should
+   baseline. Import-neighbor expansion is the remaining half. Slice 4 should
    come first: symbol matching was tuned twice against measured output on real
    requests, and the untuned version selected mostly noise.
-5. **Quality corpus and budgets.** Measure selection relevance, secret exclusion,
+4. **Quality corpus and budgets.** Measure selection relevance, secret exclusion,
    determinism, latency, and packet size on representative repositories before
-   adding caching or more heuristics.
+   adding caching or more heuristics. `diff` is the comparison half of this;
+   what remains is a labelled corpus and recorded budgets.
 
 Context quality work must remain inspectable and deterministic. No roadmap item
 requires an LLM, network call, or proprietary service inside the CLI.

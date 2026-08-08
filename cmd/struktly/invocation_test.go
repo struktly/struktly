@@ -157,3 +157,58 @@ func TestUnreadableConfigIsNotClassifiedAsInvalidConfig(t *testing.T) {
 		t.Fatalf("an unreadable config was reported as an invalid one: %q", doc.Error.Message)
 	}
 }
+
+// diff is the only context command needing no repository: a packet is
+// self-describing, so the comparison is a pure function of the two documents.
+func TestDiffNeedsNoRepository(t *testing.T) {
+	dir := t.TempDir()
+	packet := filepath.Join(dir, "packet.json")
+	var stdout bytes.Buffer
+	if code := runCLI(stdcontext.Background(), []string{"context", "--json", "--no-write",
+		"--root", repoRootForTest(t), "packet selection"}, strings.NewReader(""), &stdout, io.Discard); code != 0 {
+		t.Skip("cannot generate a packet in this environment")
+	}
+	if err := os.WriteFile(packet, stdout.Bytes(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	code := runCLI(stdcontext.Background(), []string{"diff", "--root", dir, packet, packet},
+		strings.NewReader(""), &out, io.Discard)
+	if code != 0 {
+		t.Fatalf("diff exit %d in a non-repository directory", code)
+	}
+	if !strings.Contains(out.String(), "identical") {
+		t.Fatalf("a packet compared with itself is not reported identical: %q", out.String())
+	}
+}
+
+func TestDiffRejectsADocumentThatIsNotAPacket(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "not-a-packet.json")
+	if err := os.WriteFile(path, []byte(`{"schema":"struktly/snapshot/v1"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stderr bytes.Buffer
+	code := runCLI(stdcontext.Background(), []string{"diff", "--json-errors", path, path},
+		strings.NewReader(""), io.Discard, &stderr)
+	if code != 1 {
+		t.Fatalf("exit = %d, want 1", code)
+	}
+	var doc errorDocument
+	if err := json.Unmarshal(stderr.Bytes(), &doc); err != nil {
+		t.Fatalf("stderr is not a structured error: %q", stderr.String())
+	}
+	if doc.Error.Code != "invalid_packet" {
+		t.Fatalf("error code = %q, want invalid_packet", doc.Error.Code)
+	}
+}
+
+func repoRootForTest(t *testing.T) string {
+	t.Helper()
+	root, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return root
+}
