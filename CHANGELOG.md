@@ -2,71 +2,8 @@
 
 Notable changes will be recorded here.
 
-## Unreleased
+## v0.3.0 - 2026-08-06
 
-- **Added import-neighbor expansion.** After selecting the request's own
-  candidates, Struktly adds repository files that the selected code actually
-  calls, under the `import_neighbor` reason with the supplied identifiers
-  recorded in `provenance.location`. Expansion follows identifiers rather than
-  imports, runs only from files the request matched by name or the caller
-  seeded, uses only leftover budget, and never displaces a direct match.
-  Advertised as `context.import_neighbors`.
-- **Added document title matching.** Markdown documents are now matched on their
-  first heading, reported as the `title_match` reason with the heading recorded
-  in `provenance.location` and quoted by `explain`. This closes the gap the
-  quality corpus found on its first run: a decision record named
-  `0001-record.md` and titled "ADR 0001: Record architecture decisions" was
-  pointed at but never carried. A title must name at least two distinct request
-  words, so a document that merely contains one is not evidence. Advertised as
-  `context.title_matching`.
-- **Added a selection quality corpus** under `internal/context/testdata/corpus/`.
-  Labelled requests assert which files must be selected, which must at least be
-  surfaced, and which must not appear; each case also checks determinism and
-  schema conformance, and secret exclusion is asserted against every fixture.
-  Measured item counts and packet sizes are recorded in `report.json` and
-  regenerated with `-update`, so a change in selection quality shows up as a
-  reviewable diff rather than drifting.
-- **Added `internal/schema`,** a checker for the JSON Schema subset `schemas/`
-  uses, so emitted documents are validated in the ordinary test run. It refuses
-  any keyword it does not implement rather than ignoring it. This immediately
-  found that `struktly/validation/v1` still required `priority`, `created` and
-  `agent` on tasks and still allowed `priority: normal`, none of which had been
-  true since the task contract changed.
-- Added `declared` to the `provenance.confidence` vocabulary in
-  `struktly/packet/v2` and `struktly/snapshot/v1`. A caller-declared seed is
-  neither detected nor inferred, and the enum had no value for it.
-- **Added repeatable `--seed <path>` to `context`,** letting a caller name files
-  they already know are relevant. Seeds outrank every derived reason and are
-  recorded in the packet's `seeds` field and in each item's provenance as
-  `declared`. They cannot bypass any exclusion: a seed pointing at a sensitive
-  filename or a detected secret is refused and recorded like any other
-  candidate. The MCP `context_brief` tool accepts a matching `seeds` argument.
-  Advertised as `context.seeds`.
-- **Added `--scope <dir>` to `context` and `explain`,** narrowing a request to a
-  repository-relative directory without weakening repository identity or any
-  security rule. Repository identity, branch and revisions stay the
-  repository's; the scope is recorded in the packet and is part of packet
-  identity. Repository declarations under `.struktly/` and agent instruction
-  files in ancestor directories stay eligible, because they govern the subtree.
-  `explain` reports `out_of_scope`. The MCP `context_brief` tool accepts a
-  matching `scope` argument. Advertised as `context.scope`.
-- **Added `struktly diff <before.json> <after.json>`,** reporting what changed
-  between two context packets: packet hash, repository revisions, limits,
-  selected items added, removed or changed, checks, exclusions and truncations.
-  Emits `struktly/packet-diff/v1`. It needs no repository, and it never
-  reproduces file content. A document that is not a `struktly/packet/v2` fails
-  with the new `invalid_packet` error code.
-- **Added symbol matching to context selection.** Go sources are now matched on
-  the identifiers they declare, not only on their paths, so a request naming
-  `WithTimeout` reaches the file declaring it even when nothing in the path says
-  so. Reported as the `symbol_match` reason with the matched declarations in
-  `provenance.location`, surfaced by `explain`, and advertised as
-  `context.symbol_matching`. Matching only adds candidates: excluded files are
-  never indexed, and a repository in another language is unaffected.
-- Dropped action verbs (`add`, `fix`, `update`, and similar) from request
-  matching. A request names an action and a subject, and only the subject
-  identifies code; without this, "add request timeout" matched every
-  `AddString` in the repository.
 - **Added declaration rendering for oversized Go files.** A Go source file that
   does not fit its byte budget is now included as its declarations — package
   clause, imports, types, values, and every function signature with its doc

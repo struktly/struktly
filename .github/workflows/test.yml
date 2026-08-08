@@ -39,3 +39,51 @@ jobs:
       - name: vulnerability check
         if: matrix.os == 'ubuntu-latest' && matrix.go == 'stable'
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
+
+  # Everything the release used to check, moved here and run on every push to
+  # main. release-please opens its release pull request with GITHUB_TOKEN, and
+  # GitHub does not trigger workflows for those, so a check that only ran on
+  # pull requests would never see the commit being tagged. Verifying main
+  # continuously means the release pull request adds nothing but a changelog
+  # and a version, on top of a commit already known to be good.
+  release-readiness:
+    name: release readiness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # gitleaks scans history, which needs all of it.
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: 1.25.x
+
+      - name: test with race detector
+        run: go test -race ./...
+
+      # The gitleaks CLI is MIT and needs no key. Only the gitleaks GitHub
+      # Action requires a licence for organization-owned repositories, which is
+      # what made this scan skippable before — and a scan that can be skipped
+      # silently is a scan a release can ship without. Installed by version so
+      # the Go checksum database verifies it, rather than curling a tarball.
+      - name: secret history scan
+        run: go run github.com/zricethezav/gitleaks/v8@v8.30.1 git --config .gitleaks.toml --redact --verbose .
+
+      - name: clean-repository smoke test
+        shell: bash
+        run: |
+          go install ./cmd/struktly
+          root="$(mktemp -d)"
+          git -C "$root" init --quiet
+          git -C "$root" config user.name "Struktly CI"
+          git -C "$root" config user.email "ci@struktly.invalid"
+          printf '# smoke repository\n' > "$root/README.md"
+          git -C "$root" add README.md
+          git -C "$root" commit --quiet -m initial
+          bindir="$(go env GOBIN)"
+          [ -n "$bindir" ] || bindir="$(go env GOPATH)/bin"
+          struktly="$bindir/struktly"
+          "$struktly" init --root "$root"
+          "$struktly" context --root "$root" --json --no-write "smoke test" > /dev/null
+          "$struktly" validate --root "$root"
+          "$struktly" doctor --root "$root"
