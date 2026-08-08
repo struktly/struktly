@@ -5,37 +5,86 @@
   "description": "Repository files and guidance selected for one task.",
   "type": "object",
   "properties": {
-    "schema": { "const": "struktly/packet/v2" },
-    "generated_at": { "type": "string", "format": "date-time" },
-    "metadata": { "$ref": "#/$defs/metadata" },
-    "repository": { "$ref": "#/$defs/repository" },
+    "schema": {
+      "const": "struktly/packet/v2"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "repository": {
+      "$ref": "#/$defs/repository"
+    },
     "items": {
       "type": "array",
-      "items": { "$ref": "#/$defs/item" }
+      "items": {
+        "$ref": "#/$defs/item"
+      }
     },
-    "instruction_files": { "$ref": "#/$defs/strings" },
-    "required_checks": { "$ref": "#/$defs/strings" },
-    "suggested_checks": { "$ref": "#/$defs/strings" },
+    "instruction_files": {
+      "$ref": "#/$defs/strings"
+    },
+    "required_checks": {
+      "$ref": "#/$defs/strings"
+    },
+    "suggested_checks": {
+      "$ref": "#/$defs/strings"
+    },
     "exclusions": {
       "type": "array",
-      "items": { "$ref": "#/$defs/decision" }
+      "items": {
+        "$ref": "#/$defs/decision"
+      }
     },
     "truncations": {
       "type": "array",
-      "items": { "$ref": "#/$defs/decision" }
+      "items": {
+        "$ref": "#/$defs/decision"
+      }
     },
-    "limits": { "$ref": "#/$defs/limits" },
-    "packet_hash": { "$ref": "#/$defs/hash" },
-    "task": { "type": "string" },
-    "direction": { "type": "string" },
-    "constraints": { "type": "string" },
-    "decisions": { "type": "string" },
-    "verification_commands": { "$ref": "#/$defs/strings" },
-    "docs": { "$ref": "#/$defs/strings" },
-    "suggested_files": { "$ref": "#/$defs/strings" },
-    "missing_context": { "$ref": "#/$defs/strings" },
-    "read_warnings": { "$ref": "#/$defs/strings" },
-    "source_refs": { "$ref": "#/$defs/strings" }
+    "limits": {
+      "$ref": "#/$defs/limits"
+    },
+    "packet_hash": {
+      "$ref": "#/$defs/hash"
+    },
+    "task": {
+      "type": "string"
+    },
+    "direction": {
+      "type": "string"
+    },
+    "constraints": {
+      "type": "string"
+    },
+    "decisions": {
+      "type": "string"
+    },
+    "verification_commands": {
+      "$ref": "#/$defs/strings"
+    },
+    "docs": {
+      "$ref": "#/$defs/strings"
+    },
+    "suggested_files": {
+      "$ref": "#/$defs/strings"
+    },
+    "missing_context": {
+      "$ref": "#/$defs/strings"
+    },
+    "read_warnings": {
+      "$ref": "#/$defs/strings"
+    },
+    "source_refs": {
+      "$ref": "#/$defs/strings"
+    },
+    "scope": {
+      "type": "string",
+      "description": "Repository-relative directory the request was narrowed to. Absent when the whole repository was considered. Part of packet identity."
+    }
   },
   "required": [
     "schema",
@@ -58,7 +107,9 @@
   "$defs": {
     "strings": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
     },
     "hash": {
       "type": "string",
@@ -67,54 +118,122 @@
     "provenance": {
       "type": "object",
       "properties": {
-        "source": { "type": "string" },
-        "revision": { "type": "string" },
-        "location": { "type": "string" },
-        "method": { "type": "string" },
-        "confidence": { "enum": ["detected", "inferred", "uncertain"] }
+        "source": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "confidence": {
+          "enum": [
+            "detected",
+            "inferred",
+            "uncertain"
+          ]
+        }
       },
-      "required": ["source", "method", "confidence"],
+      "required": [
+        "source",
+        "method",
+        "confidence"
+      ],
       "additionalProperties": true
     },
     "metadata": {
       "type": "object",
       "properties": {
-        "generated_at": { "type": "string", "format": "date-time" },
-        "absolute_git_root": { "type": "string" }
+        "generated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "absolute_git_root": {
+          "type": "string"
+        }
       },
-      "required": ["generated_at", "absolute_git_root"],
+      "required": [
+        "generated_at",
+        "absolute_git_root"
+      ],
       "additionalProperties": true
     },
     "repository": {
       "type": "object",
       "properties": {
-        "name": { "type": "string" },
-        "identity": { "type": "string" },
-        "vcs": { "type": "string" },
-        "root": { "type": "string" },
-        "branch": { "type": "string" },
-        "head_revision": { "type": "string" },
-        "base_revision": { "type": "string" }
+        "name": {
+          "type": "string"
+        },
+        "identity": {
+          "type": "string"
+        },
+        "vcs": {
+          "type": "string"
+        },
+        "root": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "head_revision": {
+          "type": "string"
+        },
+        "base_revision": {
+          "type": "string"
+        }
       },
-      "required": ["name", "identity", "vcs", "root", "head_revision"],
+      "required": [
+        "name",
+        "identity",
+        "vcs",
+        "root",
+        "head_revision"
+      ],
       "additionalProperties": true
     },
     "item": {
       "type": "object",
       "properties": {
-        "kind": { "type": "string" },
-        "path": { "type": "string" },
-        "content": { "type": "string" },
-        "content_hash": { "$ref": "#/$defs/hash" },
-        "provenance": { "$ref": "#/$defs/provenance" },
-        "reason": { "type": "string" },
+        "kind": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "content_hash": {
+          "$ref": "#/$defs/hash"
+        },
+        "provenance": {
+          "$ref": "#/$defs/provenance"
+        },
+        "reason": {
+          "type": "string"
+        },
         "rendering": {
-          "enum": ["declarations"],
+          "enum": [
+            "declarations"
+          ],
           "description": "Form of `content` when it is not verbatim source. Absent means verbatim. \"declarations\" means function bodies were omitted to fit the byte budget, so a body-less function must not be read as one that does nothing."
         },
-        "original_bytes": { "type": "integer", "minimum": 0 },
-        "included_bytes": { "type": "integer", "minimum": 0 },
-        "truncated": { "type": "boolean" }
+        "original_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "included_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "truncated": {
+          "type": "boolean"
+        }
       },
       "required": [
         "kind",
@@ -132,21 +251,43 @@
     "decision": {
       "type": "object",
       "properties": {
-        "path": { "type": "string" },
-        "reason": { "type": "string" },
-        "detail": { "type": "string" }
+        "path": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "detail": {
+          "type": "string"
+        }
       },
-      "required": ["path", "reason"],
+      "required": [
+        "path",
+        "reason"
+      ],
       "additionalProperties": true
     },
     "limits": {
       "type": "object",
       "properties": {
-        "max_items": { "type": "integer", "minimum": 0 },
-        "max_file_bytes": { "type": "integer", "minimum": 0 },
-        "max_total_bytes": { "type": "integer", "minimum": 0 }
+        "max_items": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_file_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_total_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
       },
-      "required": ["max_items", "max_file_bytes", "max_total_bytes"],
+      "required": [
+        "max_items",
+        "max_file_bytes",
+        "max_total_bytes"
+      ],
       "additionalProperties": true
     }
   }

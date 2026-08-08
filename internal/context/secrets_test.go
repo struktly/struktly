@@ -121,7 +121,7 @@ func TestSensitiveDirectoryConventionsAreExcluded(t *testing.T) {
 			root := initSelectionRepo(t)
 			writeFile(t, root, rel, "value\n")
 
-			explanation, err := ExplainSelection(stdcontext.Background(), root, rel, "inspect secrets credentials tokens db aws ci")
+			explanation, err := ExplainSelection(stdcontext.Background(), root, rel, "inspect secrets credentials tokens db aws ci", "")
 			if err != nil {
 				t.Fatalf("ExplainSelection returned error: %v", err)
 			}

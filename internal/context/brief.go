@@ -36,6 +36,10 @@ func Brief(opts BriefOptions) (BriefResult, error) {
 	if task == "" {
 		return BriefResult{}, fmt.Errorf("task is required")
 	}
+	scope, err := cleanScope(root, opts.Scope)
+	if err != nil {
+		return BriefResult{}, err
+	}
 	limits, err := resolvePacketLimits(PacketLimits{
 		MaxItems:      opts.MaxItems,
 		MaxFileBytes:  opts.MaxFileBytes,
@@ -60,6 +64,7 @@ func Brief(opts BriefOptions) (BriefResult, error) {
 	packet := contextPacket{
 		root:           root,
 		task:           task,
+		scope:          scope,
 		generatedAt:    now,
 		projectContext: scan.renderMarkdown(),
 		sourceRefs:     make(map[string]struct{}, len(scan.sourceRefs)),
@@ -111,6 +116,7 @@ func repositoryChangedError(expected, actual string) error {
 type contextPacket struct {
 	root           string
 	task           string
+	scope          string
 	generatedAt    time.Time
 	projectContext string
 
@@ -181,6 +187,7 @@ func (p *contextPacket) renderMarkdown(pkt Packet) string {
 		"Repository: `" + pkt.Repository.Identity + "`",
 		"Branch: `" + emptyFallback(pkt.Repository.Branch, "detached HEAD") + "`",
 		"HEAD revision: `" + pkt.Repository.HeadRevision + "`",
+		"Scope: `" + emptyFallback(pkt.Scope, "whole repository") + "`",
 	})
 	b.WriteString("\n")
 
@@ -364,7 +371,7 @@ func (p *contextPacket) writeDirection(b *strings.Builder) {
 // the same packet state.
 func (p *contextPacket) toPacket(ctx stdcontext.Context, limits PacketLimits) (Packet, error) {
 	d := p.derive()
-	selection, err := selectPacketContext(ctx, p.root, p.task, d.detectedChecks, limits)
+	selection, err := selectPacketContext(ctx, p.root, p.task, p.scope, d.detectedChecks, limits)
 	if err != nil {
 		return Packet{}, err
 	}
@@ -386,6 +393,7 @@ func (p *contextPacket) toPacket(ctx stdcontext.Context, limits PacketLimits) (P
 		Truncations:          selection.truncations,
 		Limits:               selection.limits,
 		Task:                 p.task,
+		Scope:                p.scope,
 		Direction:            strings.TrimSpace(p.currentDirection),
 		Constraints:          strings.TrimSpace(p.constraints),
 		Decisions:            strings.TrimSpace(p.decisions),
@@ -451,7 +459,14 @@ func (p *contextPacket) suggestedFiles(docs, adrs, agentFiles, topDirs []string)
 	for _, rel := range p.taskMatchedFiles(8) {
 		files.AddString(suggested, rel)
 	}
-	return files.LimitStrings(files.SortedStrings(suggested), 25)
+	scoped := make([]string, 0, len(suggested))
+	for _, rel := range files.SortedStrings(suggested) {
+		// Directory suggestions carry a trailing slash; test the path itself.
+		if withinScope(strings.TrimSuffix(rel, "/"), p.scope) {
+			scoped = append(scoped, rel)
+		}
+	}
+	return files.LimitStrings(scoped, 25)
 }
 
 // taskMatchedFiles walks the repo up to two directory levels deep and returns

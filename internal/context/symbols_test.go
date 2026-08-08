@@ -94,7 +94,7 @@ func Colour() string { return "blue" }
 		t.Fatalf("provenance does not name the matched declaration: %q", wrap.Provenance.Location)
 	}
 
-	explanation, err := ExplainSelection(stdcontext.Background(), root, "server/wrap.go", task)
+	explanation, err := ExplainSelection(stdcontext.Background(), root, "server/wrap.go", task, "")
 	if err != nil {
 		t.Fatalf("ExplainSelection returned error: %v", err)
 	}

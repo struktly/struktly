@@ -14,28 +14,32 @@ const PacketSchema = "struktly/packet/v2"
 // Packet is the structured counterpart to the context-packet markdown Brief
 // writes. Programmatic consumers should read this rather than parsing markdown.
 type Packet struct {
-	Schema               string           `json:"schema"`
-	GeneratedAt          time.Time        `json:"generated_at"`
-	Metadata             PacketMetadata   `json:"metadata"`
-	Repository           Repository       `json:"repository"`
-	Items                []PacketItem     `json:"items"`
-	InstructionFiles     []string         `json:"instruction_files,omitempty"`
-	RequiredChecks       []string         `json:"required_checks"`
-	SuggestedChecks      []string         `json:"suggested_checks"`
-	Exclusions           []PacketDecision `json:"exclusions"`
-	Truncations          []PacketDecision `json:"truncations"`
-	Limits               PacketLimits     `json:"limits"`
-	PacketHash           string           `json:"packet_hash"`
-	Task                 string           `json:"task"`
-	Direction            string           `json:"direction,omitempty"`
-	Constraints          string           `json:"constraints,omitempty"`
-	Decisions            string           `json:"decisions,omitempty"`
-	VerificationCommands []string         `json:"verification_commands"`
-	Docs                 []string         `json:"docs,omitempty"`
-	SuggestedFiles       []string         `json:"suggested_files"`
-	MissingContext       []string         `json:"missing_context,omitempty"`
-	ReadWarnings         []string         `json:"read_warnings,omitempty"`
-	SourceRefs           []string         `json:"source_refs"`
+	Schema           string           `json:"schema"`
+	GeneratedAt      time.Time        `json:"generated_at"`
+	Metadata         PacketMetadata   `json:"metadata"`
+	Repository       Repository       `json:"repository"`
+	Items            []PacketItem     `json:"items"`
+	InstructionFiles []string         `json:"instruction_files,omitempty"`
+	RequiredChecks   []string         `json:"required_checks"`
+	SuggestedChecks  []string         `json:"suggested_checks"`
+	Exclusions       []PacketDecision `json:"exclusions"`
+	Truncations      []PacketDecision `json:"truncations"`
+	Limits           PacketLimits     `json:"limits"`
+	PacketHash       string           `json:"packet_hash"`
+	Task             string           `json:"task"`
+	// Scope is the repository-relative directory the request was narrowed to,
+	// absent when the whole repository was considered. It is part of packet
+	// identity: the same request at two scopes is two different contexts.
+	Scope                string   `json:"scope,omitempty"`
+	Direction            string   `json:"direction,omitempty"`
+	Constraints          string   `json:"constraints,omitempty"`
+	Decisions            string   `json:"decisions,omitempty"`
+	VerificationCommands []string `json:"verification_commands"`
+	Docs                 []string `json:"docs,omitempty"`
+	SuggestedFiles       []string `json:"suggested_files"`
+	MissingContext       []string `json:"missing_context,omitempty"`
+	ReadWarnings         []string `json:"read_warnings,omitempty"`
+	SourceRefs           []string `json:"source_refs"`
 }
 
 type packetHashInput struct {
@@ -49,6 +53,7 @@ type packetHashInput struct {
 	Truncations          []PacketDecision     `json:"truncations"`
 	Limits               PacketLimits         `json:"limits"`
 	Task                 string               `json:"task"`
+	Scope                string               `json:"scope,omitempty"`
 	Direction            string               `json:"direction,omitempty"`
 	Constraints          string               `json:"constraints,omitempty"`
 	Decisions            string               `json:"decisions,omitempty"`
@@ -84,6 +89,7 @@ func (p *Packet) setHash() error {
 		Truncations:          p.Truncations,
 		Limits:               p.Limits,
 		Task:                 p.Task,
+		Scope:                p.Scope,
 		Direction:            p.Direction,
 		Constraints:          p.Constraints,
 		Decisions:            p.Decisions,

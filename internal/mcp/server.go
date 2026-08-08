@@ -176,8 +176,9 @@ func toolDefs() []toolDef {
 			InputSchema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"root": rootProp,
-					"task": map[string]any{"type": "string", "description": "Task the context packet is for"},
+					"root":  rootProp,
+					"task":  map[string]any{"type": "string", "description": "Task the context packet is for"},
+					"scope": map[string]any{"type": "string", "description": "Optional repository-relative directory to narrow selection to"},
 				},
 				"required": []string{"task"},
 			},
@@ -186,8 +187,9 @@ func toolDefs() []toolDef {
 }
 
 type toolArgs struct {
-	Root string `json:"root"`
-	Task string `json:"task"`
+	Root  string `json:"root"`
+	Task  string `json:"task"`
+	Scope string `json:"scope"`
 }
 
 type toolResult struct {
@@ -247,7 +249,7 @@ func runScan(args toolArgs) toolResult {
 }
 
 func runBrief(args toolArgs) toolResult {
-	result, err := repoctx.Brief(repoctx.BriefOptions{Root: args.Root, Task: args.Task})
+	result, err := repoctx.Brief(repoctx.BriefOptions{Root: args.Root, Task: args.Task, Scope: args.Scope})
 	if err != nil {
 		return errorResult(err.Error())
 	}

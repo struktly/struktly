@@ -4,6 +4,14 @@ Notable changes will be recorded here.
 
 ## Unreleased
 
+- **Added `--scope <dir>` to `context` and `explain`,** narrowing a request to a
+  repository-relative directory without weakening repository identity or any
+  security rule. Repository identity, branch and revisions stay the
+  repository's; the scope is recorded in the packet and is part of packet
+  identity. Repository declarations under `.struktly/` and agent instruction
+  files in ancestor directories stay eligible, because they govern the subtree.
+  `explain` reports `out_of_scope`. The MCP `context_brief` tool accepts a
+  matching `scope` argument. Advertised as `context.scope`.
 - **Added `struktly diff <before.json> <after.json>`,** reporting what changed
   between two context packets: packet hash, repository revisions, limits,
   selected items added, removed or changed, checks, exclusions and truncations.

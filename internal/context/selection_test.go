@@ -28,7 +28,7 @@ func TestSelectionHonorsNestedAnchoredGitIgnore(t *testing.T) {
 	}
 	assertItemAbsent(t, selection.items, "nested/private.md")
 
-	explanation, err := ExplainSelection(stdcontext.Background(), root, "nested/private.md", "inspect private docs")
+	explanation, err := ExplainSelection(stdcontext.Background(), root, "nested/private.md", "inspect private docs", "")
 	if err != nil {
 		t.Fatalf("ExplainSelection returned error: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestSelectionExcludesProviderSessionState(t *testing.T) {
 	root := initSelectionRepo(t)
 	writeFile(t, root, ".codex/sessions/session.json", `{"transcript":"private"}`)
 
-	explanation, err := ExplainSelection(stdcontext.Background(), root, ".codex/sessions/session.json", "inspect session")
+	explanation, err := ExplainSelection(stdcontext.Background(), root, ".codex/sessions/session.json", "inspect session", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -449,7 +449,7 @@ func TestPacketHashTracksDeterministicCompatibilityFields(t *testing.T) {
 }
 
 func selectPacketContextWithLimits(ctx stdcontext.Context, requestedRoot, task string, detectedChecks []string, limits PacketLimits) (packetSelection, error) {
-	return selectPacketContext(ctx, requestedRoot, task, detectedChecks, limits)
+	return selectPacketContext(ctx, requestedRoot, task, "", detectedChecks, limits)
 }
 
 func initSelectionRepo(t *testing.T) string {

@@ -21,6 +21,7 @@ type BriefOptions struct {
 	Context              stdcontext.Context
 	Root                 string
 	Task                 string
+	Scope                string
 	Now                  time.Time
 	NoWrite              bool
 	ExpectedBaseRevision string

@@ -21,6 +21,7 @@ add request timeout middleware
 - Repository: `git:50ff9c6ec8993640250492a702ea5d95fecd1c6618ddd1a4c081a4b9b05fac7f`
 - Branch: `main`
 - HEAD revision: `f4ed13fef8ff5c7ed12651deab192943050374a1`
+- Scope: `whole repository`
 
 ## Repository
 

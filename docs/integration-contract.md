@@ -66,6 +66,28 @@ selection. A mismatch fails the command instead of returning a packet for a
 different revision. Callers that need repository-owned exports can omit
 `--no-write`; the revision check still applies.
 
+`context` and `explain` accept `--scope <dir>`, a repository-relative directory
+that narrows which files the request considers:
+
+```sh
+struktly context --scope services/api --json --no-write "<coding request>"
+```
+
+Scope narrows and never widens. Repository identity, branch and revisions stay
+the repository's, because a service inside a monorepo is not a separate
+repository; the scope is recorded in the packet's `scope` field and is part of
+packet identity, so the same request at two scopes yields two packets. Every
+exclusion and security rule still applies, so naming a scope cannot admit a file
+that would otherwise be refused.
+
+Two kinds of file above the scope remain eligible, because they govern the
+subtree rather than merely sitting above it: repository declarations under
+`.struktly/`, and agent instruction files in an ancestor directory. They keep
+their own selection reasons, so the packet already says why they are present.
+A scope that is not a directory inside the repository fails with
+`invalid_invocation`. `explain --scope` reports `out_of_scope` for a path outside
+it. Advertised as the `context.scope` capability.
+
 `context` also accepts optional limit overrides:
 
 ```sh

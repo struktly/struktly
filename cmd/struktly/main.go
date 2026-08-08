@@ -95,7 +95,9 @@ func classifyError(err error) (int, string) {
 	if errors.Is(err, stdcontext.Canceled) {
 		return 130, "canceled"
 	}
-	if errors.Is(err, errInvalidInvocation) || errors.Is(err, repoctx.ErrInvalidPacketLimit) {
+	if errors.Is(err, errInvalidInvocation) ||
+		errors.Is(err, repoctx.ErrInvalidPacketLimit) ||
+		errors.Is(err, repoctx.ErrInvalidScope) {
 		return 2, "invalid_invocation"
 	}
 	if errors.Is(err, repoctx.ErrNotGitRepository) {
@@ -225,6 +227,7 @@ func currentCapabilities() capabilitiesDocument {
 		Features: []string{
 			"context.cancellation",
 			"context.declaration_rendering",
+			"context.scope",
 			"context.symbol_matching",
 			"context.limits",
 			"context.expect_base_revision",
@@ -349,13 +352,14 @@ func newStatusCmd(repoRoot *string) *cobra.Command {
 
 func newExplainCmd(repoRoot *string) *cobra.Command {
 	var task string
+	var scope string
 	var toJSON bool
 	cmd := &cobra.Command{
 		Use:   "explain <path>",
 		Short: "Experimental: explain context inclusion or exclusion",
 		Args:  invalidInvocationArgs(cobra.ExactArgs(1)),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			explanation, err := repoctx.ExplainSelection(cmd.Context(), *repoRoot, args[0], task)
+			explanation, err := repoctx.ExplainSelection(cmd.Context(), *repoRoot, args[0], task, scope)
 			if err != nil {
 				return err
 			}
@@ -367,6 +371,7 @@ func newExplainCmd(repoRoot *string) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&task, "task", "", "Optional task used for task-match selection")
+	cmd.Flags().StringVar(&scope, "scope", "", "Narrow selection to a repository-relative directory")
 	cmd.Flags().BoolVar(&toJSON, "json", false, "Print structured explanation to stdout")
 	return cmd
 }
@@ -621,6 +626,7 @@ func newBriefCmd(repoRoot *string) *cobra.Command {
 	var toJSON bool
 	var noWrite bool
 	var expectedBaseRevision string
+	var scope string
 	var maxItems int
 	var maxFileBytes int
 	var maxTotalBytes int
@@ -662,6 +668,7 @@ func newBriefCmd(repoRoot *string) *cobra.Command {
 				Context:              cmd.Context(),
 				Root:                 *repoRoot,
 				Task:                 args[0],
+				Scope:                scope,
 				NoWrite:              noWrite,
 				ExpectedBaseRevision: expectedBaseRevision,
 				MaxItems:             maxItems,
@@ -700,6 +707,7 @@ func newBriefCmd(repoRoot *string) *cobra.Command {
 	cmd.Flags().BoolVar(&toJSON, "json", false, "Print the structured packet to stdout for piping")
 	cmd.Flags().BoolVar(&noWrite, "no-write", false, "Do not write generated files; requires --json")
 	cmd.Flags().StringVar(&expectedBaseRevision, "expect-base-revision", "", "Fail if Git HEAD does not match this revision")
+	cmd.Flags().StringVar(&scope, "scope", "", "Narrow selection to a repository-relative directory")
 	cmd.Flags().IntVar(&maxItems, "max-items", 0, "Maximum selected files")
 	cmd.Flags().IntVar(&maxFileBytes, "max-file-bytes", 0, "Maximum bytes to read from each selected file")
 	cmd.Flags().IntVar(&maxTotalBytes, "max-total-bytes", 0, "Maximum total selected content bytes")

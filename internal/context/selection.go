@@ -185,6 +185,7 @@ type packetSelection struct {
 	suggestedChecks []string
 	instructions    []string
 	readWarnings    []string
+	scope           string
 	limits          PacketLimits
 }
 
@@ -194,7 +195,7 @@ type limitDecision struct {
 	last  string
 }
 
-func selectPacketContext(ctx stdcontext.Context, requestedRoot, task string, detectedChecks []string, limits PacketLimits) (packetSelection, error) {
+func selectPacketContext(ctx stdcontext.Context, requestedRoot, task, scope string, detectedChecks []string, limits PacketLimits) (packetSelection, error) {
 	repo, err := ResolveRepository(ctx, requestedRoot)
 	if err != nil {
 		return packetSelection{}, err
@@ -227,7 +228,7 @@ func selectPacketContext(ctx stdcontext.Context, requestedRoot, task string, det
 	// Symbol matching only adds candidates: a repository in another language,
 	// or one where nothing parses, selects exactly what it selected before.
 	notSelectable := func(rel string) bool {
-		return ignoredDirPath(rel) || matchesAny(rel, cfg.Context.Exclude)
+		return !withinScope(rel, scope) || ignoredDirPath(rel) || matchesAny(rel, cfg.Context.Exclude)
 	}
 	symbols := buildSymbolIndex(repo.absoluteRoot, paths, selectionTaskWords(task), notSelectable)
 	if symbols.skipped > 0 {
@@ -238,6 +239,12 @@ func selectPacketContext(ctx stdcontext.Context, requestedRoot, task string, det
 
 	candidates := make([]packetCandidate, 0, len(paths))
 	for _, rel := range paths {
+		// Out of scope is not an exclusion worth recording: the caller asked
+		// for a subtree, so naming every file outside it would bury the
+		// decisions they did not make in decisions they did.
+		if !withinScope(rel, scope) {
+			continue
+		}
 		reason := selectionReason(rel, task, cfg.Context.Include)
 		symbol := symbols.match(rel)
 		if reason == "" {
@@ -347,6 +354,7 @@ func selectPacketContext(ctx stdcontext.Context, requestedRoot, task string, det
 	sortDecisions(result.truncations)
 	sort.Strings(result.instructions)
 	result.limits = limits
+	result.scope = scope
 	return result, nil
 }
 
@@ -826,7 +834,7 @@ func sortDecisions(values []PacketDecision) {
 	})
 }
 
-func ExplainSelection(ctx stdcontext.Context, requestedRoot, requestedPath, task string) (SelectionExplanation, error) {
+func ExplainSelection(ctx stdcontext.Context, requestedRoot, requestedPath, task, requestedScope string) (SelectionExplanation, error) {
 	repo, err := ResolveRepository(ctx, requestedRoot)
 	if err != nil {
 		return SelectionExplanation{}, err
@@ -839,7 +847,19 @@ func ExplainSelection(ctx stdcontext.Context, requestedRoot, requestedPath, task
 	if err != nil {
 		return SelectionExplanation{}, err
 	}
+	scope, err := cleanScope(repo.absoluteRoot, requestedScope)
+	if err != nil {
+		return SelectionExplanation{}, err
+	}
 	explanation := SelectionExplanation{Schema: ExplanationSchema, Path: rel, Decision: "excluded"}
+	// Reported before every other reason: under a scope, "outside the requested
+	// subtree" is the whole answer, and the rules that would have applied had it
+	// been in scope are beside the point.
+	if !withinScope(rel, scope) {
+		explanation.Reason = "out_of_scope"
+		explanation.Detail = "outside " + scope
+		return explanation, nil
+	}
 	if rel == ".git" || strings.HasPrefix(rel, ".git/") || defaultRuntimePath(rel) {
 		explanation.Reason = "default_excluded"
 		return explanation, nil
