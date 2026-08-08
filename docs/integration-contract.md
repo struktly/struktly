@@ -200,6 +200,14 @@ scoring overlap. Common words and action verbs — `add`, `fix`, `update` and
 similar — are dropped, because a request names an action and a subject and only
 the subject identifies code.
 
+Markdown documents are matched on their first heading, reported as the
+`title_match` reason. A filename is a guess at a document's subject and often a
+bad one — a decision record called `0001-record.md` is titled "ADR 0001: Record
+architecture decisions" — so the title is both better evidence and something
+`explain` can quote back. A title must carry at least two distinct request words
+to count; the matched title is recorded in the item's `provenance.location` as
+`titled:<heading>`. Advertised as the `context.title_matching` capability.
+
 Go sources are additionally matched on the identifiers they declare, reported as
 the `symbol_match` reason: functions and methods, method receiver types, and
 named types, constants and variables. A request word must account for at least
@@ -293,8 +301,9 @@ Git enumeration is linear in the number of tracked and non-ignored paths. The
 classifier reads only selected candidates, retains at most 512 KiB of text, and
 streams complete selected files once to compute hashes. A Go candidate that
 exceeds its byte budget is additionally read and parsed once, bounded at 1 MiB.
-Symbol matching parses every eligible Go source once per request, bounded at
-5000 files; reaching that bound is reported as a packet warning. Measured on a
-147-file Go repository this adds roughly 50 ms. `scan` walks the repository
+Content matching reads every eligible Go source and Markdown document once per
+request, bounded at 5000 files in total; reaching that bound is reported as a
+packet warning. Measured on a 147-file Go repository this adds roughly 50 ms,
+and title extraction reads only the first 8 KiB of a document. `scan` walks the repository
 outside ignored and deprioritized directories. No context command performs a
 network request or model call.

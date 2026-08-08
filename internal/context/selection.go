@@ -31,6 +31,14 @@ const (
 // concerns. The second group is verbs: a request names an action and a subject,
 // and only the subject identifies code. Without them "add request timeout"
 // matched every AddString and addOpenQuestion in the repository.
+//
+// The list stays short and evidence-backed on purpose. A batch of apparent
+// function words — one, per, any, each, from — was written and then measured,
+// and "one" alone dropped four correctly-selected files from a repository whose
+// vocabulary includes "one composer" and "one release pipeline". A word that
+// looks generic in isolation can be a project's own terminology, so nothing
+// joins this list without a measurement showing it removes noise rather than
+// signal.
 var stopWords = map[string]struct{}{
 	"a":          {},
 	"about":      {},
@@ -244,11 +252,11 @@ func selectPacketContext(ctx stdcontext.Context, req selectionRequest) (packetSe
 	notSelectable := func(rel string) bool {
 		return !withinScope(rel, scope) || ignoredDirPath(rel) || matchesAny(rel, cfg.Context.Exclude)
 	}
-	symbols := buildSymbolIndex(repo.absoluteRoot, paths, selectionTaskWords(task), notSelectable)
-	if symbols.skipped > 0 {
+	content := buildContentIndex(repo.absoluteRoot, paths, selectionTaskWords(task), notSelectable)
+	if content.skipped > 0 {
 		result.readWarnings = append(result.readWarnings, fmt.Sprintf(
-			"Symbol matching covered %d files and stopped at the %d-file limit; %d were not indexed.",
-			symbols.indexed, maxIndexedSymbolFiles, symbols.skipped))
+			"Content matching covered %d files and stopped at the %d-file limit; %d were not indexed.",
+			content.indexed, maxIndexedSymbolFiles, content.skipped))
 	}
 
 	seeded := make(map[string]struct{}, len(req.seeds))
@@ -265,7 +273,7 @@ func selectPacketContext(ctx stdcontext.Context, req selectionRequest) (packetSe
 			continue
 		}
 		reason := selectionReason(rel, task, cfg.Context.Include)
-		symbol := symbols.match(rel)
+		symbol := content.match(rel)
 		if _, isSeed := seeded[rel]; isSeed {
 			// Naming a file gets it considered, not included: it still goes
 			// through every exclusion below, like any other candidate.
@@ -274,7 +282,7 @@ func selectPacketContext(ctx stdcontext.Context, req selectionRequest) (packetSe
 			if symbol.score == 0 {
 				continue
 			}
-			reason = "symbol_match"
+			reason = symbol.reason
 		}
 		// A tracked file under a directory named build/ or dist/ used to vanish
 		// before selection, so a packet omitted it with nothing recording that
@@ -294,12 +302,14 @@ func selectPacketContext(ctx stdcontext.Context, req selectionRequest) (packetSe
 		}
 		candidates = append(candidates, packetCandidate{
 			path: rel,
-			// Path and symbol evidence add up, so a file both named for the
-			// request and declaring what it names outranks one with only half
-			// the evidence.
+			// Relevance is how many distinct request words the file answers by
+			// any means, counted once. A file both named for the request and
+			// declaring what it names still outranks one carrying half the
+			// evidence, because its two sources cover different words.
 			reason:      reason,
-			relevance:   taskMatchScore(task, rel, reason) + symbol.score,
+			relevance:   len(mergedMatchWords(task, rel, symbol.words)),
 			symbols:     symbol.names,
+			evidence:    symbol.reason,
 			kindPenalty: pathPriority(rel),
 		})
 	}
@@ -347,7 +357,11 @@ func selectPacketContext(ctx stdcontext.Context, req selectionRequest) (packetSe
 			item.Provenance.Confidence = "declared"
 		}
 		if len(candidate.symbols) > 0 {
-			item.Provenance.Location = "declares:" + strings.Join(candidate.symbols, ",")
+			label := "declares:"
+			if candidate.evidence == "title_match" {
+				label = "titled:"
+			}
+			item.Provenance.Location = label + strings.Join(candidate.symbols, ",")
 		}
 		if inspection.truncatedBy != "" {
 			result.truncations = append(result.truncations, PacketDecision{
@@ -386,11 +400,30 @@ func selectPacketContext(ctx stdcontext.Context, req selectionRequest) (packetSe
 }
 
 type packetCandidate struct {
-	path        string
-	reason      string
-	relevance   int
-	symbols     []string
+	path      string
+	reason    string
+	relevance int
+	symbols   []string
+	// evidence names which content signal produced symbols, which is not always
+	// the selection reason: a file can match by path and still carry a title.
+	evidence    string
 	kindPenalty int
+}
+
+// mergedMatchWords is every request word the file answers, from its path and
+// from its content, counted once.
+func mergedMatchWords(task, rel string, content map[string]struct{}) map[string]struct{} {
+	merged := map[string]struct{}{}
+	words := selectionTaskWords(task)
+	for token := range pathTokens(rel) {
+		if _, ok := words[token]; ok {
+			merged[token] = struct{}{}
+		}
+	}
+	for token := range content {
+		merged[token] = struct{}{}
+	}
+	return merged
 }
 
 func rankCandidates(left, right packetCandidate) bool {
@@ -415,9 +448,9 @@ func selectionReasonPriority(reason string) int {
 		return 0
 	case "selection_rule", "repository_instruction":
 		return 1
-	// A file that declares what the request names is stronger evidence than one
-	// merely named like it.
-	case "symbol_match":
+	// A file that says what it is about is stronger evidence than one merely
+	// named like it.
+	case "symbol_match", "title_match":
 		return 2
 	case "task_match":
 		return 3
@@ -913,13 +946,17 @@ func ExplainSelection(ctx stdcontext.Context, requestedRoot, requestedPath, task
 		// One path, so this parses one file rather than building an index.
 		// A selection nobody can justify is worse than a selection nobody
 		// makes, so the matched declarations are named in the answer.
-		match, ok := fileSymbolMatch(repo.absoluteRoot, rel, selectionTaskWords(task))
+		match, ok := fileContentMatch(repo.absoluteRoot, rel, selectionTaskWords(task))
 		if !ok || match.score == 0 {
 			explanation.Reason = "not_selected"
 			return explanation, nil
 		}
-		reason = "symbol_match"
-		symbolDetail = "declares " + strings.Join(match.names, ", ")
+		reason = match.reason
+		if reason == "title_match" {
+			symbolDetail = "titled " + strings.Join(match.names, ", ")
+		} else {
+			symbolDetail = "declares " + strings.Join(match.names, ", ")
+		}
 	}
 	inspection, err := inspectSelectedFile(repo, rel, reason, maxPacketTotalBytes, maxPacketFileBytes, false)
 	if err != nil {

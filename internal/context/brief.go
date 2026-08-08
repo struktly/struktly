@@ -297,6 +297,8 @@ func humanReason(value string) string {
 		return "its filename matched the task"
 	case "symbol_match":
 		return "it declares an identifier the request names"
+	case "title_match":
+		return "its title names what the request names"
 	case "config_excluded":
 		return "excluded by repository configuration"
 	case "item_limit":

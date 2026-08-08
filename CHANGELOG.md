@@ -4,6 +4,14 @@ Notable changes will be recorded here.
 
 ## Unreleased
 
+- **Added document title matching.** Markdown documents are now matched on their
+  first heading, reported as the `title_match` reason with the heading recorded
+  in `provenance.location` and quoted by `explain`. This closes the gap the
+  quality corpus found on its first run: a decision record named
+  `0001-record.md` and titled "ADR 0001: Record architecture decisions" was
+  pointed at but never carried. A title must name at least two distinct request
+  words, so a document that merely contains one is not evidence. Advertised as
+  `context.title_matching`.
 - **Added a selection quality corpus** under `internal/context/testdata/corpus/`.
   Labelled requests assert which files must be selected, which must at least be
   surfaced, and which must not appear; each case also checks determinism and

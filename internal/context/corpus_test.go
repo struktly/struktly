@@ -48,13 +48,11 @@ var corpus = []corpusCase{
 		mustExclude: []string{"docs/adr/0001-record.md"},
 	},
 	{
-		fixture:    "go-service",
-		request:    "document the architecture decisions",
-		mustSelect: []string{"docs/architecture.md"},
-		// The scan classifies this as a decision record and the packet points
-		// at it, but selection does not use that knowledge, so its content is
-		// not carried. Recorded as a measured gap rather than an assumed one.
-		mustSurface: []string{"docs/adr/0001-record.md"},
+		fixture: "go-service",
+		request: "document the architecture decisions",
+		// 0001-record.md is titled "ADR 0001: Record architecture decisions".
+		// Its filename is a serial number, so only its title reaches it.
+		mustSelect: []string{"docs/architecture.md", "docs/adr/0001-record.md"},
 	},
 	{
 		fixture:     "go-service",

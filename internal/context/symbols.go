@@ -19,30 +19,38 @@ const maxIndexedSymbolFiles = 5000
 // The record is there to justify the selection, not to reproduce the file.
 const maxRecordedSymbols = 6
 
-// symbolIndex maps repository-relative paths to the identifiers they declare
-// that the request also names.
+// contentIndex maps repository-relative paths to what a file says it is about,
+// where that differs from what its path says.
 //
-// Filename matching cannot see inside a file, so a request like "add request
-// timeout middleware" finds middleware/timeout.go by its name and misses
-// `func WithTimeout` in server/wrap.go entirely. The declarations are ground
-// truth for what a file offers, and go/ast reads them exactly rather than
-// guessing — which is the property that lets `explain` justify the selection in
-// one line instead of asserting relevance.
+// Filename matching cannot see inside a file. A request naming a timeout finds
+// middleware/timeout.go by its name and misses `func WithTimeout` in
+// server/wrap.go; a request naming architecture decisions misses
+// docs/adr/0001-record.md, whose filename is a serial number and whose title is
+// "ADR 0001: Record architecture decisions". Both are the same failure — the
+// path is not the file — and both are read exactly rather than guessed, which
+// is what lets `explain` justify a selection in one line.
 //
 // Matching only ever adds candidates. A repository in another language, or one
 // where nothing parses, selects exactly what it selected before.
-type symbolIndex struct {
-	matches  map[string]symbolMatch
+type contentIndex struct {
+	matches  map[string]contentMatch
 	indexed  int
 	skipped  int
 	attempts int
 }
 
-type symbolMatch struct {
-	// score is the number of distinct request words the file's declarations
-	// match, so a file answering three words outranks one answering one.
+type contentMatch struct {
+	// score is the number of distinct request words the file matches, so a file
+	// answering three words outranks one answering one.
 	score int
-	// names are the declarations responsible, for the audit trail.
+	// words are those request words. Relevance unions them with the words the
+	// path already matched rather than adding: a document titled after its own
+	// filename answers one question, not two, and summing let it outrank the
+	// implementation it merely describes.
+	words map[string]struct{}
+	// reason is the selection reason this evidence supports.
+	reason string
+	// names are the declarations or the title responsible, for the audit trail.
 	names []string
 }
 
@@ -50,13 +58,13 @@ type symbolMatch struct {
 // declare identifiers the request names. Paths already excluded by directory
 // convention or repository configuration are not read: they cannot be selected,
 // so indexing them would cost I/O to reach a foregone conclusion.
-func buildSymbolIndex(root string, paths []string, words map[string]struct{}, excluded func(string) bool) symbolIndex {
-	index := symbolIndex{matches: map[string]symbolMatch{}}
+func buildContentIndex(root string, paths []string, words map[string]struct{}, excluded func(string) bool) contentIndex {
+	index := contentIndex{matches: map[string]contentMatch{}}
 	if len(words) == 0 {
 		return index
 	}
 	for _, rel := range paths {
-		if !isGoSource(rel) || excluded(rel) {
+		if !isIndexableContent(rel) || excluded(rel) {
 			continue
 		}
 		if index.attempts >= maxIndexedSymbolFiles {
@@ -64,7 +72,7 @@ func buildSymbolIndex(root string, paths []string, words map[string]struct{}, ex
 			continue
 		}
 		index.attempts++
-		match, ok := fileSymbolMatch(root, rel, words)
+		match, ok := fileContentMatch(root, rel, words)
 		if !ok {
 			continue
 		}
@@ -76,27 +84,46 @@ func buildSymbolIndex(root string, paths []string, words map[string]struct{}, ex
 	return index
 }
 
-func (i symbolIndex) match(rel string) symbolMatch {
+func (i contentIndex) match(rel string) contentMatch {
 	return i.matches[rel]
+}
+
+func isIndexableContent(rel string) bool {
+	return isGoSource(rel) || isMarkdown(rel)
+}
+
+func isMarkdown(rel string) bool {
+	return strings.HasSuffix(strings.ToLower(rel), ".md")
+}
+
+// fileContentMatch reads whichever kind of evidence the file carries.
+func fileContentMatch(root, rel string, words map[string]struct{}) (contentMatch, bool) {
+	if isGoSource(rel) {
+		return fileSymbolMatch(root, rel, words)
+	}
+	if isMarkdown(rel) {
+		return fileTitleMatch(root, rel, words)
+	}
+	return contentMatch{}, false
 }
 
 // fileSymbolMatch reports which of words the declarations in rel match. The
 // second result is false when the file could not be read or parsed, which is
 // not an error: a file mid-edit simply contributes no symbols.
-func fileSymbolMatch(root, rel string, words map[string]struct{}) (symbolMatch, bool) {
+func fileSymbolMatch(root, rel string, words map[string]struct{}) (contentMatch, bool) {
 	full := filepath.Join(root, filepath.FromSlash(rel))
 	info, err := os.Lstat(full)
 	if err != nil || !info.Mode().IsRegular() || info.Size() > maxDeclarationParseBytes {
-		return symbolMatch{}, false
+		return contentMatch{}, false
 	}
 	src, err := os.ReadFile(full)
 	if err != nil {
-		return symbolMatch{}, false
+		return contentMatch{}, false
 	}
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, "", src, parser.SkipObjectResolution)
 	if err != nil {
-		return symbolMatch{}, false
+		return contentMatch{}, false
 	}
 
 	matchedWords := map[string]struct{}{}
@@ -124,7 +151,7 @@ func fileSymbolMatch(root, rel string, words map[string]struct{}) (symbolMatch, 
 	if len(names) > maxRecordedSymbols {
 		names = names[:maxRecordedSymbols]
 	}
-	return symbolMatch{score: len(matchedWords), names: names}, true
+	return contentMatch{score: len(matchedWords), words: matchedWords, reason: "symbol_match", names: names}, true
 }
 
 // isSpecificMatch reports whether a declaration is about the words it matched,

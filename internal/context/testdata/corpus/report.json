@@ -30,11 +30,12 @@
     "truncations": 0
   },
   "go-service / document the architecture decisions": {
-    "items": 6,
-    "packet_bytes": 4581,
+    "items": 7,
+    "packet_bytes": 5160,
     "reasons": [
       "selection_rule",
-      "task_match"
+      "task_match",
+      "title_match"
     ],
     "exclusions": 0,
     "truncations": 0

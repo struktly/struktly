@@ -38,15 +38,12 @@ Those are Platform concerns.
   to every exclusion.
 - A labelled selection corpus with a recorded report, per-case determinism, and
   schema conformance for every emitted document.
+- Document title matching, so a file whose name has drifted from its subject is
+  still reachable by what it says it is about.
 
 ## Next context-quality slices
 
-1. **Decision records as selectable context.** The scan classifies
-   `docs/adr/` files as decision records and the packet points at them, but
-   selection does not use that knowledge, so an ADR's content is never carried.
-   Measured, not assumed: the corpus records it as a reachability case rather
-   than a recall failure.
-2. **Import-neighbor expansion.** The remaining half of code-aware selection:
+1. **Import-neighbor expansion.** The remaining half of code-aware selection:
    once a file is selected, the repository files it imports are strong
    candidates. The corpus exists to measure whether that is true before it
    ships.

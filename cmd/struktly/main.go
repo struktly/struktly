@@ -231,6 +231,7 @@ func currentCapabilities() capabilitiesDocument {
 			"context.scope",
 			"context.seeds",
 			"context.symbol_matching",
+			"context.title_matching",
 			"context.limits",
 			"context.expect_base_revision",
 			"context.no_write",
