@@ -2,6 +2,18 @@
 
 Notable changes will be recorded here.
 
+## [0.4.0](https://github.com/struktly/struktly/compare/v0.3.0...v0.4.0) (2026-08-08)
+
+
+### Features
+
+* **cli:** compare two context packets ([c68a345](https://github.com/struktly/struktly/commit/c68a34570e135a0b2f3435e577958f20b7f66cef))
+* **context:** accept caller-supplied seed paths ([d4fe472](https://github.com/struktly/struktly/commit/d4fe472a847f5511170b55efd5ffa8f8aeb95f7e))
+* **context:** expand selection to the code it calls ([167b731](https://github.com/struktly/struktly/commit/167b731a793311dad2f292f2d3962152be708509))
+* **context:** match documents by their title ([46521c6](https://github.com/struktly/struktly/commit/46521c67c4cf4f188db6eba526e541beee734536))
+* **context:** narrow a request to a package or service ([572d670](https://github.com/struktly/struktly/commit/572d6704deb6e281d8d14b604ef343ae3a33e2bb))
+* **context:** select Go files by the identifiers they declare ([997134c](https://github.com/struktly/struktly/commit/997134c0b8c9fc5f3f5a15b4c20e5b917812ed1d))
+
 ## v0.3.0 - 2026-08-06
 
 - **Added declaration rendering for oversized Go files.** A Go source file that
