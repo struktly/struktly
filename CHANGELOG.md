@@ -4,6 +4,13 @@ Notable changes will be recorded here.
 
 ## Unreleased
 
+- **Added import-neighbor expansion.** After selecting the request's own
+  candidates, Struktly adds repository files that the selected code actually
+  calls, under the `import_neighbor` reason with the supplied identifiers
+  recorded in `provenance.location`. Expansion follows identifiers rather than
+  imports, runs only from files the request matched by name or the caller
+  seeded, uses only leftover budget, and never displaces a direct match.
+  Advertised as `context.import_neighbors`.
 - **Added document title matching.** Markdown documents are now matched on their
   first heading, reported as the `title_match` reason with the heading recorded
   in `provenance.location` and quoted by `explain`. This closes the gap the

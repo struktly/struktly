@@ -3,10 +3,11 @@ package middleware
 
 import (
 	"net/http"
-	"time"
+
+	"example.com/go-service/internal/clock"
 )
 
 // Timeout wraps h with a fixed request timeout.
-func Timeout(h http.Handler, d time.Duration) http.Handler {
-	return http.TimeoutHandler(h, d, "request timed out")
+func Timeout(h http.Handler) http.Handler {
+	return http.TimeoutHandler(h, clock.Grace, "request timed out")
 }

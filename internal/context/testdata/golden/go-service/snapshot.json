@@ -27,6 +27,16 @@
       ]
     },
     {
+      "value": "internal",
+      "provenance": [
+        {
+          "source": "internal",
+          "method": "dir-listing",
+          "confidence": "detected"
+        }
+      ]
+    },
+    {
       "value": "middleware",
       "provenance": [
         {
@@ -47,12 +57,12 @@
           "confidence": "detected"
         },
         {
-          "source": "middleware/logger.go",
+          "source": "internal/clock/clock.go",
           "method": "file-extension",
           "confidence": "inferred"
         },
         {
-          "source": "middleware/timeout.go",
+          "source": "internal/clock/unused.go",
           "method": "file-extension",
           "confidence": "inferred"
         }
@@ -180,7 +190,7 @@
     "go.mod"
   ],
   "stats": {
-    "files_scanned": 9,
+    "files_scanned": 11,
     "duration_ms": 0
   }
 }

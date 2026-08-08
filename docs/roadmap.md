@@ -40,13 +40,14 @@ Those are Platform concerns.
   schema conformance for every emitted document.
 - Document title matching, so a file whose name has drifted from its subject is
   still reachable by what it says it is about.
+- Import-neighbor expansion, which follows the identifiers selected code calls
+  rather than the packages it imports.
 
 ## Next context-quality slices
 
-1. **Import-neighbor expansion.** The remaining half of code-aware selection:
-   once a file is selected, the repository files it imports are strong
-   candidates. The corpus exists to measure whether that is true before it
-   ships.
+The recorded context-quality slices are done. Further work should start by
+adding cases to the selection corpus, since every slice above changed shape
+after being measured against it.
 
 Context quality work must remain inspectable and deterministic. No roadmap item
 requires an LLM, network call, or proprietary service inside the CLI.

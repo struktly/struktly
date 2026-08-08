@@ -10,9 +10,10 @@
     "truncations": 0
   },
   "go-service / add request timeout middleware": {
-    "items": 7,
-    "packet_bytes": 5474,
+    "items": 8,
+    "packet_bytes": 6209,
     "reasons": [
+      "import_neighbor",
       "selection_rule",
       "task_match"
     ],
@@ -21,7 +22,7 @@
   },
   "go-service / add request timeout middleware @middleware": {
     "items": 4,
-    "packet_bytes": 4135,
+    "packet_bytes": 4163,
     "reasons": [
       "selection_rule",
       "task_match"

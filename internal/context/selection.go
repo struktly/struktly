@@ -327,7 +327,15 @@ func selectPacketContext(ctx stdcontext.Context, req selectionRequest) (packetSe
 	}
 
 	total := 0
+	// Two passes over one budget. The second considers files reachable from
+	// what the first selected, and runs afterwards so it can only use the
+	// budget the request itself did not need — an import neighbour is weaker
+	// evidence than a direct match and must never displace one.
+	considered := map[string]struct{}{}
 	for _, candidate := range candidates {
+		considered[candidate.path] = struct{}{}
+	}
+	admit := func(candidate packetCandidate) error {
 		rel := candidate.path
 		reason := candidate.reason
 		// Past the item limit a candidate is still classified, because
@@ -338,19 +346,19 @@ func selectPacketContext(ctx stdcontext.Context, req selectionRequest) (packetSe
 		atItemLimit := len(result.items) >= limits.MaxItems
 		inspection, err := inspectSelectedFile(repo, rel, reason, limits.MaxTotalBytes-total, limits.MaxFileBytes, atItemLimit)
 		if err != nil {
-			return packetSelection{}, err
+			return err
 		}
 		if inspection.decision.Reason != "" {
 			if inspection.decision.Reason == "total_limit" {
 				countOmission("total_limit", rel)
-				continue
+				return nil
 			}
 			result.exclusions = append(result.exclusions, inspection.decision)
-			continue
+			return nil
 		}
 		if atItemLimit {
 			countOmission("item_limit", rel)
-			continue
+			return nil
 		}
 		item := inspection.item
 		if reason == "seed" {
@@ -358,8 +366,11 @@ func selectPacketContext(ctx stdcontext.Context, req selectionRequest) (packetSe
 		}
 		if len(candidate.symbols) > 0 {
 			label := "declares:"
-			if candidate.evidence == "title_match" {
+			switch candidate.evidence {
+			case "title_match":
 				label = "titled:"
+			case "import_neighbor":
+				label = "provides:"
 			}
 			item.Provenance.Location = label + strings.Join(candidate.symbols, ",")
 		}
@@ -374,7 +385,49 @@ func selectPacketContext(ctx stdcontext.Context, req selectionRequest) (packetSe
 		if item.Kind == "instruction" {
 			result.instructions = append(result.instructions, item.Path)
 		}
+		return nil
 	}
+
+	for _, candidate := range candidates {
+		if err := admit(candidate); err != nil {
+			return packetSelection{}, err
+		}
+	}
+
+	if len(result.items) < limits.MaxItems && total < limits.MaxTotalBytes {
+		// Expansion follows only from files the request named directly or the
+		// caller seeded. A file selected because it happens to declare one
+		// matching identifier is a weak enough signal on its own; expanding
+		// from it multiplies that weakness by its whole import surface, which
+		// is how a request about documentation acquired fifteen Go files from
+		// cmd/struktly/main.go on the strength of a type called errorDocument.
+		roots := make([]PacketItem, 0, len(result.items))
+		for _, item := range result.items {
+			if item.Reason == "seed" || item.Reason == "task_match" {
+				roots = append(roots, item)
+			}
+		}
+		neighbors := findImportNeighbors(repo.absoluteRoot, roots, considered, paths, func(rel string) bool {
+			return withinScope(rel, scope) && !ignoredDirPath(rel) && !matchesAny(rel, cfg.Context.Exclude)
+		})
+		expansion := make([]packetCandidate, 0, len(neighbors))
+		for _, neighbor := range neighbors {
+			expansion = append(expansion, packetCandidate{
+				path:        neighbor.path,
+				reason:      "import_neighbor",
+				relevance:   len(neighbor.provides),
+				symbols:     neighbor.provides,
+				evidence:    "import_neighbor",
+				kindPenalty: pathPriority(neighbor.path),
+			})
+		}
+		for _, candidate := range expansion {
+			if err := admit(candidate); err != nil {
+				return packetSelection{}, err
+			}
+		}
+	}
+
 	if omitted := limitOmissions["item_limit"]; omitted.count > 0 {
 		result.exclusions = append(result.exclusions, PacketDecision{
 			Path:   "item_limit",
@@ -454,6 +507,11 @@ func selectionReasonPriority(reason string) int {
 		return 2
 	case "task_match":
 		return 3
+	// Reachable from something selected, which is a reason to look rather than
+	// evidence about the request. Ranked last so it fills budget the request
+	// did not need instead of competing for it.
+	case "import_neighbor":
+		return 4
 	default:
 		return 5
 	}
@@ -948,6 +1006,16 @@ func ExplainSelection(ctx stdcontext.Context, requestedRoot, requestedPath, task
 		// makes, so the matched declarations are named in the answer.
 		match, ok := fileContentMatch(repo.absoluteRoot, rel, selectionTaskWords(task))
 		if !ok || match.score == 0 {
+			// Import expansion depends on what else the request selected, so it
+			// cannot be answered from this path alone. Running the selection is
+			// the cost of not reporting `not_selected` for a file the packet
+			// would in fact contain.
+			if provides, ok := explainImportNeighbor(ctx, repo.absoluteRoot, rel, task, requestedScope); ok {
+				explanation.Decision = "included"
+				explanation.Reason = "import_neighbor"
+				explanation.Detail = "provides " + strings.Join(provides, ", ")
+				return explanation, nil
+			}
 			explanation.Reason = "not_selected"
 			return explanation, nil
 		}
@@ -971,6 +1039,24 @@ func ExplainSelection(ctx stdcontext.Context, requestedRoot, requestedPath, task
 	explanation.Reason = reason
 	explanation.Detail = symbolDetail
 	return explanation, nil
+}
+
+// explainImportNeighbor reports whether the request would reach rel through
+// something else it selected, and what rel supplies.
+func explainImportNeighbor(ctx stdcontext.Context, root, rel, task, scope string) ([]string, bool) {
+	selection, err := selectPacketContext(ctx, selectionRequest{
+		root: root, task: task, scope: scope, limits: DefaultPacketLimits(),
+	})
+	if err != nil {
+		return nil, false
+	}
+	for _, item := range selection.items {
+		if item.Path != rel || item.Reason != "import_neighbor" {
+			continue
+		}
+		return strings.Split(strings.TrimPrefix(item.Provenance.Location, "provides:"), ","), true
+	}
+	return nil, false
 }
 
 func cleanRequestedPath(root, requested string) (string, error) {

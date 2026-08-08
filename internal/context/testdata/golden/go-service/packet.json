@@ -7,12 +7,12 @@
   },
   "repository": {
     "name": "go-service",
-    "identity": "git:0e709b14ea2e846e54e1d38161502ee8f4a49a40963cbbe8abb58b938ca7a1d7",
+    "identity": "git:9e32ee6a0f32d5c9fb24e98545a74619da682cba8248d369648c707ad8112c40",
     "vcs": "git",
     "root": ".",
     "branch": "main",
-    "head_revision": "983c7b8424a771fe26dbd36f266a305acf674d48",
-    "base_revision": "983c7b8424a771fe26dbd36f266a305acf674d48"
+    "head_revision": "bbf50c1ba03f95b993b74ece34f282d51deb63dd",
+    "base_revision": "bbf50c1ba03f95b993b74ece34f282d51deb63dd"
   },
   "items": [
     {
@@ -22,7 +22,7 @@
       "content_hash": "sha256:81564faaa40d080d602077a0bfc444e5599f68f165e1c603c89ee505e5292485",
       "provenance": {
         "source": ".struktly/constraints.md",
-        "revision": "983c7b8424a771fe26dbd36f266a305acf674d48",
+        "revision": "bbf50c1ba03f95b993b74ece34f282d51deb63dd",
         "method": "selection_rule",
         "confidence": "detected"
       },
@@ -38,7 +38,7 @@
       "content_hash": "sha256:1fff95fc45cbaa0c04fe78855816cc3d507df5e85b3b1c097ec98a5e12af0057",
       "provenance": {
         "source": ".struktly/direction.md",
-        "revision": "983c7b8424a771fe26dbd36f266a305acf674d48",
+        "revision": "bbf50c1ba03f95b993b74ece34f282d51deb63dd",
         "method": "selection_rule",
         "confidence": "detected"
       },
@@ -54,7 +54,7 @@
       "content_hash": "sha256:e450912e118fd02bee73756f442a14547c1f17ce479dc9ab319b985468514bb9",
       "provenance": {
         "source": "Makefile",
-        "revision": "983c7b8424a771fe26dbd36f266a305acf674d48",
+        "revision": "bbf50c1ba03f95b993b74ece34f282d51deb63dd",
         "method": "selection_rule",
         "confidence": "detected"
       },
@@ -70,7 +70,7 @@
       "content_hash": "sha256:3358d5eb78ed93bd2419ed728bc1049ce2a689cb87ca55325ae0ceb4f48c962b",
       "provenance": {
         "source": "README.md",
-        "revision": "983c7b8424a771fe26dbd36f266a305acf674d48",
+        "revision": "bbf50c1ba03f95b993b74ece34f282d51deb63dd",
         "method": "selection_rule",
         "confidence": "detected"
       },
@@ -86,7 +86,7 @@
       "content_hash": "sha256:f6c2e852e2767de6925f0cdffc43aceb1ccd9192f70473b0f0407448a4886ce1",
       "provenance": {
         "source": "go.mod",
-        "revision": "983c7b8424a771fe26dbd36f266a305acf674d48",
+        "revision": "bbf50c1ba03f95b993b74ece34f282d51deb63dd",
         "method": "selection_rule",
         "confidence": "detected"
       },
@@ -97,12 +97,29 @@
     },
     {
       "kind": "source",
+      "path": "internal/clock/clock.go",
+      "content": "// Package clock supplies the wall-clock source middleware depends on.\npackage clock\n\nimport \"time\"\n\n// Grace is the deadline applied when none is configured.\nconst Grace = 30 * time.Second\n\n// Wall returns the current instant.\nfunc Wall() time.Time { return time.Now() }\n",
+      "content_hash": "sha256:7f86d528f399fab5677a123f8fcee25b6ed6d7b4311a3c1df073682c183555a9",
+      "provenance": {
+        "source": "internal/clock/clock.go",
+        "revision": "bbf50c1ba03f95b993b74ece34f282d51deb63dd",
+        "location": "provides:Grace",
+        "method": "import_neighbor",
+        "confidence": "detected"
+      },
+      "reason": "import_neighbor",
+      "original_bytes": 272,
+      "included_bytes": 272,
+      "truncated": false
+    },
+    {
+      "kind": "source",
       "path": "middleware/logger.go",
       "content": "package middleware\n\nimport (\n\t\"log\"\n\t\"net/http\"\n)\n\n// Logger logs each request method and path.\nfunc Logger(h http.Handler) http.Handler {\n\treturn http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {\n\t\tlog.Printf(\"%s %s\", r.Method, r.URL.Path)\n\t\th.ServeHTTP(w, r)\n\t})\n}\n",
       "content_hash": "sha256:79ab9481be7e91f1130665b0c50407af6c808a804d625e2d625837b3d517f21a",
       "provenance": {
         "source": "middleware/logger.go",
-        "revision": "983c7b8424a771fe26dbd36f266a305acf674d48",
+        "revision": "bbf50c1ba03f95b993b74ece34f282d51deb63dd",
         "method": "task_match",
         "confidence": "detected"
       },
@@ -114,18 +131,18 @@
     {
       "kind": "source",
       "path": "middleware/timeout.go",
-      "content": "// Package middleware provides HTTP middleware for the service.\npackage middleware\n\nimport (\n\t\"net/http\"\n\t\"time\"\n)\n\n// Timeout wraps h with a fixed request timeout.\nfunc Timeout(h http.Handler, d time.Duration) http.Handler {\n\treturn http.TimeoutHandler(h, d, \"request timed out\")\n}\n",
-      "content_hash": "sha256:1ddd4a28247cbd327889ea8e97584abab79c8074864dbc715869bcee82602f7d",
+      "content": "// Package middleware provides HTTP middleware for the service.\npackage middleware\n\nimport (\n\t\"net/http\"\n\n\t\"example.com/go-service/internal/clock\"\n)\n\n// Timeout wraps h with a fixed request timeout.\nfunc Timeout(h http.Handler) http.Handler {\n\treturn http.TimeoutHandler(h, clock.Grace, \"request timed out\")\n}\n",
+      "content_hash": "sha256:e59afd85a547cb059a77ab04fcfe46c2e2cc1b0697ae07cc12ac5a7c7f16c1bd",
       "provenance": {
         "source": "middleware/timeout.go",
-        "revision": "983c7b8424a771fe26dbd36f266a305acf674d48",
+        "revision": "bbf50c1ba03f95b993b74ece34f282d51deb63dd",
         "location": "declares:Timeout",
         "method": "task_match",
         "confidence": "detected"
       },
       "reason": "task_match",
-      "original_bytes": 283,
-      "included_bytes": 283,
+      "original_bytes": 310,
+      "included_bytes": 310,
       "truncated": false
     }
   ],
@@ -144,7 +161,7 @@
     "max_file_bytes": 65536,
     "max_total_bytes": 524288
   },
-  "packet_hash": "sha256:f861cf65b548504f75ff1db4838619cb09dd8ebbb85dab5f920cfb60ca7723e6",
+  "packet_hash": "sha256:7d15b90f6e98d6e24df04708c31b31cb48f61dfd31226a9f9149d0f7f8c6ec8d",
   "task": "add request timeout middleware",
   "direction": "# Direction\n\nShip a reliable payments API with strict timeouts on every outbound call.\n\n## Non-goals\n\n- No new public endpoints until the middleware chain is hardened.",
   "constraints": "# Constraints\n\n- Keep handler latency under 200ms.\n- No new third-party dependencies without a decision record.",

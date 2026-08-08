@@ -299,6 +299,8 @@ func humanReason(value string) string {
 		return "it declares an identifier the request names"
 	case "title_match":
 		return "its title names what the request names"
+	case "import_neighbor":
+		return "a selected file imports it"
 	case "config_excluded":
 		return "excluded by repository configuration"
 	case "item_limit":

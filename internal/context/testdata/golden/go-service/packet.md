@@ -17,10 +17,10 @@ add request timeout middleware
 ## Packet details
 
 - Schema: `struktly/packet/v2`
-- Packet hash: `sha256:f861cf65b548504f75ff1db4838619cb09dd8ebbb85dab5f920cfb60ca7723e6`
-- Repository: `git:0e709b14ea2e846e54e1d38161502ee8f4a49a40963cbbe8abb58b938ca7a1d7`
+- Packet hash: `sha256:7d15b90f6e98d6e24df04708c31b31cb48f61dfd31226a9f9149d0f7f8c6ec8d`
+- Repository: `git:9e32ee6a0f32d5c9fb24e98545a74619da682cba8248d369648c707ad8112c40`
 - Branch: `main`
-- HEAD revision: `983c7b8424a771fe26dbd36f266a305acf674d48`
+- HEAD revision: `bbf50c1ba03f95b993b74ece34f282d51deb63dd`
 - Scope: `whole repository`
 
 ## Repository
@@ -32,6 +32,7 @@ add request timeout middleware
 
 - `.struktly`
 - `docs`
+- `internal`
 - `middleware`
 
 ## Languages and frameworks
@@ -169,6 +170,26 @@ module example.com/go-service
 go 1.24.0
 ```
 
+### `internal/clock/clock.go`
+
+- Type: Source
+- Why it was included: a selected file imports it
+- Content hash: `sha256:7f86d528f399fab5677a123f8fcee25b6ed6d7b4311a3c1df073682c183555a9`
+- Bytes: `272/272`
+
+```text
+// Package clock supplies the wall-clock source middleware depends on.
+package clock
+
+import "time"
+
+// Grace is the deadline applied when none is configured.
+const Grace = 30 * time.Second
+
+// Wall returns the current instant.
+func Wall() time.Time { return time.Now() }
+```
+
 ### `middleware/logger.go`
 
 - Type: Source
@@ -197,8 +218,8 @@ func Logger(h http.Handler) http.Handler {
 
 - Type: Source
 - Why it was included: its filename matched the task
-- Content hash: `sha256:1ddd4a28247cbd327889ea8e97584abab79c8074864dbc715869bcee82602f7d`
-- Bytes: `283/283`
+- Content hash: `sha256:e59afd85a547cb059a77ab04fcfe46c2e2cc1b0697ae07cc12ac5a7c7f16c1bd`
+- Bytes: `310/310`
 
 ```text
 // Package middleware provides HTTP middleware for the service.
@@ -206,12 +227,13 @@ package middleware
 
 import (
 	"net/http"
-	"time"
+
+	"example.com/go-service/internal/clock"
 )
 
 // Timeout wraps h with a fixed request timeout.
-func Timeout(h http.Handler, d time.Duration) http.Handler {
-	return http.TimeoutHandler(h, d, "request timed out")
+func Timeout(h http.Handler) http.Handler {
+	return http.TimeoutHandler(h, clock.Grace, "request timed out")
 }
 ```
 

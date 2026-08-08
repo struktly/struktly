@@ -220,6 +220,18 @@ Matching only ever adds candidates: files already excluded are never indexed, an
 a repository in another language selects exactly what it selected before.
 Advertised as the `context.symbol_matching` capability.
 
+After the request's own candidates are selected, a second pass adds repository
+files that the selected code calls, reported as the `import_neighbor` reason
+with the supplied identifiers in `provenance.location` as `provides:<names>`.
+The unit is the identifier, not the package: `files.CleanRoot` reaches whichever
+file declares `CleanRoot` and leaves its siblings alone, because a Go import
+names a directory and a directory is not a unit of relevance. Only first-degree
+imports, only from files the request matched by name or the caller seeded, and
+only into budget the request itself did not use — an import neighbour is a
+reason to look rather than evidence about the request, so it never displaces a
+direct match. Scope and every exclusion still apply. Advertised as the
+`context.import_neighbors` capability.
+
 Candidates are ranked deterministically by reason and relevance, then item count
 and byte limits are applied. Path and symbol evidence add up, and symbol
 evidence outranks a filename match alone.

@@ -41,11 +41,15 @@ type corpusCase struct {
 
 var corpus = []corpusCase{
 	{
-		fixture:    "go-service",
-		request:    "add request timeout middleware",
-		mustSelect: []string{"middleware/timeout.go", "README.md", ".struktly/constraints.md"},
-		// Nothing in this request concerns logging.
-		mustExclude: []string{"docs/adr/0001-record.md"},
+		fixture: "go-service",
+		request: "add request timeout middleware",
+		// clock.go is here only because timeout.go calls clock.Grace: nothing in
+		// its path, its identifiers or its package name matches the request.
+		// unused.go is its sibling in the same package, called by nothing
+		// selected, and is the distinction import expansion has to make —
+		// reachability is not relevance.
+		mustSelect:  []string{"middleware/timeout.go", "README.md", ".struktly/constraints.md", "internal/clock/clock.go"},
+		mustExclude: []string{"docs/adr/0001-record.md", "internal/clock/unused.go"},
 	},
 	{
 		fixture: "go-service",

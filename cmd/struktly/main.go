@@ -232,6 +232,7 @@ func currentCapabilities() capabilitiesDocument {
 			"context.seeds",
 			"context.symbol_matching",
 			"context.title_matching",
+			"context.import_neighbors",
 			"context.limits",
 			"context.expect_base_revision",
 			"context.no_write",

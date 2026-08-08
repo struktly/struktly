@@ -19,6 +19,7 @@ Generated locally from repository files and Git metadata.
 
 - `.struktly`
 - `docs`
+- `internal`
 - `middleware`
 
 ## Languages and frameworks
