@@ -216,11 +216,11 @@ func TestSelectionDoesNotMatchDockerfileFromDockWord(t *testing.T) {
 func TestSelectionPrefersImplementationForCamelCaseQuickSwitcherUnderItemLimit(t *testing.T) {
 	root := initSelectionRepo(t)
 	writeFile(t, root, ".struktly/config.json", `{"schema":"struktly/config/v1","context":{"exclude":["README.md",".struktly/config.json"]},"checks":{}}`)
-	writeFile(t, root, "app/src/app/shell/QuickSwitcher.tsx", "export const quickSwitch = true\n")
-	writeFile(t, root, "app/src/app/shell/QuickSwitcher.test.tsx", "export const quickSwitch = true\n")
+	writeFile(t, root, "src/shell/QuickSwitcher.tsx", "export const quickSwitch = true\n")
+	writeFile(t, root, "src/shell/QuickSwitcher.test.tsx", "export const quickSwitch = true\n")
 	writeFile(t, root, "e2e/quick-switcher.md", "# E2E quick switcher\n")
 	writeFile(t, root, ".struktly/tasks/quick-switcher.md", validTaskDocument)
-	runGit(t, root, "add", ".struktly/config.json", "app/src/app/shell/QuickSwitcher.tsx", "app/src/app/shell/QuickSwitcher.test.tsx", "e2e/quick-switcher.md", ".struktly/tasks/quick-switcher.md")
+	runGit(t, root, "add", ".struktly/config.json", "src/shell/QuickSwitcher.tsx", "src/shell/QuickSwitcher.test.tsx", "e2e/quick-switcher.md", ".struktly/tasks/quick-switcher.md")
 	runGit(t, root, "commit", "-qm", "add timeout candidates")
 
 	selection, err := selectPacketContextWithLimits(
@@ -240,7 +240,7 @@ func TestSelectionPrefersImplementationForCamelCaseQuickSwitcherUnderItemLimit(t
 	if len(selection.items) != 1 {
 		t.Fatalf("expected one selected item, got %d", len(selection.items))
 	}
-	item := requireItem(t, selection.items, "app/src/app/shell/QuickSwitcher.tsx")
+	item := requireItem(t, selection.items, "src/shell/QuickSwitcher.tsx")
 	if item.Reason != "task_match" {
 		t.Fatalf("expected task_match reason for ranked source file, got: %#v", item)
 	}
