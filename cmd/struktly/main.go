@@ -217,6 +217,8 @@ func currentCapabilities() capabilitiesDocument {
 			"struktly/doctor/v1",
 			"struktly/error/v1",
 			"struktly/explanation/v1",
+			initResultSchema,
+			instructionSuggestionsSchema,
 			repoctx.PacketSchema,
 			repoctx.PacketDiffSchema,
 			repoctx.SnapshotSchema,
@@ -558,23 +560,51 @@ func emptyValue(value, fallback string) string {
 }
 
 func newInitCmd(repoRoot *string) *cobra.Command {
-	return &cobra.Command{
+	var toJSON bool
+	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Create repository configuration and write project context",
 		Args:  invalidInvocationArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runInit(cmd, *repoRoot)
+			return runInit(cmd, *repoRoot, toJSON)
 		},
 	}
+	cmd.Flags().BoolVar(&toJSON, "json", false, "Print the versioned init result to stdout")
+	return cmd
 }
 
-func runInit(cmd *cobra.Command, repoRoot string) error {
+// initDocument is the machine contract for init: what was created, what was
+// deliberately left alone, and where the scan snapshot went, all repository-
+// relative. Prose output stays for people; a caller that must not parse prose
+// — Platform is one — reads this instead.
+type initDocument struct {
+	Schema   string   `json:"schema"`
+	Root     string   `json:"root"`
+	Created  []string `json:"created"`
+	Skipped  []string `json:"skipped"`
+	Snapshot string   `json:"snapshot"`
+}
+
+const initResultSchema = "struktly/init-result/v1"
+
+func runInit(cmd *cobra.Command, repoRoot string, toJSON bool) error {
 	result, err := app.Init(app.InitOptions{Root: repoRoot})
 	if err != nil {
 		return err
 	}
 
 	root := result.Root
+	if toJSON {
+		document := initDocument{Schema: initResultSchema, Root: root, Created: []string{}, Skipped: []string{}}
+		for _, path := range result.CreatedPaths {
+			document.Created = append(document.Created, relToRoot(root, path))
+		}
+		for _, path := range result.SkippedPaths {
+			document.Skipped = append(document.Skipped, relToRoot(root, path))
+		}
+		document.Snapshot = relToRoot(root, result.ScanOutputPath)
+		return writeJSON(cmd.OutOrStdout(), document)
+	}
 
 	for _, path := range result.CreatedPaths {
 		if _, err := fmt.Fprintf(cmd.OutOrStdout(), "created %s\n", relToRoot(root, path)); err != nil {
@@ -722,17 +752,32 @@ func newBriefCmd(repoRoot *string) *cobra.Command {
 }
 
 func newSuggestInstructionsCmd(repoRoot *string) *cobra.Command {
-	return &cobra.Command{
+	var toJSON bool
+	cmd := &cobra.Command{
 		Use:   "suggest-instructions",
 		Short: "Write suggested agent instruction drafts under .struktly/agent-instructions/",
 		Args:  invalidInvocationArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runSuggestInstructions(cmd, *repoRoot)
+			return runSuggestInstructions(cmd, *repoRoot, toJSON)
 		},
 	}
+	cmd.Flags().BoolVar(&toJSON, "json", false, "Print the versioned suggestion result to stdout")
+	return cmd
 }
 
-func runSuggestInstructions(cmd *cobra.Command, repoRoot string) error {
+// suggestionsDocument is the machine contract for suggest-instructions: the
+// draft files written, repository-relative. The drafts themselves stay
+// Markdown on disk where a person edits them; the document says where they
+// are, not what they say.
+type suggestionsDocument struct {
+	Schema  string   `json:"schema"`
+	Root    string   `json:"root"`
+	Written []string `json:"written"`
+}
+
+const instructionSuggestionsSchema = "struktly/instruction-suggestions/v1"
+
+func runSuggestInstructions(cmd *cobra.Command, repoRoot string, toJSON bool) error {
 	result, err := repoctx.SuggestInstructions(repoctx.SuggestInstructionsOptions{
 		Root: repoRoot,
 	})
@@ -741,6 +786,13 @@ func runSuggestInstructions(cmd *cobra.Command, repoRoot string) error {
 	}
 
 	root := result.Root
+	if toJSON {
+		document := suggestionsDocument{Schema: instructionSuggestionsSchema, Root: root, Written: []string{}}
+		for _, path := range result.OutputPaths {
+			document.Written = append(document.Written, relToRoot(root, path))
+		}
+		return writeJSON(cmd.OutOrStdout(), document)
+	}
 
 	for _, path := range result.OutputPaths {
 		_, err = fmt.Fprintf(cmd.OutOrStdout(), "wrote %s\n", relToRoot(root, path))
