@@ -1,20 +1,11 @@
 name: Release
 
-# release-please keeps a release pull request up to date with every change
-# merged to main. Merging that pull request is the release: it tags the commit
-# and publishes the GitHub release.
-#
-# There is nothing to build and attach. Struktly is installed with
-# `go install github.com/struktly/struktly/cmd/struktly@vX.Y.Z`, so the tag is
-# the artifact — the module proxy serves it, and `struktly version` reports it
-# from the build info Go records at install time.
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
-permissions:
-  contents: write
-  pull-requests: write
+permissions: {}
 
 concurrency:
   group: release-please
@@ -23,6 +14,10 @@ concurrency:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:

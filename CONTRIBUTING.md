@@ -13,6 +13,11 @@ make test
 make build
 ```
 
+`make lint` builds the golangci-lint pinned in `tools/go.mod` into `.bin/` the
+first time it is needed, so there is nothing to install beforehand and CI runs
+that same binary against that same configuration. Formatting is gofumpt and is
+reported by the same run; `make fmt` applies it.
+
 Keep changes small and include tests for behavior changes. Do not add a runtime
 dependency when the standard library or an existing dependency is sufficient.
 
@@ -48,10 +53,12 @@ not an ancestor of `main` and tag-derived versioning would read the history
 wrongly.
 
 Everything a release depends on runs on every push to `main`, not on the release
-pull request: race tests, the gitleaks history scan, and an install smoke test
-against a clean repository. release-please opens its pull request with
-`GITHUB_TOKEN`, and GitHub does not start workflows for those, so a check that
-only ran on pull requests would never see the commit being tagged.
+pull request: race tests, a govulncheck scan, the gitleaks history scan, and an
+install smoke test against a clean repository. release-please opens its pull
+request with `GITHUB_TOKEN`, and GitHub does not start workflows for those, so a
+check that only ran on pull requests would never see the commit being tagged.
+Those checks run on pull requests as well, because a secret that reaches the
+history of `main` fails the scan on every run afterwards.
 
 The changelog for a release is generated from commit subjects. Write them for a
 reader of the release notes, and put the reasoning in the commit body, where it
