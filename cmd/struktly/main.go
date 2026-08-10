@@ -338,21 +338,32 @@ func writeTaskArchive(w io.Writer, document repoctx.TaskArchiveDocument, check b
 		return err
 	}
 	if check {
-		fmt.Fprintf(w, "%d finished task(s) misfiled outside %s/:\n", len(document.Archived), repoctx.TaskArchiveDir)
-		for _, move := range document.Archived {
-			fmt.Fprintf(w, "  %s -> %s\n", move.From, move.To)
+		_, err := fmt.Fprintf(w, "%d finished task(s) misfiled outside %s/:\n", len(document.Archived), repoctx.TaskArchiveDir)
+		if err != nil {
+			return err
 		}
-		_, err := fmt.Fprintln(w, "run: struktly tasks archive")
+		for _, move := range document.Archived {
+			_, err := fmt.Fprintf(w, "  %s -> %s\n", move.From, move.To)
+			if err != nil {
+				return err
+			}
+		}
+		_, err = fmt.Fprintln(w, "run: struktly tasks archive")
 		return err
 	}
 	for _, move := range document.Archived {
-		fmt.Fprintf(w, "archived %s -> %s\n", move.From, move.To)
+		_, err := fmt.Fprintf(w, "archived %s -> %s\n", move.From, move.To)
+		if err != nil {
+			return err
+		}
 	}
-	var err error
 	for _, rewrite := range document.Rewritten {
-		_, err = fmt.Fprintf(w, "rewrote %d link(s) in %s\n", rewrite.Links, rewrite.Path)
+		_, err := fmt.Fprintf(w, "rewrote %d link(s) in %s\n", rewrite.Links, rewrite.Path)
+		if err != nil {
+			return err
+		}
 	}
-	return err
+	return nil
 }
 
 // newTasksCompleteCmd is the atomic done transition: frontmatter status and
@@ -372,8 +383,10 @@ func newTasksCompleteCmd(repoRoot *string) *cobra.Command {
 			if toJSON {
 				return writeJSON(cmd.OutOrStdout(), document)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "completed %s: %s -> %s\n", document.ID, document.From, document.To)
-			var writeErr error
+			_, writeErr := fmt.Fprintf(cmd.OutOrStdout(), "completed %s: %s -> %s\n", document.ID, document.From, document.To)
+			if writeErr != nil {
+				return writeErr
+			}
 			for _, rewrite := range document.Rewritten {
 				_, writeErr = fmt.Fprintf(cmd.OutOrStdout(), "rewrote %d link(s) in %s\n", rewrite.Links, rewrite.Path)
 			}

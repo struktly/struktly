@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -92,18 +93,30 @@ func TestArchiveTasksFilesMisfiledTasksAndRepairsEveryDirection(t *testing.T) {
 		file string
 		want []string
 	}{
-		{"links out of a moved task gain a level", ".struktly/tasks/archive/finished.md",
-			[]string{"](../live.md)", "](earlier.md)", "](../../../docs/plan.md)"}},
-		{"links into it from a live task gain archive/", ".struktly/tasks/live.md",
-			[]string{"](archive/finished.md#done-when)", "`.struktly/tasks/archive/finished.md`"}},
-		{"links from an already-archived task lose a level", ".struktly/tasks/archive/earlier.md",
-			[]string{"](finished.md)"}},
-		{"links from a doc outside the bundle follow", "docs/plan.md",
-			[]string{"](../.struktly/tasks/archive/finished.md)"}},
-		{"a Go comment citing the path follows", "internal/tasks/tasks.go",
-			[]string{".struktly/tasks/archive/finished.md"}},
-		{"directory links are left alone", ".struktly/tasks/index.md",
-			[]string{"](.)", "](archive/)"}},
+		{
+			"links out of a moved task gain a level", ".struktly/tasks/archive/finished.md",
+			[]string{"](../live.md)", "](earlier.md)", "](../../../docs/plan.md)"},
+		},
+		{
+			"links into it from a live task gain archive/", ".struktly/tasks/live.md",
+			[]string{"](archive/finished.md#done-when)", "`.struktly/tasks/archive/finished.md`"},
+		},
+		{
+			"links from an already-archived task lose a level", ".struktly/tasks/archive/earlier.md",
+			[]string{"](finished.md)"},
+		},
+		{
+			"links from a doc outside the bundle follow", "docs/plan.md",
+			[]string{"](../.struktly/tasks/archive/finished.md)"},
+		},
+		{
+			"a Go comment citing the path follows", "internal/tasks/tasks.go",
+			[]string{".struktly/tasks/archive/finished.md"},
+		},
+		{
+			"directory links are left alone", ".struktly/tasks/index.md",
+			[]string{"](.)", "](archive/)"},
+		},
 	}
 	for _, c := range cases {
 		content := readFile(t, root, c.file)
@@ -362,5 +375,139 @@ func TestCompletedTaskContentPreservesEverythingElse(t *testing.T) {
 	}
 	if _, err := completedTaskContent("---\ntitle: no status\n---\n\nBody.\n", "2026-08-10"); err == nil {
 		t.Error("frontmatter without status did not error")
+	}
+}
+
+func TestTaskLifecycleRefusesASymlinkedArchiveDirectory(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	live := archiveTask("ship-it", "done", "Nothing links here.\n")
+	writeFile(t, root, ".struktly/tasks/ship-it.md", live)
+	if err := os.Symlink(outside, filepath.Join(root, ".struktly", "tasks", "archive")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+
+	// MkdirAll accepts the symlink and reports success, so without an explicit
+	// refusal both commands file the task wherever it points and then delete
+	// the only copy left inside the repository.
+	if _, err := CompleteTask(CompleteTaskOptions{Root: root, ID: "ship-it"}); err == nil {
+		t.Error("CompleteTask wrote through a symlinked archive directory")
+	}
+	if _, err := ArchiveTasks(ArchiveTasksOptions{Root: root}); err == nil {
+		t.Error("ArchiveTasks filed through a symlinked archive directory")
+	}
+	if readFile(t, root, ".struktly/tasks/ship-it.md") != live {
+		t.Error("the live task did not survive the refusal")
+	}
+	entries, err := os.ReadDir(outside)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("wrote %d entries outside the repository", len(entries))
+	}
+}
+
+func TestArchiveTasksLeavesIgnoredTreesAlone(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, ".struktly/tasks/finished.md", archiveTask("finished", "done", "Done.\n"))
+	generated := "Recorded when `.struktly/tasks/finished.md` was still live.\n"
+	// Generated and historical state, named by DefaultIgnoredPaths and by the
+	// repository's own .gitignore. Each is a record of what was true when it
+	// was written, so a lifecycle command must not edit it.
+	writeFile(t, root, ".struktly/scans/latest.md", generated)
+	writeFile(t, root, ".struktly/context-packets/packet.md", generated)
+	writeFile(t, root, ".struktly/runs/run.md", generated)
+	writeFile(t, root, ".gitignore", "generated/\n")
+	writeFile(t, root, "generated/notes.md", generated)
+	writeFile(t, root, "docs/plan.md", generated)
+
+	document, err := ArchiveTasks(ArchiveTasksOptions{Root: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ignored := []string{
+		".struktly/scans/latest.md",
+		".struktly/context-packets/packet.md",
+		".struktly/runs/run.md",
+		"generated/notes.md",
+	}
+	for _, rel := range ignored {
+		if readFile(t, root, rel) != generated {
+			t.Errorf("%s was rewritten", rel)
+		}
+	}
+	for _, rewrite := range document.Rewritten {
+		if slices.Contains(ignored, rewrite.Path) {
+			t.Errorf("reported a rewrite of an ignored path: %s", rewrite.Path)
+		}
+	}
+	// The same citation outside an ignored tree is still repaired, so this is a
+	// narrower walk rather than a broken one.
+	if readFile(t, root, "docs/plan.md") == generated {
+		t.Error("docs/plan.md was not repaired")
+	}
+}
+
+func TestCompleteTaskRefusesADocumentThatIsNotATask(t *testing.T) {
+	root := t.TempDir()
+	// Frontmatter parses and carries an id and a status, but declares no type,
+	// schema or title: `tasks` reports this file as invalid rather than listing
+	// it, and completing it would rewrite and file something that is not a task.
+	notes := "---\nid: notes\nstatus: in-progress\n---\n\nNot a task.\n"
+	writeFile(t, root, ".struktly/tasks/notes.md", notes)
+
+	_, err := CompleteTask(CompleteTaskOptions{Root: root, ID: "notes"})
+	if !errors.Is(err, ErrInvalidTask) {
+		t.Fatalf("err = %v, want ErrInvalidTask", err)
+	}
+	if readFile(t, root, ".struktly/tasks/notes.md") != notes {
+		t.Error("the document was modified")
+	}
+	if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(".struktly/tasks/archive/notes.md"))); err == nil {
+		t.Error("a document that is not a task was filed under archive/")
+	}
+}
+
+func TestCompleteTaskConvergesWhenTheLiveFileCouldNotBeRemoved(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses file permissions")
+	}
+	root := t.TempDir()
+	writeFile(t, root, ".struktly/tasks/ship-it.md", archiveTask("ship-it", "in-progress", "Nothing links here.\n"))
+	archiveDir := filepath.Join(root, filepath.FromSlash(TaskArchiveDir))
+	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Writable archive, unwritable live directory: the destination write
+	// succeeds and the removal that follows it cannot.
+	liveDir := filepath.Join(root, filepath.FromSlash(tasksDir))
+	if err := os.Chmod(liveDir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(liveDir, 0o755) })
+
+	if _, err := CompleteTask(CompleteTaskOptions{Root: root, ID: "ship-it"}); err == nil {
+		t.Skip("filesystem does not enforce the unwritable mode")
+	}
+	filed, err := os.ReadFile(filepath.Join(archiveDir, "ship-it.md"))
+	if err != nil {
+		t.Skipf("the destination was not written, so this is not the state under test: %v", err)
+	}
+
+	if err := os.Chmod(liveDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Both copies now exist. The rerun must recognise its own earlier work
+	// rather than report the slot as taken by a stranger.
+	if _, err := CompleteTask(CompleteTaskOptions{Root: root, ID: "ship-it"}); err != nil {
+		t.Fatalf("rerun did not converge: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(".struktly/tasks/ship-it.md"))); !errors.Is(err, os.ErrNotExist) {
+		t.Error("the rerun left the live copy in place")
+	}
+	if got := readFile(t, root, ".struktly/tasks/archive/ship-it.md"); got != string(filed) {
+		t.Errorf("the rerun rewrote the archived task\n got: %q\nwant: %q", got, filed)
 	}
 }

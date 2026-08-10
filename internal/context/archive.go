@@ -139,11 +139,20 @@ func ArchiveTasks(opts ArchiveTasksOptions) (TaskArchiveDocument, error) {
 		moves[rel] = TaskArchiveDir + "/" + path.Base(rel)
 		document.Archived = append(document.Archived, TaskArchiveMove{From: rel, To: moves[rel]})
 	}
+	archiveDir := ""
 	if !opts.Check {
+		// The directory tasks are filed into is settled before anything is
+		// written, because a rename into a symlinked one files them outside the
+		// repository.
+		archiveDir, err = ensureTaskArchiveDir(root)
+		if err != nil {
+			return TaskArchiveDocument{}, err
+		}
 		// A rename onto an occupied archive slot would overwrite it, so refuse
-		// before anything — link repairs included — is written.
+		// before anything — link repairs included — is written. Lstat, so a
+		// symlink sitting in the slot counts as occupying it.
 		for _, rel := range misfiled {
-			if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(moves[rel]))); err == nil {
+			if _, err := os.Lstat(filepath.Join(root, filepath.FromSlash(moves[rel]))); err == nil {
 				return TaskArchiveDocument{}, fmt.Errorf("%w: %s already exists", ErrTaskAlreadyArchived, moves[rel])
 			}
 		}
@@ -159,12 +168,9 @@ func ArchiveTasks(opts ArchiveTasksOptions) (TaskArchiveDocument, error) {
 		return document, nil
 	}
 
-	if err := os.MkdirAll(filepath.Join(root, filepath.FromSlash(TaskArchiveDir)), 0o755); err != nil {
-		return TaskArchiveDocument{}, err
-	}
 	for _, rel := range misfiled {
 		from := filepath.Join(root, filepath.FromSlash(rel))
-		to := filepath.Join(root, filepath.FromSlash(moves[rel]))
+		to := filepath.Join(archiveDir, path.Base(rel))
 		if err := os.Rename(from, to); err != nil {
 			return TaskArchiveDocument{}, err
 		}
@@ -178,12 +184,18 @@ func ArchiveTasks(opts ArchiveTasksOptions) (TaskArchiveDocument, error) {
 //
 // Ordering, so that a failure at any step leaves the original live file
 // intact: (1) resolve the id and compute the completed content, (2) ensure the
-// archive slot exists and is free, (3) repair inbound links across the
-// repository, (4) write the completed content at the archive path, (5) remove
-// the live file. The live file is never rewritten in place. A run interrupted
-// after (3) has re-pointed links at an archive path that does not exist yet;
-// rerunning the command converges, because the repairs are recognised as
-// already made and the move still happens.
+// archive directory is a real directory and the slot is free, (3) repair
+// inbound links across the repository, (4) write the completed content at the
+// archive path, (5) remove the live file. The live file is never rewritten in
+// place.
+//
+// Every interruption converges on a rerun. After (3), links point at an
+// archive path that does not exist yet, and the repairs are recognised as
+// already made while the move still happens. After (4) — the destination
+// written but the live file not yet removed, which is what an unwritable live
+// directory leaves behind — the slot holds this same task rather than a
+// stranger, so the rerun finishes the removal instead of refusing a collision
+// it caused itself.
 func CompleteTask(opts CompleteTaskOptions) (TaskTransitionDocument, error) {
 	root, err := files.CleanRoot(opts.Root)
 	if err != nil {
@@ -211,12 +223,19 @@ func CompleteTask(opts CompleteTaskOptions) (TaskTransitionDocument, error) {
 		Rewritten:  []TaskArchiveRewrite{},
 	}
 
-	if err := os.MkdirAll(filepath.Join(root, filepath.FromSlash(TaskArchiveDir)), 0o755); err != nil {
+	archiveDir, err := ensureTaskArchiveDir(root)
+	if err != nil {
 		return TaskTransitionDocument{}, err
 	}
-	absTo := filepath.Join(root, filepath.FromSlash(to))
-	if _, err := os.Stat(absTo); err == nil {
-		return TaskTransitionDocument{}, fmt.Errorf("%w: %s already exists", ErrTaskAlreadyArchived, to)
+	absTo := filepath.Join(archiveDir, path.Base(to))
+	resuming, filedOn, err := archivedSlotState(absTo, to, opts.ID)
+	if err != nil {
+		return TaskTransitionDocument{}, err
+	}
+	if resuming && filedOn != "" {
+		// The transition happened on the earlier run; today's date is not when
+		// this task was completed, so the report carries the date on disk.
+		document.Updated = filedOn
 	}
 
 	// The task's own outbound links are re-expressed in memory and land in the
@@ -239,8 +258,12 @@ func CompleteTask(opts CompleteTaskOptions) (TaskTransitionDocument, error) {
 		})
 	}
 
-	if err := os.WriteFile(absTo, []byte(completed), 0o644); err != nil {
-		return TaskTransitionDocument{}, err
+	// Not rewritten when resuming: the destination already holds this task, and
+	// writing it again would only replace the date it was filed on with today's.
+	if !resuming {
+		if err := os.WriteFile(absTo, []byte(completed), 0o644); err != nil {
+			return TaskTransitionDocument{}, err
+		}
 	}
 	if err := os.Remove(filepath.Join(root, filepath.FromSlash(from))); err != nil {
 		return TaskTransitionDocument{}, err
@@ -276,7 +299,8 @@ func taskByID(root, dir, id string) (string, string, error) {
 		return "", "", err
 	}
 	for _, rel := range rels {
-		data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
+		abs := filepath.Join(root, filepath.FromSlash(rel))
+		data, err := os.ReadFile(abs)
 		if err != nil {
 			return "", "", err
 		}
@@ -286,11 +310,71 @@ func taskByID(root, dir, id string) (string, string, error) {
 			// already reports it as invalid.
 			continue
 		}
-		if metadata["id"] == id {
-			return rel, string(data), nil
+		if metadata["id"] != id {
+			continue
 		}
+		// Frontmatter carrying an id is not yet a task: a declaration also needs
+		// type, schema and title, which is what `tasks` requires before it will
+		// list one. Without this, a document holding nothing but id and status
+		// is rewritten and filed as though it were a task, and the caller is
+		// told it succeeded rather than that the file is invalid.
+		if _, err := loadTaskFile(root, abs, false); err != nil {
+			return "", "", err
+		}
+		return rel, string(data), nil
 	}
 	return "", "", nil
+}
+
+// ensureTaskArchiveDir returns the absolute archive directory, creating it when
+// it is absent and refusing it when it is a symlink. MkdirAll accepts an
+// existing symlink and reports success, after which every write below lands
+// wherever that link points — outside the repository — while the live task is
+// removed from it. taskFiles makes the same refusal for the directories it
+// reads; this is the same rule on the directory written to.
+func ensureTaskArchiveDir(root string) (string, error) {
+	abs := filepath.Join(root, filepath.FromSlash(TaskArchiveDir))
+	info, err := os.Lstat(abs)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		if err := os.MkdirAll(abs, 0o755); err != nil {
+			return "", err
+		}
+	case err != nil:
+		return "", fmt.Errorf("inspect %s: %w", TaskArchiveDir, err)
+	case info.Mode()&os.ModeSymlink != 0 || !info.IsDir():
+		return "", fmt.Errorf("%s must be a directory, not a symlink", TaskArchiveDir)
+	}
+	return abs, nil
+}
+
+// archivedSlotState inspects the archive slot a completion is about to write.
+// A free slot reports false. A slot already holding this same task reports
+// true along with the date it was filed: a previous run wrote the destination
+// and failed before removing the live copy, and finishing that run is what
+// converges. Anything else — another task's file, a symlink, a directory — is a
+// real collision and is refused rather than written through.
+func archivedSlotState(abs, rel, id string) (bool, string, error) {
+	info, err := os.Lstat(abs)
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, "", nil
+	}
+	if err != nil {
+		return false, "", fmt.Errorf("inspect %s: %w", rel, err)
+	}
+	occupied := fmt.Errorf("%w: %s already exists", ErrTaskAlreadyArchived, rel)
+	if !info.Mode().IsRegular() {
+		return false, "", occupied
+	}
+	data, err := os.ReadFile(abs)
+	if err != nil {
+		return false, "", err
+	}
+	metadata, _, err := parseTaskFrontmatter(string(data))
+	if err != nil || metadata["id"] != id {
+		return false, "", occupied
+	}
+	return true, metadata["updated"], nil
 }
 
 // misfiledTasks lists repository-relative paths of finished tasks still in the
@@ -403,6 +487,7 @@ func completedTaskContent(content, updated string) (string, error) {
 // report and leaves the tree alone.
 func repairTaskLinks(root string, moves map[string]string, write bool, skip string) ([]TaskArchiveRewrite, error) {
 	rewritten := []TaskArchiveRewrite{}
+	ignores := files.NewIgnoreMatcher(root)
 	exists := func(rel string) bool {
 		_, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel)))
 		return err == nil
@@ -411,20 +496,9 @@ func repairTaskLinks(root string, moves map[string]string, write bool, skip stri
 		if err != nil {
 			return err
 		}
-		if entry.IsDir() {
-			// The root itself may carry an ignored name; only descendants are
-			// skipped.
-			if abs != root && slices.Contains(files.DefaultIgnoredDirs, entry.Name()) {
-				return fs.SkipDir
-			}
-			return nil
-		}
-		if !entry.Type().IsRegular() {
-			return nil
-		}
-		name := entry.Name()
-		isMarkdown := strings.HasSuffix(name, ".md")
-		if !isMarkdown && !strings.HasSuffix(name, ".go") {
+		// The root itself may carry an ignored name; only descendants are
+		// skipped.
+		if abs == root {
 			return nil
 		}
 		relOS, err := filepath.Rel(root, abs)
@@ -432,6 +506,26 @@ func repairTaskLinks(root string, moves map[string]string, write bool, skip stri
 			return err
 		}
 		rel := filepath.ToSlash(relOS)
+		// The same rule the scan walks by, rather than a basename check against
+		// DefaultIgnoredDirs alone. Whole paths are excluded too —
+		// .struktly/scans and .struktly/context-packets hold generated copies of
+		// task prose, .struktly/runs holds historical state — and a repository's
+		// .gitignore names the rest. Rewriting a task path inside any of them
+		// edits a record of what was true when it was written.
+		if ignores.ShouldSkip(rel, entry.IsDir()) {
+			if entry.IsDir() {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if entry.IsDir() || !entry.Type().IsRegular() {
+			return nil
+		}
+		name := entry.Name()
+		isMarkdown := strings.HasSuffix(name, ".md")
+		if !isMarkdown && !strings.HasSuffix(name, ".go") {
+			return nil
+		}
 		if rel == skip {
 			return nil
 		}
