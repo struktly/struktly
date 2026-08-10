@@ -81,13 +81,13 @@ func LoadConfig(root string) (Config, bool, error) {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&declared); err != nil {
-		return Config{}, true, fmt.Errorf("%w: parse %s: %v", ErrInvalidConfig, configPath, err)
+		return Config{}, true, fmt.Errorf("%w: parse %s: %w", ErrInvalidConfig, configPath, err)
 	}
 	if err := ensureJSONEOF(dec); err != nil {
-		return Config{}, true, fmt.Errorf("%w: parse %s: %v", ErrInvalidConfig, configPath, err)
+		return Config{}, true, fmt.Errorf("%w: parse %s: %w", ErrInvalidConfig, configPath, err)
 	}
 	if err := ValidateConfig(declared); err != nil {
-		return Config{}, true, fmt.Errorf("%w: validate %s: %v", ErrInvalidConfig, configPath, err)
+		return Config{}, true, fmt.Errorf("%w: validate %s: %w", ErrInvalidConfig, configPath, err)
 	}
 
 	defaults := DefaultConfig()

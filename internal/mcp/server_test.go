@@ -22,9 +22,12 @@ func scannedRepo(t *testing.T) string {
 		t.Fatalf("scan fixture: %v", err)
 	}
 	for _, args := range [][]string{
-		{"init", "-q"}, {"config", "user.email", "test@example.com"},
-		{"config", "user.name", "Test"}, {"config", "commit.gpgsign", "false"},
-		{"add", "-A"}, {"commit", "-qm", "fixture"},
+		{"init", "-q"},
+		{"config", "user.email", "test@example.com"},
+		{"config", "user.name", "Test"},
+		{"config", "commit.gpgsign", "false"},
+		{"add", "-A"},
+		{"commit", "-qm", "fixture"},
 	} {
 		cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
 		if output, err := cmd.CombinedOutput(); err != nil {

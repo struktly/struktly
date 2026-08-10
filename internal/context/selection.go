@@ -738,7 +738,7 @@ func inspectSelectedFile(repo Repository, rel, reason string, remaining, maxFile
 	if err != nil {
 		return excluded("unreadable", "cannot open file")
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }() // read-only; nothing to report
 	prefix, err := io.ReadAll(io.LimitReader(f, int64(maxFileBytes)+utf8.UTFMax))
 	if err != nil {
 		return fileInspection{}, fmt.Errorf("read %s: %w", rel, err)
@@ -833,7 +833,8 @@ func inspectSelectedFile(repo Repository, rel, reason string, remaining, maxFile
 func declarationSkeleton(rel string, f *os.File, size int64) (struct {
 	text   string
 	secret bool
-}, error) {
+}, error,
+) {
 	var result struct {
 		text   string
 		secret bool

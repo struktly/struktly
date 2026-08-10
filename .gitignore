@@ -1,4 +1,5 @@
 /struktly
+/.bin/
 coverage.out
 .struktly/context-packets/
 .DS_Store

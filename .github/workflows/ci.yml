@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            tools/go.sum
+      - name: lint
+        run: make lint
+
+  test:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+      - name: test
+        run: go test ./...
+      - name: validate this repository
+        run: go run ./cmd/struktly validate
+      - name: doctor this repository
+        run: go run ./cmd/struktly doctor
+
+  release-readiness:
+    name: release readiness
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # gitleaks scans history
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable # govulncheck reports vulnerabilities in its own toolchain
+
+      - name: test with the race detector
+        run: go test -race ./...
+
+      - name: check for vulnerabilities
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
+
+      - name: scan history for secrets
+        run: go run github.com/zricethezav/gitleaks/v8@v8.30.1 git --config .gitleaks.toml --redact --verbose .
+
+      - name: smoke-test a clean repository
+        shell: bash
+        run: |
+          go install ./cmd/struktly
+          bindir="$(go env GOBIN)"
+          [ -n "$bindir" ] || bindir="$(go env GOPATH)/bin"
+          struktly="$bindir/struktly"
+
+          root="$(mktemp -d)"
+          out="$(mktemp -d)"
+          git -C "$root" init --quiet
+          git -C "$root" config user.name "Struktly CI"
+          git -C "$root" config user.email "ci@struktly.invalid"
+          printf '# smoke repository\n' > "$root/README.md"
+          git -C "$root" add README.md
+          git -C "$root" commit --quiet -m initial
+
+          "$struktly" init --root "$root" --json > "$out/init.json"
+          jq -e '.schema == "struktly/init-result/v1" and (.created | length) > 0' "$out/init.json" > /dev/null
+          "$struktly" suggest-instructions --root "$root" --json |
+            jq -e '.schema == "struktly/instruction-suggestions/v1"' > /dev/null
+          "$struktly" context --root "$root" --json --no-write "smoke test" |
+            jq -e '.schema' > /dev/null
+          "$struktly" validate --root "$root"
+          "$struktly" doctor --root "$root"
+
+  required-checks:
+    name: required checks
+    if: always()
+    needs: [lint, test, release-readiness]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: check job results
+        run: |
+          echo "lint:              ${{ needs.lint.result }}"
+          echo "test:              ${{ needs.test.result }}"
+          echo "release-readiness: ${{ needs.release-readiness.result }}"
+          [ "${{ needs.lint.result }}" = success ] &&
+          [ "${{ needs.test.result }}" = success ] &&
+          [ "${{ needs.release-readiness.result }}" = success ]

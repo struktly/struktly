@@ -58,7 +58,7 @@ func documentTitle(path string) (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	defer handle.Close()
+	defer func() { _ = handle.Close() }() // read-only; nothing to report
 
 	prefix := make([]byte, maxTitleScanBytes)
 	n, err := handle.Read(prefix)

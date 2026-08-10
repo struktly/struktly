@@ -166,8 +166,10 @@ func TestDiffNeedsNoRepository(t *testing.T) {
 	dir := t.TempDir()
 	packet := filepath.Join(dir, "packet.json")
 	var stdout bytes.Buffer
-	if code := runCLI(stdcontext.Background(), []string{"context", "--json", "--no-write",
-		"--root", repoRootForTest(t), "packet selection"}, strings.NewReader(""), &stdout, io.Discard); code != 0 {
+	if code := runCLI(stdcontext.Background(), []string{
+		"context", "--json", "--no-write",
+		"--root", repoRootForTest(t), "packet selection",
+	}, strings.NewReader(""), &stdout, io.Discard); code != 0 {
 		t.Skip("cannot generate a packet in this environment")
 	}
 	if err := os.WriteFile(packet, stdout.Bytes(), 0o644); err != nil {

@@ -37,7 +37,7 @@ func cleanSeeds(root, scope string, requested []string) ([]string, error) {
 		}
 		rel, err := cleanRequestedPath(root, raw)
 		if err != nil {
-			return nil, fmt.Errorf("%w: %s", ErrInvalidSeed, err)
+			return nil, fmt.Errorf("%w: %w", ErrInvalidSeed, err)
 		}
 		info, err := os.Lstat(filepath.Join(root, filepath.FromSlash(rel)))
 		if err != nil {
