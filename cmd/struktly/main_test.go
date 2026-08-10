@@ -560,6 +560,7 @@ func TestInitAndSuggestInstructionsSpeakJSON(t *testing.T) {
 	}
 	var initDoc struct {
 		Schema   string   `json:"schema"`
+		Root     string   `json:"root"`
 		Created  []string `json:"created"`
 		Skipped  []string `json:"skipped"`
 		Snapshot string   `json:"snapshot"`
@@ -569,6 +570,11 @@ func TestInitAndSuggestInstructionsSpeakJSON(t *testing.T) {
 	}
 	if initDoc.Schema != "struktly/init-result/v1" || initDoc.Snapshot != ".struktly/project-context.md" {
 		t.Fatalf("init document = %+v", initDoc)
+	}
+	// The absolute root names the workstation that ran the command, so it must
+	// not reach a document whose other paths are repository-relative.
+	if initDoc.Root != "." {
+		t.Fatalf("init root = %q, want %q", initDoc.Root, ".")
 	}
 	if len(initDoc.Created) == 0 || initDoc.Created[0] != ".struktly/config.json" {
 		t.Fatalf("init created = %v, want config.json first", initDoc.Created)
@@ -591,6 +597,7 @@ func TestInitAndSuggestInstructionsSpeakJSON(t *testing.T) {
 	}
 	var suggestions struct {
 		Schema  string   `json:"schema"`
+		Root    string   `json:"root"`
 		Written []string `json:"written"`
 	}
 	if err := json.Unmarshal([]byte(stdout), &suggestions); err != nil {
@@ -598,6 +605,9 @@ func TestInitAndSuggestInstructionsSpeakJSON(t *testing.T) {
 	}
 	if suggestions.Schema != "struktly/instruction-suggestions/v1" || len(suggestions.Written) == 0 {
 		t.Fatalf("suggestions document = %+v, want written draft paths", suggestions)
+	}
+	if suggestions.Root != "." {
+		t.Fatalf("suggestions root = %q, want %q", suggestions.Root, ".")
 	}
 	for _, path := range suggestions.Written {
 		if _, err := os.Stat(filepath.Join(root, path)); err != nil {

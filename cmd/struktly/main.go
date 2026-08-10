@@ -595,7 +595,7 @@ func runInit(cmd *cobra.Command, repoRoot string, toJSON bool) error {
 
 	root := result.Root
 	if toJSON {
-		document := initDocument{Schema: initResultSchema, Root: root, Created: []string{}, Skipped: []string{}}
+		document := initDocument{Schema: initResultSchema, Root: portableRoot, Created: []string{}, Skipped: []string{}}
 		for _, path := range result.CreatedPaths {
 			document.Created = append(document.Created, relToRoot(root, path))
 		}
@@ -787,7 +787,7 @@ func runSuggestInstructions(cmd *cobra.Command, repoRoot string, toJSON bool) er
 
 	root := result.Root
 	if toJSON {
-		document := suggestionsDocument{Schema: instructionSuggestionsSchema, Root: root, Written: []string{}}
+		document := suggestionsDocument{Schema: instructionSuggestionsSchema, Root: portableRoot, Written: []string{}}
 		for _, path := range result.OutputPaths {
 			document.Written = append(document.Written, relToRoot(root, path))
 		}
@@ -802,6 +802,11 @@ func runSuggestInstructions(cmd *cobra.Command, repoRoot string, toJSON bool) er
 	}
 	return nil
 }
+
+// portableRoot is how a machine document names the root its paths are relative
+// to. The absolute root is workstation-specific, so it is never emitted; every
+// other repository document uses this same value.
+const portableRoot = "."
 
 func relToRoot(root, path string) string {
 	rel, err := filepath.Rel(root, path)
