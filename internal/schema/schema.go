@@ -249,7 +249,7 @@ func (v validator) checkString(path string, schema map[string]any, value any) er
 		}
 		matcher, err := regexp.Compile(expression)
 		if err != nil {
-			return at(path, fmt.Errorf("pattern %q does not compile: %v", expression, err))
+			return at(path, fmt.Errorf("pattern %q does not compile: %w", expression, err))
 		}
 		if !matcher.MatchString(text) {
 			return at(path, fmt.Errorf("%q does not match %q", text, expression))

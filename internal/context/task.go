@@ -549,7 +549,7 @@ func sentenceCase(value string) string {
 }
 
 func invalidTask(path string, err error) error {
-	return fmt.Errorf("%w: %s: %v", ErrInvalidTask, path, err)
+	return fmt.Errorf("%w: %s: %w", ErrInvalidTask, path, err)
 }
 
 func oneOf(value string, allowed ...string) bool {

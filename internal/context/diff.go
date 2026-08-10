@@ -93,7 +93,7 @@ func LoadPacket(path string) (Packet, error) {
 	}
 	var packet Packet
 	if err := json.Unmarshal(data, &packet); err != nil {
-		return Packet{}, fmt.Errorf("%w: %s: %v", ErrInvalidPacket, path, err)
+		return Packet{}, fmt.Errorf("%w: %s: %w", ErrInvalidPacket, path, err)
 	}
 	// One live version of each format, so a document naming another schema is
 	// rejected rather than guessed at. See docs/compatibility.md.

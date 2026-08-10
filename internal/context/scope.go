@@ -28,7 +28,7 @@ func cleanScope(root, requested string) (string, error) {
 	}
 	rel, err := cleanRequestedPath(root, requested)
 	if err != nil {
-		return "", fmt.Errorf("%w: %s", ErrInvalidScope, err)
+		return "", fmt.Errorf("%w: %w", ErrInvalidScope, err)
 	}
 	if rel == "." {
 		// Scoping to the repository root is the unscoped case, not an error.

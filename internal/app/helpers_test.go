@@ -3,7 +3,6 @@ package app
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -15,12 +14,5 @@ func writeFile(t *testing.T, root, rel, content string) {
 	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("write %s: %v", rel, err)
-	}
-}
-
-func assertContains(t *testing.T, content, want string) {
-	t.Helper()
-	if !strings.Contains(content, want) {
-		t.Fatalf("expected content to contain %q\n\n%s", want, content)
 	}
 }
