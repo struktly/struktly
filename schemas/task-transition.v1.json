@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "struktly/task-transition/v1",
+  "title": "Struktly task lifecycle transition",
+  "description": "Result of one task lifecycle transition. The transition field names which one, so future transitions can share this document instead of each minting a new schema.",
+  "type": "object",
+  "properties": {
+    "schema": { "const": "struktly/task-transition/v1" },
+    "root": { "type": "string" },
+    "transition": { "enum": ["complete"] },
+    "id": { "type": "string" },
+    "from": { "type": "string" },
+    "to": { "type": "string" },
+    "status": {
+      "enum": ["done"],
+      "description": "The status the transition wrote into the task's frontmatter."
+    },
+    "updated": { "type": "string", "format": "date" },
+    "rewritten": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/rewrite" }
+    }
+  },
+  "required": ["schema", "root", "transition", "id", "from", "to", "status", "updated", "rewritten"],
+  "additionalProperties": true,
+  "$defs": {
+    "rewrite": {
+      "type": "object",
+      "description": "A file whose references to the moved task were rewritten, ordered by path. links counts rewritten references: Markdown link targets plus repository-root path citations in Markdown and Go sources. The task file's own rewritten outbound links are reported under its pre-move path.",
+      "properties": {
+        "path": { "type": "string" },
+        "links": { "type": "integer", "minimum": 1 }
+      },
+      "required": ["path", "links"],
+      "additionalProperties": true
+    }
+  }
+}

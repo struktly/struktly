@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "struktly/task-archive/v1",
+  "title": "Struktly task archive sweep",
+  "description": "Result of filing finished tasks under .struktly/tasks/archive/ and repairing links. In check mode the same document reports what a mutating run would do, without writing any of it.",
+  "type": "object",
+  "properties": {
+    "schema": { "const": "struktly/task-archive/v1" },
+    "root": { "type": "string" },
+    "archived": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/move" }
+    },
+    "rewritten": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/rewrite" }
+    },
+    "clean": {
+      "type": "boolean",
+      "description": "True when no finished task sat outside archive/ when the command ran: the location invariant held."
+    }
+  },
+  "required": ["schema", "root", "archived", "rewritten", "clean"],
+  "additionalProperties": true,
+  "$defs": {
+    "move": {
+      "type": "object",
+      "properties": {
+        "from": { "type": "string" },
+        "to": { "type": "string" }
+      },
+      "required": ["from", "to"],
+      "additionalProperties": true
+    },
+    "rewrite": {
+      "type": "object",
+      "description": "A file whose references to a moved task were rewritten, ordered by path. links counts rewritten references: Markdown link targets plus repository-root path citations in Markdown and Go sources.",
+      "properties": {
+        "path": { "type": "string" },
+        "links": { "type": "integer", "minimum": 1 }
+      },
+      "required": ["path", "links"],
+      "additionalProperties": true
+    }
+  }
+}

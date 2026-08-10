@@ -19,13 +19,15 @@ import (
 // exited 1 as operation_failed.
 func TestInvalidFlagValuesUseTheInvocationExitCode(t *testing.T) {
 	for name, args := range map[string][]string{
-		"non-numeric int": {"context", "--max-items", "abc", "task"},
-		"non-boolean":     {"tasks", "--json=bogus"},
-		"unknown flag":    {"tasks", "--nope"},
-		"unknown command": {"nosuchcommand"},
-		"wrong arg count": {"explain"},
-		"exclusive flags": {"context", "--stdout", "--json", "task"},
-		"no-write alone":  {"context", "--no-write", "task"},
+		"non-numeric int":        {"context", "--max-items", "abc", "task"},
+		"non-boolean":            {"tasks", "--json=bogus"},
+		"unknown flag":           {"tasks", "--nope"},
+		"unknown command":        {"nosuchcommand"},
+		"wrong arg count":        {"explain"},
+		"stray archive argument": {"tasks", "archive", "stray-argument"},
+		"complete without an id": {"tasks", "complete"},
+		"exclusive flags":        {"context", "--stdout", "--json", "task"},
+		"no-write alone":         {"context", "--no-write", "task"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			code := runCLI(stdcontext.Background(), append(args, "--json-errors"), strings.NewReader(""), io.Discard, io.Discard)
@@ -269,6 +271,30 @@ func TestCommandDocumentsConformToTheirSchemas(t *testing.T) {
 			t.Fatalf("suggest-instructions --json exit %d", code)
 		}
 		assertDocumentConforms(t, "instruction-suggestions.v1.json", stdout.Bytes())
+	})
+
+	// The two lifecycle documents mutate the repository, so they run against
+	// throwaway fixtures rather than this checkout.
+	t.Run("tasks archive", func(t *testing.T) {
+		root := t.TempDir()
+		writeTestFile(t, filepath.Join(root, ".struktly", "tasks", "add-timeout.md"), finishedTaskDocument("add-timeout", "Add timeout"))
+		var stdout bytes.Buffer
+		if code := runCLI(stdcontext.Background(), []string{"tasks", "archive", "--root", root, "--json"},
+			strings.NewReader(""), &stdout, io.Discard); code != 0 {
+			t.Fatalf("tasks archive --json exit %d", code)
+		}
+		assertDocumentConforms(t, "task-archive.v1.json", stdout.Bytes())
+	})
+
+	t.Run("tasks complete", func(t *testing.T) {
+		root := t.TempDir()
+		writeTestFile(t, filepath.Join(root, ".struktly", "tasks", "add-timeout.md"), taskDocument("add-timeout", "Add timeout"))
+		var stdout bytes.Buffer
+		if code := runCLI(stdcontext.Background(), []string{"tasks", "complete", "add-timeout", "--root", root, "--json"},
+			strings.NewReader(""), &stdout, io.Discard); code != 0 {
+			t.Fatalf("tasks complete --json exit %d", code)
+		}
+		assertDocumentConforms(t, "task-transition.v1.json", stdout.Bytes())
 	})
 
 	t.Run("error", func(t *testing.T) {
