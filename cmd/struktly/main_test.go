@@ -138,6 +138,15 @@ func TestCapabilitiesCommandReportsContextContract(t *testing.T) {
 	if !slices.Contains(document.Schemas, "struktly/init-result/v1") || !slices.Contains(document.Schemas, "struktly/instruction-suggestions/v1") {
 		t.Fatalf("capabilities do not advertise init/instruction-suggestions schemas: %+v", document)
 	}
+	for _, command := range []string{"tasks archive", "tasks complete"} {
+		if !slices.Contains(document.Commands, command) {
+			t.Fatalf("capabilities do not advertise %q: %+v", command, document)
+		}
+	}
+	if !slices.Contains(document.Schemas, repoctx.TaskArchiveSchema) || !slices.Contains(document.Schemas, repoctx.TaskTransitionSchema) ||
+		!slices.Contains(document.Features, "tasks.archive") || !slices.Contains(document.Features, "tasks.complete") {
+		t.Fatalf("capabilities do not advertise the task lifecycle contract: %+v", document)
+	}
 	if slices.Contains(document.Schemas, "struktly/packet/v1") {
 		t.Fatalf("capabilities advertise historical packet generation: %+v", document)
 	}
@@ -283,6 +292,139 @@ func TestTasksCommandUnreadableRootUsesStructuredError(t *testing.T) {
 	}
 	if document.Error.Code != "operation_failed" || !strings.Contains(document.Error.Message, "stat root") {
 		t.Fatalf("unexpected error document: %#v", document)
+	}
+}
+
+func finishedTaskDocument(id, title string) string {
+	return strings.Replace(taskDocument(id, title), "status: ready", "status: done", 1)
+}
+
+func TestTasksArchiveFilesMisfiledTasksAndSpeaksJSON(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, filepath.Join(root, ".struktly", "tasks", "add-timeout.md"), finishedTaskDocument("add-timeout", "Add timeout"))
+	writeTestFile(t, filepath.Join(root, ".struktly", "tasks", "follow-up.md"),
+		taskDocument("follow-up", "Follow up")+"\nSee [prior](add-timeout.md).\n")
+
+	stdout, stderr, err := executeTestCommand("tasks", "archive", "--root", root, "--json")
+	if err != nil {
+		t.Fatalf("tasks archive returned error: %v\nstderr:\n%s", err, stderr)
+	}
+	if strings.TrimSpace(stderr) != "" {
+		t.Fatalf("tasks archive wrote diagnostics on success: %s", stderr)
+	}
+	var document repoctx.TaskArchiveDocument
+	if err := json.Unmarshal([]byte(stdout), &document); err != nil {
+		t.Fatalf("tasks archive output is not JSON: %v\n%s", err, stdout)
+	}
+	if document.Schema != repoctx.TaskArchiveSchema || document.Clean {
+		t.Fatalf("unexpected task-archive document: %+v", document)
+	}
+	if len(document.Archived) != 1 || document.Archived[0].From != ".struktly/tasks/add-timeout.md" ||
+		document.Archived[0].To != ".struktly/tasks/archive/add-timeout.md" {
+		t.Fatalf("unexpected archived moves: %+v", document.Archived)
+	}
+	if len(document.Rewritten) != 1 || document.Rewritten[0].Path != ".struktly/tasks/follow-up.md" || document.Rewritten[0].Links != 1 {
+		t.Fatalf("unexpected rewritten files: %+v", document.Rewritten)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".struktly", "tasks", "archive", "add-timeout.md")); err != nil {
+		t.Fatalf("archived file missing: %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(root, ".struktly", "tasks", "follow-up.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "](archive/add-timeout.md)") {
+		t.Fatalf("inbound link was not repaired:\n%s", data)
+	}
+
+	// A clean tree reports itself in prose too.
+	stdout, _, err = executeTestCommand("tasks", "archive", "--root", root)
+	if err != nil {
+		t.Fatalf("clean archive returned error: %v", err)
+	}
+	if !strings.Contains(stdout, "nothing to archive") {
+		t.Fatalf("expected clean confirmation, got:\n%s", stdout)
+	}
+}
+
+func TestTasksArchiveCheckGatesWithoutMoving(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, filepath.Join(root, ".struktly", "tasks", "add-timeout.md"), finishedTaskDocument("add-timeout", "Add timeout"))
+
+	stdout, stderr, exitCode := executeCLICommand("tasks", "archive", "--check", "--json", "--root", root)
+	if exitCode != 1 {
+		t.Fatalf("check on a misfiled tree: exit = %d, want 1\nstderr=%s", exitCode, stderr)
+	}
+	var document repoctx.TaskArchiveDocument
+	if err := json.Unmarshal([]byte(stdout), &document); err != nil {
+		t.Fatalf("check stdout is not the task-archive document: %v\n%s", err, stdout)
+	}
+	if document.Clean || len(document.Archived) != 1 || document.Archived[0].From != ".struktly/tasks/add-timeout.md" {
+		t.Fatalf("check did not name the misfiled task: %+v", document)
+	}
+	var failure errorDocument
+	if err := json.Unmarshal([]byte(stderr), &failure); err != nil {
+		t.Fatalf("check stderr is not a structured error: %v\n%s", err, stderr)
+	}
+	if failure.Error.Code != "tasks_unarchived" {
+		t.Fatalf("error code = %q, want tasks_unarchived", failure.Error.Code)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".struktly", "tasks", "add-timeout.md")); err != nil {
+		t.Fatalf("check mode moved the file: %v", err)
+	}
+
+	if _, _, err := executeTestCommand("tasks", "archive", "--root", root); err != nil {
+		t.Fatalf("archive returned error: %v", err)
+	}
+	if _, _, exitCode := executeCLICommand("tasks", "archive", "--check", "--root", root); exitCode != 0 {
+		t.Fatalf("check on a conforming tree: exit = %d, want 0", exitCode)
+	}
+}
+
+func TestTasksCompleteTransitionsAtomicallyAndSpeaksJSON(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, filepath.Join(root, ".struktly", "tasks", "add-timeout.md"), taskDocument("add-timeout", "Add timeout"))
+	writeTestFile(t, filepath.Join(root, ".struktly", "tasks", "follow-up.md"),
+		taskDocument("follow-up", "Follow up")+"\nSee [prior](add-timeout.md).\n")
+
+	stdout, stderr, err := executeTestCommand("tasks", "complete", "add-timeout", "--root", root, "--json")
+	if err != nil {
+		t.Fatalf("tasks complete returned error: %v\nstderr:\n%s", err, stderr)
+	}
+	var document repoctx.TaskTransitionDocument
+	if err := json.Unmarshal([]byte(stdout), &document); err != nil {
+		t.Fatalf("tasks complete output is not JSON: %v\n%s", err, stdout)
+	}
+	if document.Schema != repoctx.TaskTransitionSchema || document.Transition != "complete" ||
+		document.ID != "add-timeout" || document.Status != "done" || document.Updated == "" ||
+		document.To != ".struktly/tasks/archive/add-timeout.md" {
+		t.Fatalf("unexpected task-transition document: %+v", document)
+	}
+	archived, err := os.ReadFile(filepath.Join(root, ".struktly", "tasks", "archive", "add-timeout.md"))
+	if err != nil {
+		t.Fatalf("archived file missing: %v", err)
+	}
+	if !strings.Contains(string(archived), "status: done") || !strings.Contains(string(archived), "updated: "+document.Updated) {
+		t.Fatalf("frontmatter was not transitioned:\n%s", archived)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".struktly", "tasks", "add-timeout.md")); !os.IsNotExist(err) {
+		t.Fatal("the live file survived the transition")
+	}
+
+	// The id is now filed under archive/; completing it again is refused with
+	// its own code, as is an id nothing declares.
+	for id, wantCode := range map[string]string{"add-timeout": "task_already_archived", "missing": "task_not_found"} {
+		_, stderr, exitCode := executeCLICommand("tasks", "complete", id, "--root", root, "--json-errors")
+		if exitCode != 1 {
+			t.Fatalf("complete %q: exit = %d, want 1", id, exitCode)
+		}
+		var failure errorDocument
+		if err := json.Unmarshal([]byte(stderr), &failure); err != nil {
+			t.Fatalf("complete %q stderr is not a structured error: %v\n%s", id, err, stderr)
+		}
+		if failure.Error.Code != wantCode {
+			t.Fatalf("complete %q: error code = %q, want %q", id, failure.Error.Code, wantCode)
+		}
 	}
 }
 

@@ -73,6 +73,34 @@ Unknown fields are preserved under `extensions` rather than rejected, as OKF
 v0.2 §4.1 requires; a repository can annotate its own tasks with keys this
 parser does not define.
 
+## Lifecycle and location
+
+Frontmatter `status` is the single source of truth for a task's lifecycle.
+Location is an enforced invariant derived from it, and part of this contract
+rather than one repository's convention:
+
+- The live `.struktly/tasks/` directory MUST NOT contain a task whose status is
+  `done` or `canceled`.
+- Finished tasks live under `.struktly/tasks/archive/`.
+- When frontmatter and location disagree, frontmatter wins: a `done` or
+  `canceled` file sitting in the live directory is **misfiled** — still
+  finished, never ambiguous, and detectable.
+
+The reserved names `index.md` and `log.md` (OKF v0.2 §8 and §9) are not tasks
+and are never moved by archiving. Task discovery lists the live directory;
+archived tasks keep their frontmatter and remain readable, but they are records
+of finished work rather than work.
+
+The CLI owns the lifecycle operations, so the invariant holds with or without
+any other Struktly component. `struktly tasks complete <id>` performs the done
+transition atomically: it sets `status: done` and today's `updated` date, files
+the task under `archive/`, and repairs Markdown links in both directions in one
+invocation, ordered so that a failure leaves the original live file intact.
+`struktly tasks archive` files already-finished tasks that are misfiled — the
+migration and cleanup case — and `struktly tasks archive --check` is the
+conformance gate for this section: it exits `1` with the `tasks_unarchived`
+error code while the live directory violates the invariant.
+
 ## Body contract
 
 A task body needs two sections, in any order, with any other prose around them:

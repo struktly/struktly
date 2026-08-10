@@ -29,6 +29,8 @@ Machine modes write one JSON document to stdout:
 | `suggest-instructions --json` | `struktly/instruction-suggestions/v1` |
 | `context --json <request>` | `struktly/packet/v2` |
 | `tasks --json` | `struktly/tasks/v1` |
+| `tasks archive --json` | `struktly/task-archive/v1` |
+| `tasks complete <id> --json` | `struktly/task-transition/v1` |
 | `status --json` | `struktly/status/v1` |
 | `explain --json <path>` | `struktly/explanation/v1` |
 | `validate --json` | `struktly/validation/v1` |
@@ -49,7 +51,8 @@ Other default modes write plain text for developers.
 Programs should inspect `capabilities --json` before depending on additive CLI
 features. The current stable feature identifiers are
 `context.cancellation`, `context.expect_base_revision`, `context.limits`,
-`context.no_write`, `scan.no_write`, `structured_errors`, and `tasks.partial_results`.
+`context.no_write`, `scan.no_write`, `structured_errors`, `tasks.archive`,
+`tasks.complete`, and `tasks.partial_results`.
 
 For side-effect-free packet generation, invoke:
 
@@ -144,8 +147,9 @@ document on stderr for a failed invocation:
 
 Stable error codes currently include `not_git_repository`, `repository_changed`,
 `invalid_config`, `invalid_task`, `invalid_packet`, `invalid_invocation`,
-`diagnostic_failed`, `canceled`, and `operation_failed`. Messages are for people;
-automation must branch on `error.code` and the process exit code.
+`diagnostic_failed`, `tasks_unarchived`, `task_not_found`,
+`task_already_archived`, `canceled`, and `operation_failed`. Messages are for
+people; automation must branch on `error.code` and the process exit code.
 
 | Exit | Meaning |
 |---:|---|
@@ -305,6 +309,34 @@ and resume command. Provider session contents and execution logs remain runtime 
 canonical path order under `tasks`; malformed files appear under `invalid` and
 do not hide valid siblings. Each task includes the exact file SHA-256 and a
 body-derived contract. A missing body contract is represented by empty fields.
+
+Task lifecycle transitions are CLI operations, and none of them requires a Git
+repository. [task-format.md](task-format.md) states the location invariant they
+enforce: the live `.struktly/tasks/` directory carries no `done` or `canceled`
+task, finished tasks live under `archive/`, and frontmatter wins when the two
+disagree.
+
+`tasks complete <id>` resolves `<id>` against the frontmatter `id` of live
+tasks, sets `status: done` and today's `updated` date, files the task under
+`archive/`, and repairs Markdown links in both directions — links out of the
+moved task and links into it, plus repository-root path citations in Markdown
+and Go sources. The ordering is part of the contract: inbound repairs are
+written first, then the completed content lands at the archive path, and the
+live file is removed only after that write succeeds, so a failure at any step
+leaves the original live file intact and rerunning the command converges. An
+unknown id fails with `task_not_found`; an id already filed under `archive/`,
+or whose archive slot is occupied, fails with `task_already_archived`. `--json`
+emits `struktly/task-transition/v1`; the `transition` field names the
+operation so future transitions can share the schema.
+
+`tasks archive` files every already-finished task that is misfiled in the live
+directory, with the same link repair — the migration and cleanup case.
+`tasks archive --check` is the conformance gate: it writes its report and then
+exits 1 with `tasks_unarchived` while the invariant is violated, so CI can
+branch on it. `--json` emits `struktly/task-archive/v1` in both modes; combined
+with `--check` the document reports what a mutating run would do, without
+writing any of it. Reserved OKF names (`index.md`, `log.md`) are never treated
+as tasks or moved.
 
 Chats, executions, sessions, approvals, evidence, memory, checks, and review
 history are Platform state and are never created or read by this CLI.

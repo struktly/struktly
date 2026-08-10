@@ -81,6 +81,8 @@ its permissions and execution behavior.
 | `context <request>` | Build a request-specific packet from live repository state. Use `--scope <dir>` to narrow it to one package or service, and `--seed <path>` to name files you already know matter. |
 | `scan` | Write a general repository summary. It is optional and not a prerequisite for `context`. |
 | `tasks` | Emit safely readable repository task declarations and per-file invalid results. |
+| `tasks complete <id>` | Set a task's status to `done`, file it under `tasks/archive/`, and repair links, in one atomic transition. |
+| `tasks archive` | File already-finished tasks under `tasks/archive/`; `--check` gates CI on the location invariant. |
 | `status` | Report repository, configuration, and portable-file state. |
 | `explain <path>` | Diagnose why one path would be included or excluded. |
 | `diff <before> <after>` | Report what changed between two context packets. |
@@ -113,7 +115,8 @@ Repository-owned files live under `.struktly/`:
   guidance written by people.
 - `project-context.md`, `context-packets/` and `agent-instructions/` are
   generated output, and are Git-ignored by default.
-- `tasks/` contains optional portable task handoffs.
+- `tasks/` contains optional portable task handoffs; finished ones live under
+  `tasks/archive/`.
 
 Runtime and product state is deliberately absent from this CLI.
 

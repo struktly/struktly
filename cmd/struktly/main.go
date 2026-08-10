@@ -76,6 +76,11 @@ var errInvalidInvocation = errors.New("invalid invocation")
 // The report has already been written; this only carries the exit code.
 var errDoctorFailed = errors.New("doctor reported a failing check")
 
+// errTasksUnarchived reports that `tasks archive --check` found finished tasks
+// misfiled outside archive/. The listing has already been written; this only
+// carries the exit code.
+var errTasksUnarchived = errors.New("finished tasks remain outside " + repoctx.TaskArchiveDir + "/")
+
 func invalidInvocation(err error) error {
 	if err == nil {
 		return nil
@@ -118,6 +123,15 @@ func classifyError(err error) (int, string) {
 	}
 	if errors.Is(err, errDoctorFailed) {
 		return 1, "diagnostic_failed"
+	}
+	if errors.Is(err, errTasksUnarchived) {
+		return 1, "tasks_unarchived"
+	}
+	if errors.Is(err, repoctx.ErrTaskNotFound) {
+		return 1, "task_not_found"
+	}
+	if errors.Is(err, repoctx.ErrTaskAlreadyArchived) {
+		return 1, "task_already_archived"
 	}
 	// Cobra reports an unknown subcommand from Find, before any hook this
 	// program can install, so this one classification still reads the message.
@@ -206,7 +220,8 @@ func currentCapabilities() capabilitiesDocument {
 		Build:  buildinfo.Current(),
 		Commands: []string{
 			"capabilities", "context", "diff", "doctor", "explain", "init", "mcp",
-			"scan", "status", "suggest-instructions", "tasks", "validate", "version",
+			"scan", "status", "suggest-instructions", "tasks", "tasks archive",
+			"tasks complete", "validate", "version",
 		},
 		Schemas: []string{
 			capabilitiesSchema,
@@ -222,6 +237,8 @@ func currentCapabilities() capabilitiesDocument {
 			repoctx.PacketSchema,
 			repoctx.PacketDiffSchema,
 			repoctx.SnapshotSchema,
+			repoctx.TaskArchiveSchema,
+			repoctx.TaskTransitionSchema,
 			repoctx.TasksSchema,
 			"struktly/status/v1",
 			"struktly/validation/v1",
@@ -240,6 +257,8 @@ func currentCapabilities() capabilitiesDocument {
 			"context.no_write",
 			"scan.no_write",
 			"structured_errors",
+			"tasks.archive",
+			"tasks.complete",
 			"tasks.partial_results",
 		},
 	}
@@ -270,6 +289,111 @@ func newTasksCmd(repoRoot *string) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&toJSON, "json", false, "Print the versioned tasks document")
+	cmd.AddCommand(newTasksArchiveCmd(repoRoot))
+	cmd.AddCommand(newTasksCompleteCmd(repoRoot))
+	return cmd
+}
+
+// newTasksArchiveCmd enforces the location invariant the task format states:
+// the live tasks directory carries no done or canceled task. Frontmatter is
+// the source of truth, so a finished task sitting live is misfiled, and this
+// sweep files it — the migration and cleanup case; `tasks complete` is the
+// transition that keeps the invariant from being violated in the first place.
+func newTasksArchiveCmd(repoRoot *string) *cobra.Command {
+	var toJSON bool
+	var check bool
+	cmd := &cobra.Command{
+		Use:   "archive",
+		Short: "File finished tasks under " + repoctx.TaskArchiveDir + "/ and repair links",
+		Args:  invalidInvocationArgs(cobra.NoArgs),
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			document, err := repoctx.ArchiveTasks(repoctx.ArchiveTasksOptions{Root: *repoRoot, Check: check})
+			if err != nil {
+				return err
+			}
+			if toJSON {
+				if err := writeJSON(cmd.OutOrStdout(), document); err != nil {
+					return err
+				}
+			} else if err := writeTaskArchive(cmd.OutOrStdout(), document, check); err != nil {
+				return err
+			}
+			// The report is the payload, so it is always written; the exit
+			// code then tells a gate branching on --check whether the live
+			// directory violates the invariant.
+			if check && !document.Clean {
+				return errTasksUnarchived
+			}
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&toJSON, "json", false, "Print the versioned task-archive document")
+	cmd.Flags().BoolVar(&check, "check", false, "Report misfiled finished tasks without moving them")
+	return cmd
+}
+
+func writeTaskArchive(w io.Writer, document repoctx.TaskArchiveDocument, check bool) error {
+	if document.Clean {
+		_, err := fmt.Fprintf(w, "nothing to archive (no finished tasks outside %s/)\n", repoctx.TaskArchiveDir)
+		return err
+	}
+	if check {
+		_, err := fmt.Fprintf(w, "%d finished task(s) misfiled outside %s/:\n", len(document.Archived), repoctx.TaskArchiveDir)
+		if err != nil {
+			return err
+		}
+		for _, move := range document.Archived {
+			_, err := fmt.Fprintf(w, "  %s -> %s\n", move.From, move.To)
+			if err != nil {
+				return err
+			}
+		}
+		_, err = fmt.Fprintln(w, "run: struktly tasks archive")
+		return err
+	}
+	for _, move := range document.Archived {
+		_, err := fmt.Fprintf(w, "archived %s -> %s\n", move.From, move.To)
+		if err != nil {
+			return err
+		}
+	}
+	for _, rewrite := range document.Rewritten {
+		_, err := fmt.Fprintf(w, "rewrote %d link(s) in %s\n", rewrite.Links, rewrite.Path)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// newTasksCompleteCmd is the atomic done transition: frontmatter status and
+// updated date, the move to archive/, and link repair land in one invocation,
+// ordered so a failure leaves the original live file intact.
+func newTasksCompleteCmd(repoRoot *string) *cobra.Command {
+	var toJSON bool
+	cmd := &cobra.Command{
+		Use:   "complete <id>",
+		Short: "Set a task's status to done and file it under " + repoctx.TaskArchiveDir + "/",
+		Args:  invalidInvocationArgs(cobra.ExactArgs(1)),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			document, err := repoctx.CompleteTask(repoctx.CompleteTaskOptions{Root: *repoRoot, ID: args[0]})
+			if err != nil {
+				return err
+			}
+			if toJSON {
+				return writeJSON(cmd.OutOrStdout(), document)
+			}
+			_, writeErr := fmt.Fprintf(cmd.OutOrStdout(), "completed %s: %s -> %s\n", document.ID, document.From, document.To)
+			if writeErr != nil {
+				return writeErr
+			}
+			for _, rewrite := range document.Rewritten {
+				_, writeErr = fmt.Fprintf(cmd.OutOrStdout(), "rewrote %d link(s) in %s\n", rewrite.Links, rewrite.Path)
+			}
+			return writeErr
+		},
+	}
+	cmd.Flags().BoolVar(&toJSON, "json", false, "Print the versioned task-transition document")
 	return cmd
 }
 

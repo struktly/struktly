@@ -16,7 +16,7 @@ frontmatter and required body sections are defined in
 
 JSON Schema definitions live in [`schemas/`](../schemas/). Current schemas are
 `struktly/packet/v2`, `struktly/tasks/v1`, and
-`struktly/{snapshot,config,error,status,validation,doctor,explanation,capabilities,version,init-result,instruction-suggestions}/v1`.
+`struktly/{snapshot,config,error,status,validation,doctor,explanation,capabilities,version,init-result,instruction-suggestions,task-archive,task-transition}/v1`.
 
 Two identifiers are Markdown-only and have no JSON Schema file, because the
 documents they name are presentation rather than a machine surface:
@@ -84,7 +84,8 @@ export artifacts:
   direction.md            # user-owned
   constraints.md          # user-owned
   decisions.md            # user-owned
-  tasks/                  # portable task handoffs (struktly/task/v1)
+  tasks/                  # live portable task handoffs (struktly/task/v1)
+  tasks/archive/          # finished (done or canceled) task handoffs
 ```
 
 Generated scans and packets are ignored by this repository's default Git rules;
