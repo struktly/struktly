@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "struktly/init-result/v1",
+  "title": "Struktly init result",
+  "description": "Machine-readable result of repository initialization.",
+  "type": "object",
+  "properties": {
+    "schema": { "const": "struktly/init-result/v1" },
+    "root": { "type": "string" },
+    "created": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "skipped": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "snapshot": { "type": "string" }
+  },
+  "required": ["schema", "root", "created", "skipped", "snapshot"],
+  "additionalProperties": true
+}

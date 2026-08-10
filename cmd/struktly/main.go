@@ -211,7 +211,7 @@ func currentCapabilities() capabilitiesDocument {
 		Schemas: []string{
 			capabilitiesSchema,
 			// Markdown-only presentation identifiers, carried in OKF
-			// frontmatter rather than as JSON Schema files.
+			// frontmatter instead of JSON Schema files.
 			"struktly/agent-instructions/v1",
 			"struktly/project-context/v1",
 			"struktly/doctor/v1",

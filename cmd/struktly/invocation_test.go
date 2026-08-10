@@ -239,6 +239,36 @@ func TestCommandDocumentsConformToTheirSchemas(t *testing.T) {
 		})
 	}
 
+	t.Run("init", func(t *testing.T) {
+		root := t.TempDir()
+		writeTestFile(t, filepath.Join(root, "README.md"), "# Repo\n")
+		initTestGitRepo(t, root)
+
+		var stdout bytes.Buffer
+		if code := runCLI(stdcontext.Background(), []string{"init", "--root", root, "--json"},
+			strings.NewReader(""), &stdout, io.Discard); code != 0 {
+			t.Fatalf("init --json exit %d", code)
+		}
+		assertDocumentConforms(t, "init-result.v1.json", stdout.Bytes())
+	})
+
+	t.Run("suggest-instructions", func(t *testing.T) {
+		root := t.TempDir()
+		writeTestFile(t, filepath.Join(root, "README.md"), "# Repo\n")
+		initTestGitRepo(t, root)
+		if code := runCLI(stdcontext.Background(), []string{"init", "--root", root, "--json"},
+			strings.NewReader(""), io.Discard, io.Discard); code != 0 {
+			t.Fatalf("init --json exit %d", code)
+		}
+
+		var stdout bytes.Buffer
+		if code := runCLI(stdcontext.Background(), []string{"suggest-instructions", "--root", root, "--json"},
+			strings.NewReader(""), &stdout, io.Discard); code != 0 {
+			t.Fatalf("suggest-instructions --json exit %d", code)
+		}
+		assertDocumentConforms(t, "instruction-suggestions.v1.json", stdout.Bytes())
+	})
+
 	t.Run("error", func(t *testing.T) {
 		var stderr bytes.Buffer
 		runCLI(stdcontext.Background(), []string{"context", "--json-errors", "--root", t.TempDir(), "x"},

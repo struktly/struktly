@@ -16,7 +16,7 @@ frontmatter and required body sections are defined in
 
 JSON Schema definitions live in [`schemas/`](../schemas/). Current schemas are
 `struktly/packet/v2`, `struktly/tasks/v1`, and
-`struktly/{snapshot,config,error,status,validation,doctor,explanation,capabilities,version}/v1`.
+`struktly/{snapshot,config,error,status,validation,doctor,explanation,capabilities,version,init-result,instruction-suggestions}/v1`.
 
 Two identifiers are Markdown-only and have no JSON Schema file, because the
 documents they name are presentation rather than a machine surface:

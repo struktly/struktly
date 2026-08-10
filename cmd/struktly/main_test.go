@@ -135,6 +135,9 @@ func TestCapabilitiesCommandReportsContextContract(t *testing.T) {
 	if !slices.Contains(document.Commands, "tasks") || !slices.Contains(document.Schemas, repoctx.TasksSchema) || !slices.Contains(document.Features, "tasks.partial_results") {
 		t.Fatalf("capabilities do not advertise tasks contract: %+v", document)
 	}
+	if !slices.Contains(document.Schemas, "struktly/init-result/v1") || !slices.Contains(document.Schemas, "struktly/instruction-suggestions/v1") {
+		t.Fatalf("capabilities do not advertise init/instruction-suggestions schemas: %+v", document)
+	}
 	if slices.Contains(document.Schemas, "struktly/packet/v1") {
 		t.Fatalf("capabilities advertise historical packet generation: %+v", document)
 	}
