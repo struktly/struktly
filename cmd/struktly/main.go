@@ -80,7 +80,7 @@ func invalidInvocation(err error) error {
 	if err == nil {
 		return nil
 	}
-	return fmt.Errorf("%w: %v", errInvalidInvocation, err)
+	return fmt.Errorf("%w: %w", errInvalidInvocation, err)
 }
 
 // invalidInvocationArgs wraps a cobra positional-argument validator so an
@@ -259,17 +259,14 @@ func newTasksCmd(repoRoot *string) *cobra.Command {
 			if toJSON {
 				return writeJSON(cmd.OutOrStdout(), document)
 			}
+			out := newProse(cmd.OutOrStdout())
 			for _, task := range document.Tasks {
-				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "%s\t%s\t%s\n", task.Status, task.Path, task.Title); err != nil {
-					return err
-				}
+				out.printf("%s\t%s\t%s\n", task.Status, task.Path, task.Title)
 			}
 			for _, invalid := range document.Invalid {
-				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "invalid\t%s\t%s\n", invalid.Path, invalid.Reason); err != nil {
-					return err
-				}
+				out.printf("invalid\t%s\t%s\n", invalid.Path, invalid.Reason)
 			}
-			return nil
+			return out.err
 		},
 	}
 	cmd.Flags().BoolVar(&toJSON, "json", false, "Print the versioned tasks document")
@@ -287,11 +284,12 @@ func newCapabilitiesCmd() *cobra.Command {
 			if toJSON {
 				return writeJSON(cmd.OutOrStdout(), capabilities)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "struktly %s\n", capabilities.Build.Version)
+			out := newProse(cmd.OutOrStdout())
+			out.printf("struktly %s\n", capabilities.Build.Version)
 			for _, feature := range capabilities.Features {
-				fmt.Fprintln(cmd.OutOrStdout(), feature)
+				out.printf("%s\n", feature)
 			}
-			return nil
+			return out.err
 		},
 	}
 	cmd.Flags().BoolVar(&toJSON, "json", false, "Print the versioned capabilities document")
@@ -309,19 +307,15 @@ func newVersionCmd() *cobra.Command {
 			if toJSON {
 				return writeJSON(cmd.OutOrStdout(), versionDocument{Schema: versionSchema, Info: info})
 			}
-			_, err := fmt.Fprintf(cmd.OutOrStdout(), "struktly %s\n", info.Version)
-			if err != nil {
-				return err
-			}
+			out := newProse(cmd.OutOrStdout())
+			out.printf("struktly %s\n", info.Version)
 			if info.Revision != "" {
-				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "revision: %s\n", info.Revision); err != nil {
-					return err
-				}
+				out.printf("revision: %s\n", info.Revision)
 			}
 			if info.Date != "" {
-				_, err = fmt.Fprintf(cmd.OutOrStdout(), "built: %s\n", info.Date)
+				out.printf("built: %s\n", info.Date)
 			}
-			return err
+			return out.err
 		},
 	}
 	cmd.Flags().BoolVar(&toJSON, "json", false, "Print build metadata as JSON")
@@ -342,14 +336,15 @@ func newStatusCmd(repoRoot *string) *cobra.Command {
 			if toJSON {
 				return writeJSON(cmd.OutOrStdout(), report)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "repository: %s (%s)\n", report.Repository.Name, report.Repository.HeadRevision)
-			fmt.Fprintf(cmd.OutOrStdout(), "branch: %s\n", emptyValue(report.Repository.Branch, "detached HEAD"))
-			fmt.Fprintf(cmd.OutOrStdout(), "config: %s\n", declaredValue(report.ConfigDeclared))
+			out := newProse(cmd.OutOrStdout())
+			out.printf("repository: %s (%s)\n", report.Repository.Name, report.Repository.HeadRevision)
+			out.printf("branch: %s\n", emptyValue(report.Repository.Branch, "detached HEAD"))
+			out.printf("config: %s\n", declaredValue(report.ConfigDeclared))
 			for _, file := range report.PortableFiles {
-				fmt.Fprintf(cmd.OutOrStdout(), "%s: %s\n", file.Path, file.Status)
+				out.printf("%s: %s\n", file.Path, file.Status)
 			}
-			_, err = fmt.Fprintf(cmd.OutOrStdout(), "%s: %s\n", report.LatestSnapshot.Path, report.LatestSnapshot.Status)
-			return err
+			out.printf("%s: %s\n", report.LatestSnapshot.Path, report.LatestSnapshot.Status)
+			return out.err
 		},
 	}
 	cmd.Flags().BoolVar(&toJSON, "json", false, "Print structured status to stdout")
@@ -412,11 +407,12 @@ func newDiffCmd() *cobra.Command {
 }
 
 func writePacketDiff(w io.Writer, diff repoctx.PacketDiff) error {
+	out := newProse(w)
 	if diff.Identical {
-		_, err := fmt.Fprintf(w, "identical packets (%s)\n", diff.PacketHash.Before)
-		return err
+		out.printf("identical packets (%s)\n", diff.PacketHash.Before)
+		return out.err
 	}
-	fmt.Fprintf(w, "packet hash: %s -> %s\n", diff.PacketHash.Before, diff.PacketHash.After)
+	out.printf("packet hash: %s -> %s\n", diff.PacketHash.Before, diff.PacketHash.After)
 	for _, group := range []struct {
 		label   string
 		changes []repoctx.FieldChange
@@ -425,23 +421,23 @@ func writePacketDiff(w io.Writer, diff repoctx.PacketDiff) error {
 		{label: "limits", changes: diff.Limits},
 	} {
 		for _, change := range group.changes {
-			fmt.Fprintf(w, "%s %s: %s -> %s\n", group.label, change.Field,
+			out.printf("%s %s: %s -> %s\n", group.label, change.Field,
 				emptyValue(change.Before, "(none)"), emptyValue(change.After, "(none)"))
 		}
 	}
 
-	fmt.Fprintf(w, "\nitems: %d unchanged, %d added, %d removed, %d changed\n",
+	out.printf("\nitems: %d unchanged, %d added, %d removed, %d changed\n",
 		diff.Items.Unchanged, len(diff.Items.Added), len(diff.Items.Removed), len(diff.Items.Changed))
 	for _, item := range diff.Items.Added {
-		fmt.Fprintf(w, "  + %s\t%s%s\t%d bytes\n", item.Path, item.Reason, renderingSuffix(item.Rendering), item.IncludedBytes)
+		out.printf("  + %s\t%s%s\t%d bytes\n", item.Path, item.Reason, renderingSuffix(item.Rendering), item.IncludedBytes)
 	}
 	for _, item := range diff.Items.Removed {
-		fmt.Fprintf(w, "  - %s\t%s\n", item.Path, item.Reason)
+		out.printf("  - %s\t%s\n", item.Path, item.Reason)
 	}
 	for _, item := range diff.Items.Changed {
-		fmt.Fprintf(w, "  ~ %s\n", item.Path)
+		out.printf("  ~ %s\n", item.Path)
 		for _, change := range item.Changes {
-			fmt.Fprintf(w, "      %s: %s -> %s\n", change.Field,
+			out.printf("      %s: %s -> %s\n", change.Field,
 				emptyValue(change.Before, "(none)"), emptyValue(change.After, "(none)"))
 		}
 	}
@@ -454,10 +450,10 @@ func writePacketDiff(w io.Writer, diff repoctx.PacketDiff) error {
 		{label: "suggested checks", set: diff.SuggestedChecks},
 	} {
 		for _, value := range group.set.Added {
-			fmt.Fprintf(w, "%s + %s\n", group.label, value)
+			out.printf("%s + %s\n", group.label, value)
 		}
 		for _, value := range group.set.Removed {
-			fmt.Fprintf(w, "%s - %s\n", group.label, value)
+			out.printf("%s - %s\n", group.label, value)
 		}
 	}
 
@@ -469,13 +465,13 @@ func writePacketDiff(w io.Writer, diff repoctx.PacketDiff) error {
 		{label: "truncation", set: diff.Truncations},
 	} {
 		for _, decision := range group.set.Added {
-			fmt.Fprintf(w, "%s + %s\t%s\n", group.label, decision.Path, decision.Reason)
+			out.printf("%s + %s\t%s\n", group.label, decision.Path, decision.Reason)
 		}
 		for _, decision := range group.set.Removed {
-			fmt.Fprintf(w, "%s - %s\t%s\n", group.label, decision.Path, decision.Reason)
+			out.printf("%s - %s\t%s\n", group.label, decision.Path, decision.Reason)
 		}
 	}
-	return nil
+	return out.err
 }
 
 func renderingSuffix(rendering string) string {
@@ -523,14 +519,16 @@ func newDoctorCmd(repoRoot *string) *cobra.Command {
 					return err
 				}
 			} else {
+				out := newProse(cmd.OutOrStdout())
 				for _, check := range report.Checks {
-					if _, err := fmt.Fprintf(cmd.OutOrStdout(), "[%s] %s", check.Status, check.Name); err != nil {
-						return err
-					}
+					out.printf("[%s] %s", check.Status, check.Name)
 					if check.Message != "" {
-						fmt.Fprintf(cmd.OutOrStdout(), ": %s", check.Message)
+						out.printf(": %s", check.Message)
 					}
-					fmt.Fprintln(cmd.OutOrStdout())
+					out.newline()
+				}
+				if out.err != nil {
+					return out.err
 				}
 			}
 			// The report is the payload, so it is always written; the exit code
@@ -606,18 +604,15 @@ func runInit(cmd *cobra.Command, repoRoot string, toJSON bool) error {
 		return writeJSON(cmd.OutOrStdout(), document)
 	}
 
+	out := newProse(cmd.OutOrStdout())
 	for _, path := range result.CreatedPaths {
-		if _, err := fmt.Fprintf(cmd.OutOrStdout(), "created %s\n", relToRoot(root, path)); err != nil {
-			return err
-		}
+		out.printf("created %s\n", relToRoot(root, path))
 	}
 	for _, path := range result.SkippedPaths {
-		if _, err := fmt.Fprintf(cmd.OutOrStdout(), "kept %s (already exists)\n", relToRoot(root, path)); err != nil {
-			return err
-		}
+		out.printf("kept %s (already exists)\n", relToRoot(root, path))
 	}
-	_, err = fmt.Fprintf(cmd.OutOrStdout(), "wrote %s\n", relToRoot(root, result.ScanOutputPath))
-	return err
+	out.printf("wrote %s\n", relToRoot(root, result.ScanOutputPath))
+	return out.err
 }
 
 func newScanCmd(repoRoot *string) *cobra.Command {
@@ -794,13 +789,11 @@ func runSuggestInstructions(cmd *cobra.Command, repoRoot string, toJSON bool) er
 		return writeJSON(cmd.OutOrStdout(), document)
 	}
 
+	out := newProse(cmd.OutOrStdout())
 	for _, path := range result.OutputPaths {
-		_, err = fmt.Fprintf(cmd.OutOrStdout(), "wrote %s\n", relToRoot(root, path))
-		if err != nil {
-			return err
-		}
+		out.printf("wrote %s\n", relToRoot(root, path))
 	}
-	return nil
+	return out.err
 }
 
 // portableRoot is how a machine document names the root its paths are relative
@@ -821,3 +814,21 @@ func writeJSON(w io.Writer, value any) error {
 	enc.SetIndent("", "  ")
 	return enc.Encode(value)
 }
+
+// prose writes the human-readable half of a command. It keeps the first write
+// error and skips every write after it, so a command checks once at the end.
+type prose struct {
+	w   io.Writer
+	err error
+}
+
+func newProse(w io.Writer) *prose { return &prose{w: w} }
+
+func (p *prose) printf(format string, args ...any) {
+	if p.err != nil {
+		return
+	}
+	_, p.err = fmt.Fprintf(p.w, format, args...)
+}
+
+func (p *prose) newline() { p.printf("\n") }
