@@ -135,6 +135,9 @@ func TestCapabilitiesCommandReportsContextContract(t *testing.T) {
 	if !slices.Contains(document.Commands, "tasks") || !slices.Contains(document.Schemas, repoctx.TasksSchema) || !slices.Contains(document.Features, "tasks.partial_results") {
 		t.Fatalf("capabilities do not advertise tasks contract: %+v", document)
 	}
+	if !slices.Contains(document.Schemas, "struktly/init-result/v1") || !slices.Contains(document.Schemas, "struktly/instruction-suggestions/v1") {
+		t.Fatalf("capabilities do not advertise init/instruction-suggestions schemas: %+v", document)
+	}
 	if slices.Contains(document.Schemas, "struktly/packet/v1") {
 		t.Fatalf("capabilities advertise historical packet generation: %+v", document)
 	}
@@ -540,6 +543,75 @@ func initTestGitRepo(t *testing.T, root string) {
 		cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
 		if output, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, output)
+		}
+	}
+}
+
+// The two commands that write into the repository carry versioned machine
+// contracts, so a caller that refuses to parse prose — Platform is one — can
+// consume what they did.
+func TestInitAndSuggestInstructionsSpeakJSON(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, filepath.Join(root, "README.md"), "# Repo\n")
+
+	stdout, stderr, err := executeTestCommand("init", "--root", root, "--json")
+	if err != nil {
+		t.Fatalf("init --json: %v\nstderr:\n%s", err, stderr)
+	}
+	var initDoc struct {
+		Schema   string   `json:"schema"`
+		Root     string   `json:"root"`
+		Created  []string `json:"created"`
+		Skipped  []string `json:"skipped"`
+		Snapshot string   `json:"snapshot"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &initDoc); err != nil {
+		t.Fatalf("init output is not JSON: %v\n%s", err, stdout)
+	}
+	if initDoc.Schema != "struktly/init-result/v1" || initDoc.Snapshot != ".struktly/project-context.md" {
+		t.Fatalf("init document = %+v", initDoc)
+	}
+	// The absolute root names the workstation that ran the command, so it must
+	// not reach a document whose other paths are repository-relative.
+	if initDoc.Root != "." {
+		t.Fatalf("init root = %q, want %q", initDoc.Root, ".")
+	}
+	if len(initDoc.Created) == 0 || initDoc.Created[0] != ".struktly/config.json" {
+		t.Fatalf("init created = %v, want config.json first", initDoc.Created)
+	}
+
+	stdout, stderr, err = executeTestCommand("init", "--root", root, "--json")
+	if err != nil {
+		t.Fatalf("second init --json: %v\nstderr:\n%s", err, stderr)
+	}
+	if err := json.Unmarshal([]byte(stdout), &initDoc); err != nil {
+		t.Fatal(err)
+	}
+	if len(initDoc.Skipped) == 0 {
+		t.Fatalf("second init document = %+v, want the existing config reported as skipped, not rewritten", initDoc)
+	}
+
+	stdout, stderr, err = executeTestCommand("suggest-instructions", "--root", root, "--json")
+	if err != nil {
+		t.Fatalf("suggest-instructions --json: %v\nstderr:\n%s", err, stderr)
+	}
+	var suggestions struct {
+		Schema  string   `json:"schema"`
+		Root    string   `json:"root"`
+		Written []string `json:"written"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &suggestions); err != nil {
+		t.Fatalf("suggestions output is not JSON: %v\n%s", err, stdout)
+	}
+	if suggestions.Schema != "struktly/instruction-suggestions/v1" || len(suggestions.Written) == 0 {
+		t.Fatalf("suggestions document = %+v, want written draft paths", suggestions)
+	}
+	if suggestions.Root != "." {
+		t.Fatalf("suggestions root = %q, want %q", suggestions.Root, ".")
+	}
+	for _, path := range suggestions.Written {
+		if _, err := os.Stat(filepath.Join(root, path)); err != nil {
+			t.Fatalf("reported draft %s does not exist: %v", path, err)
 		}
 	}
 }

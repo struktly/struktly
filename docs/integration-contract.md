@@ -24,7 +24,9 @@ Machine modes write one JSON document to stdout:
 
 | Invocation | Schema |
 |---|---|
+| `init --json` | `struktly/init-result/v1` |
 | `scan --json` | `struktly/snapshot/v1` |
+| `suggest-instructions --json` | `struktly/instruction-suggestions/v1` |
 | `context --json <request>` | `struktly/packet/v2` |
 | `tasks --json` | `struktly/tasks/v1` |
 | `status --json` | `struktly/status/v1` |

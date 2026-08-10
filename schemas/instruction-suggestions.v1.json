@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "struktly/instruction-suggestions/v1",
+  "title": "Struktly instruction suggestions",
+  "description": "Machine-readable result for suggestion draft generation.",
+  "type": "object",
+  "properties": {
+    "schema": { "const": "struktly/instruction-suggestions/v1" },
+    "root": { "type": "string" },
+    "written": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "required": ["schema", "root", "written"],
+  "additionalProperties": true
+}
