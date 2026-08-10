@@ -2,6 +2,14 @@
 
 Notable changes will be recorded here.
 
+## [0.5.0](https://github.com/struktly/struktly/compare/v0.4.0...v0.5.0) (2026-08-10)
+
+
+### Features
+
+* **cli:** machine contracts for init and suggest-instructions ([#12](https://github.com/struktly/struktly/issues/12)) ([63e83b0](https://github.com/struktly/struktly/commit/63e83b0dcdf3d2e911f486c664e5c90dd8184c97))
+* **tasks:** task lifecycle on disk — complete, archive, and the spec'd invariant ([#14](https://github.com/struktly/struktly/issues/14)) ([7af6a6d](https://github.com/struktly/struktly/commit/7af6a6d6ee51620a602e8957bc8ccb8fd7a039c3))
+
 ## [0.4.0](https://github.com/struktly/struktly/compare/v0.3.0...v0.4.0) (2026-08-08)
 
 
