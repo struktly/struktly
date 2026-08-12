@@ -48,7 +48,8 @@ jobs:
           revision=$(git rev-parse HEAD)
           test "$(git rev-list -n 1 "$TAG")" = "$revision"
           if [ -n "$EXPECTED_REVISION" ]; then test "$EXPECTED_REVISION" = "$revision"; fi
-          test "$(gh release view "$TAG" --json isDraft --jq .isDraft)" = false
+          # Immutable releases accept assets only while they are drafts.
+          test "$(gh release view "$TAG" --json isDraft --jq .isDraft)" = true
           test "$(gh release view "$TAG" --json isPrerelease --jq .isPrerelease)" = false
           test "$(gh release view "$TAG" --json targetCommitish --jq .targetCommitish)" = "$revision"
       - name: Build deterministic release binaries
@@ -62,4 +63,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag }}
-        run: gh release upload "$TAG" dist/*
+        run: |
+          set -eu
+          gh release upload "$TAG" dist/*
+          expected=$(find dist -maxdepth 1 -type f | wc -l | tr -d ' ')
+          actual=$(gh release view "$TAG" --json assets --jq '.assets | length')
+          test "$expected" = 6
+          test "$actual" = "$expected"
+          gh release edit "$TAG" --draft=false --prerelease=false --latest
+          test "$(gh release view "$TAG" --json isDraft --jq .isDraft)" = false
+          test "$(gh release view "$TAG" --json isPrerelease --jq .isPrerelease)" = false
