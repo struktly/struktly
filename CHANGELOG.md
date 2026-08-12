@@ -2,6 +2,13 @@
 
 Notable changes will be recorded here.
 
+## [0.5.2](https://github.com/struktly/struktly/compare/v0.5.1...v0.5.2) (2026-08-12)
+
+
+### Bug Fixes
+
+* **release:** stage assets before publication ([#19](https://github.com/struktly/struktly/issues/19)) ([a72c0a4](https://github.com/struktly/struktly/commit/a72c0a48d2c8491d0a965613e143ebf535fc401d))
+
 ## [0.5.1](https://github.com/struktly/struktly/compare/v0.5.0...v0.5.1) (2026-08-12)
 
 
