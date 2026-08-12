@@ -95,6 +95,9 @@ jobs:
           "$struktly" validate --root "$root"
           "$struktly" doctor --root "$root"
 
+      - name: check release binaries
+        run: ./scripts/test-release-binaries.sh
+
   required-checks:
     name: required checks
     if: always()

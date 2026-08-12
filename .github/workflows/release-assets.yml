@@ -1,0 +1,65 @@
+name: Release assets
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+      revision:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing stable release tag to backfill
+        type: string
+        required: true
+      revision:
+        description: Optional exact tag revision
+        type: string
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  binaries:
+    name: Publish release binaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Verify release identity
+        env:
+          EXPECTED_REVISION: ${{ inputs.revision }}
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -eu
+          revision=$(git rev-parse HEAD)
+          test "$(git rev-list -n 1 "$TAG")" = "$revision"
+          if [ -n "$EXPECTED_REVISION" ]; then test "$EXPECTED_REVISION" = "$revision"; fi
+          test "$(gh release view "$TAG" --json isDraft --jq .isDraft)" = false
+          test "$(gh release view "$TAG" --json isPrerelease --jq .isPrerelease)" = false
+          test "$(gh release view "$TAG" --json targetCommitish --jq .targetCommitish)" = "$revision"
+      - name: Build deterministic release binaries
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          for target in aarch64-apple-darwin x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu; do
+            ./scripts/package-release-binary.sh "$TAG" "$target" dist
+          done
+      - name: Publish immutable assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: gh release upload "$TAG" dist/*

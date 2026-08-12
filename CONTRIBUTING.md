@@ -41,10 +41,11 @@ the GitHub release. Nobody picks a version by hand — it comes from the
 conventional-commit subjects since the last release, and while the project is
 pre-1.0 a `!` breaking change bumps the minor rather than the major.
 
-There is no build artifact. Struktly is installed with
-`go install github.com/struktly/struktly/cmd/struktly@vX.Y.Z`, so the tag is the
-release: the module proxy serves it and `struktly version` reports it from the
-build information Go records at install time.
+Struktly remains installable with
+`go install github.com/struktly/struktly/cmd/struktly@vX.Y.Z`. Each stable
+release also carries checksum-manifested binaries for the targets consumed by
+Struktly Platform. They are built from the release tag on public Ubuntu runners
+with the exact version and revision embedded, and are never overwritten.
 
 The current version lives in
 [`.release-please-manifest.json`](.release-please-manifest.json) rather than

@@ -13,6 +13,10 @@ concurrency:
 
 jobs:
   release-please:
+    outputs:
+      release-created: ${{ steps.release.outputs.release_created }}
+      tag-name: ${{ steps.release.outputs.tag_name }}
+      revision: ${{ steps.release.outputs.sha }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -20,6 +24,17 @@ jobs:
       pull-requests: write
     steps:
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+  release-assets:
+    needs: release-please
+    if: needs.release-please.outputs.release-created == 'true'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release-assets.yml
+    with:
+      tag: ${{ needs.release-please.outputs.tag-name }}
+      revision: ${{ needs.release-please.outputs.revision }}
