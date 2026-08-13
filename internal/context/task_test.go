@@ -361,3 +361,93 @@ func TestLoadTasksRejectsMalformedTasks(t *testing.T) {
 		})
 	}
 }
+
+// Taken from a real task file. Its Verification section runs three commands in
+// a fenced block and then explains the outcomes in prose, quoting the attributor's
+// own labels. Reading only inline spans dropped all three commands and promoted
+// the two labels to required checks — which a platform offers to run, so somebody
+// would be asked to execute `no_turn` as a shell command.
+func TestFencedCommandsBeatProseCodeSpans(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, ".struktly/tasks/attribution.md", `---
+type: task
+schema: struktly/task/v1
+id: attribution
+title: "Attribute every changed line"
+status: ready
+priority: high
+created: 2026-08-03
+updated: 2026-08-04
+---
+
+# Attribute every changed line
+
+## Objective
+
+Every changed line answers for itself.
+
+## Verification
+
+Run:
+
+`+"```sh"+`
+# the whole toolchain
+go build ./...
+go vet ./...
+go test ./...
+`+"```"+`
+
+Focused tests must cover:
+
+1. Work already present before the first writable turn -> `+"`no_turn`"+`.
+2. A missing boundary produces `+"`unknown`"+`, not `+"`no_turn`"+`.
+
+## Required outcomes
+
+- The attribution holds after a restart.
+`)
+
+	document, err := DiscoverTasks(root)
+	if err != nil {
+		t.Fatalf("DiscoverTasks returned error: %v", err)
+	}
+	checks := document.Tasks[0].Contract.RequiredChecks
+	if !reflect.DeepEqual(checks, []string{"go build ./...", "go vet ./...", "go test ./..."}) {
+		t.Fatalf("required_checks = %#v", checks)
+	}
+}
+
+// A task that names its checks only in a sentence is still naming them. The
+// fenced rule must not stop this file being read the way it always was.
+func TestInlineSpansStillReadWhenThereIsNoFencedBlock(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, ".struktly/tasks/inline.md", `---
+type: task
+schema: struktly/task/v1
+id: inline
+title: "Inline checks"
+status: ready
+priority: high
+created: 2026-08-03
+updated: 2026-08-04
+---
+
+# Inline checks
+
+## Objective
+
+Keep reading what we used to read.
+
+## Verification
+
+`+"`go test ./...`"+` passes.
+`)
+
+	document, err := DiscoverTasks(root)
+	if err != nil {
+		t.Fatalf("DiscoverTasks returned error: %v", err)
+	}
+	if checks := document.Tasks[0].Contract.RequiredChecks; !reflect.DeepEqual(checks, []string{"go test ./..."}) {
+		t.Fatalf("required_checks = %#v", checks)
+	}
+}
