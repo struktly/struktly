@@ -124,6 +124,9 @@ func classifyError(err error) (int, string) {
 	if errors.Is(err, errDoctorFailed) {
 		return 1, "diagnostic_failed"
 	}
+	if errors.Is(err, errVerificationFailed) {
+		return 1, "verification_failed"
+	}
 	if errors.Is(err, errTasksUnarchived) {
 		return 1, "tasks_unarchived"
 	}
@@ -187,6 +190,7 @@ func newRootCmd() *cobra.Command {
 	cmd.AddCommand(newValidateCmd(&repoRoot))
 	cmd.AddCommand(newDoctorCmd(&repoRoot))
 	cmd.AddCommand(newMCPCmd(&repoRoot))
+	cmd.AddCommand(newVerifyCmd())
 	cmd.AddCommand(newVersionCmd())
 	cmd.AddCommand(newCapabilitiesCmd())
 
@@ -221,7 +225,7 @@ func currentCapabilities() capabilitiesDocument {
 		Commands: []string{
 			"capabilities", "context", "diff", "doctor", "explain", "init", "mcp",
 			"scan", "status", "suggest-instructions", "tasks", "tasks archive",
-			"tasks complete", "validate", "version",
+			"tasks complete", "validate", "verify", "version",
 		},
 		Schemas: []string{
 			capabilitiesSchema,
@@ -234,6 +238,8 @@ func currentCapabilities() capabilitiesDocument {
 			"struktly/explanation/v1",
 			initResultSchema,
 			instructionSuggestionsSchema,
+			recordBundleSchema,
+			recordVerificationSchema,
 			repoctx.PacketSchema,
 			repoctx.PacketDiffSchema,
 			repoctx.SnapshotSchema,
