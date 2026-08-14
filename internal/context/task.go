@@ -29,6 +29,10 @@ var (
 	taskIDPattern       = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 	legacyTaskIDPattern = regexp.MustCompile(`^[a-z0-9]+(?:[.-][a-z0-9]+)*$`)
 	taskCodeSpan        = regexp.MustCompile("`([^`\n]+)`")
+	// taskFencedBlock captures the body of a fenced code block, with or without
+	// a language tag. A task that writes "Run:" above a fenced block is naming
+	// commands as plainly as a task file can, and reading them is not optional.
+	taskFencedBlock = regexp.MustCompile("(?s)```[^\n]*\n(.*?)```")
 )
 
 // A task contract needs two things to be checkable: what the work is for, and
@@ -345,15 +349,59 @@ func parseTaskContract(body string) (TaskContract, []string) {
 		sections["verification"],
 		sections["required checks"],
 	}, "\n")
+	contract.RequiredChecks = taskChecks(checkText)
+	return contract, notes
+}
+
+// taskChecks reads the commands a task says it is verified with.
+//
+// A fenced block wins outright. Reading inline code spans everywhere was wrong
+// in both directions at once, and one real task file showed both halves: its
+// Verification section runs `go build`, `go vet` and `go test` inside a fenced
+// block, and explains the outcomes in prose below using spans like `no_turn`
+// and `unknown`. The three commands were dropped and the two prose fragments
+// became its required checks — which a platform then offers to run, so somebody
+// would be asked to execute `no_turn` as a shell command.
+//
+// Spans remain the fallback, because a task that writes its checks only as
+// `go test ./...` in a sentence is still telling us, and this must not stop
+// reading files it used to read. The rule is only that being shown a block of
+// commands beats inferring from punctuation.
+func taskChecks(text string) []string {
+	checks := []string{}
 	seen := map[string]bool{}
-	for _, match := range taskCodeSpan.FindAllStringSubmatch(checkText, -1) {
-		value := strings.TrimSpace(match[1])
-		if value != "" && !seen[value] {
-			seen[value] = true
-			contract.RequiredChecks = append(contract.RequiredChecks, value)
+	add := func(value string) {
+		value = strings.TrimSpace(value)
+		if value == "" || seen[value] {
+			return
+		}
+		seen[value] = true
+		checks = append(checks, value)
+	}
+
+	fenced := taskFencedBlock.FindAllStringSubmatch(text, -1)
+	if len(fenced) > 0 {
+		for _, block := range fenced {
+			for _, line := range strings.Split(block[1], "\n") {
+				line = strings.TrimSpace(line)
+				// A comment is a note to the reader, not a command to run.
+				if line == "" || strings.HasPrefix(line, "#") {
+					continue
+				}
+				// Shell prompts are how people write commands to be copied.
+				line = strings.TrimPrefix(strings.TrimPrefix(line, "$ "), "% ")
+				add(line)
+			}
+		}
+		if len(checks) > 0 {
+			return checks
 		}
 	}
-	return contract, notes
+
+	for _, match := range taskCodeSpan.FindAllStringSubmatch(text, -1) {
+		add(match[1])
+	}
+	return checks
 }
 
 // resolveTaskSection returns the first present spelling of a contract section.

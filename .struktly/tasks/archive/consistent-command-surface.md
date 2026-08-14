@@ -3,9 +3,10 @@ type: task
 schema: struktly/task/v1
 id: consistent-command-surface
 title: "Make output flags and command names consistent"
-status: ready
+status: done
 priority: medium
 created: 2026-08-03
+updated: 2026-08-13
 ---
 
 # Make output flags and command names consistent
