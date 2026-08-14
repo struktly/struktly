@@ -2,6 +2,18 @@
 
 Notable changes will be recorded here.
 
+## [0.6.0](https://github.com/struktly/struktly/compare/v0.5.2...v0.6.0) (2026-08-14)
+
+
+### Features
+
+* **verify:** check an exported Struktly Record without Struktly ([#21](https://github.com/struktly/struktly/issues/21)) ([3a15b56](https://github.com/struktly/struktly/commit/3a15b56366609bb7fc0d0a389970a6b51f97435f))
+
+
+### Bug Fixes
+
+* **tasks:** read the commands a task actually names ([#23](https://github.com/struktly/struktly/issues/23)) ([c19b02d](https://github.com/struktly/struktly/commit/c19b02d59570dbcb2c01e7b28a2f44957c3bb828))
+
 ## [0.5.2](https://github.com/struktly/struktly/compare/v0.5.1...v0.5.2) (2026-08-12)
 
 
