@@ -91,6 +91,7 @@ its permissions and execution behavior.
 | `capabilities` | Report supported schemas and machine-interface features. |
 | `suggest-instructions` | Draft agent instruction files for human review. |
 | `mcp` | Expose repository scanning and request-specific context over MCP stdio. |
+| `intel` | Pass a command through to the installed Struktly desktop app; exits 3 when it is absent. |
 
 Run `struktly <command> --help` for flags.
 
@@ -131,6 +132,31 @@ needs them; they are not dependencies of this CLI.
 
 The desktop app—not this CLI—owns chats, executions, provider sessions, working
 copies, checks, evidence, memory, and review history.
+
+## Driving the desktop platform headlessly
+
+If the Struktly desktop app is installed, `struktly intel` runs its headless
+entrypoint:
+
+```sh
+struktly intel plan "add request timeout middleware"
+struktly intel status --json
+```
+
+This is a bridge and nothing else. The CLI imports no platform code, opens no
+connection to a platform process, and still calls no model. It finds the `intel`
+binary the app ships beside `struktly-server`, hands the process over to it with
+every argument and the environment unchanged, and returns its exit code. What
+`intel` accepts and prints is the platform's contract, documented by the
+platform — `up`, `status`, `plan`, `approve`, `graph`, `run`, `allow`,
+`decisions`, `evidence`, `keep`, `secret`, `task`, `turn` and `record` at the
+time of writing. Run `struktly intel` with no arguments to see the installed
+platform's own help.
+
+The binary is resolved as `$STRUKTLY_INTEL`, then `intel` beside this executable
+(on macOS, `/Applications/Struktly.app/Contents/MacOS/`), then `intel` on
+`PATH`. Without the desktop app, the command prints one sentence on stderr and
+exits 3, so a script can tell "not installed" apart from a failed operation.
 
 ## Machine interfaces
 

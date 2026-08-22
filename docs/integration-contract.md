@@ -156,6 +156,7 @@ people; automation must branch on `error.code` and the process exit code.
 | 0 | Operation completed; inspect structured diagnostic statuses where applicable. |
 | 1 | Repository, configuration, filesystem, Git, or other operational failure. |
 | 2 | Invalid command, flag, argument count, or mutually exclusive flags. |
+| 3 | `intel` only: the Struktly desktop platform is not installed, so there was nothing to drive. |
 | 130 | Operation canceled through the command context or process signal. |
 
 SIGINT and SIGTERM cancel the root command context. Cancellation is cooperative:
@@ -167,6 +168,35 @@ The experimental MCP server currently accepts cancellation notifications but
 does not interrupt an in-flight tool call. A request longer than 4 MiB is
 answered with a JSON-RPC `-32600` error and a null id; the server keeps serving
 subsequent requests.
+
+## Driving the desktop platform
+
+`struktly intel [arguments...]` is a pass-through to the headless entrypoint of
+the installed Struktly desktop app, and is the one command in this CLI whose
+output is not this CLI's. Arguments are not parsed, interpreted, or defaulted:
+the resolved `intel` binary is given them verbatim along with the process
+environment, and its exit code is returned unchanged. On unix the process is
+replaced with `exec(2)`, so nothing sits between the caller and the platform.
+
+Consequences a caller should rely on:
+
+- **The output contract belongs to the platform.** Its subcommands, its JSON,
+  its schema identifiers, and its exit codes are versioned by the desktop
+  product and documented there. Nothing under `schemas/` describes them, and
+  `capabilities --json` does not advertise `intel`, because this CLI cannot
+  make promises about a program it does not contain.
+- **`--root` and `--json-errors` do not apply.** They are the CLI's flags; after
+  `intel` every argument is the platform's, including `--json` and `-h`.
+- **Exit 3 means the platform is absent.** The binary is resolved as
+  `$STRUKTLY_INTEL`, then `intel` beside the running `struktly` executable, then
+  `intel` on `PATH`. If none resolves, one sentence is written to stderr — never
+  a `struktly/error/v1` document, even when `--json` appears in the arguments —
+  and the command exits 3 without running anything. Any other exit code came
+  from the platform.
+
+This command does not weaken the boundary the rest of this document describes:
+the CLI still calls no model, links no platform code, and speaks to no platform
+process. It locates a binary and gets out of the way.
 
 ## Packet determinism and versioning
 

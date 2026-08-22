@@ -57,6 +57,7 @@ window, because from that point the guarantee is real.
 - **JSON is the stable machine surface.** Markdown rendering is presentation and may evolve within a schema version; do not parse markdown when a JSON form exists.
 - **CLI surface**: versioned machine commands and flags change only with an explicit schema or capability update.
 - **Command language**: `context` is the primary name for request-scoped packet generation. `brief` remains a compatibility alias.
+- **`intel` is outside this policy.** `struktly intel` passes its arguments to the desktop platform's own binary; its subcommands, output, and exit codes are versioned by that product, not here. The only part this repository guarantees is the handover itself: arguments and environment unchanged, the platform's exit code returned, and exit 3 when the platform is not installed. See [integration-contract.md](integration-contract.md).
 - **MCP wire names** (tools, resource URIs) are a compatibility surface once released; renames follow the breaking-change rule.
 
 ## Context-packet identity
