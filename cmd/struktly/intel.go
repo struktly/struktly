@@ -83,9 +83,10 @@ those exist, this command exits 127.
 `
 
 // exitCodeError carries an exit code that classifyError cannot derive, because
-// it belongs to another program. A pass-through has to be able to return 3 for
-// an absent platform and whatever the child returned otherwise; classification
-// by error identity only reaches the codes this CLI defines for itself.
+// it belongs to another program. A pass-through has to be able to return
+// intelMissingExit for an absent platform and whatever the child returned
+// otherwise; classification by error identity only reaches the codes this CLI
+// defines for itself.
 type exitCodeError struct {
 	code int
 	// message is written to stderr as-is. It is empty when the child process

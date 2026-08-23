@@ -47,27 +47,48 @@ Run it against a repository you know well and read what it selected:
 struktly context --stdout "add request timeout middleware"
 ```
 
-What comes back is a list of files with the reason each one is in it — run on
-this repository, that is eight files out of several hundred:
+What comes back is a Markdown packet. Abridged, on this repository:
 
-```
-internal/context/selection.go          symbol_match
-internal/context/testdata/.../logger.go  task_match
-Makefile                               selection_rule
-go.mod                                  selection_rule
+```markdown
+## Packet details
+
+- Packet hash: `sha256:...`
+- HEAD revision: `...`
+- Scope: `whole repository`
+
+## Suggested checks
+
+- `go test ./...`
+- `make lint`
+- `make test`
+
+## Relevant documentation
+
+- `README.md`
+- `docs/integration-contract.md`
+
+## Files to inspect
+
+- `.github/pull_request_template.md`
+- `README.md`
+
+## Included files
+
+### `README.md`
 ...
 ```
 
-`symbol_match` means the request's words matched a symbol defined in that file,
-`task_match` a portable task declaration, `selection_rule` a rule in
-`.struktly/config.json`. The packet also carries the repository's declared check
-commands, the exclusions that applied, any truncation the limits caused, and a
-`packet_hash` over the whole selection.
+Nobody told it that `make test` runs this repository's tests or that
+`docs/integration-contract.md` is worth reading — it asked Git what is tracked,
+matched the request against symbols and declarations, and applied the
+repository's own configuration. `--json` gives the same selection with the
+reason recorded per file (`symbol_match`, `task_match`, `selection_rule`)
+alongside the exclusions that applied and any truncation the limits caused.
 
 That is the difference from pasting paths yourself: not that the files are
 better chosen, but that the choice is written down and re-checkable. The same
-request on the same revision produces the same hash, so two runs that disagree
-disagree about the repository and not about the tool.
+request on the same revision produces the same `packet_hash`, so two runs that
+disagree disagree about the repository and not about the tool.
 
 The packet is a plain artifact. `context` writes a Markdown file and a
 `struktly/packet/v2` JSON file under `.struktly/context-packets/`. Use `--json`
