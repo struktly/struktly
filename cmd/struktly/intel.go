@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 
 	"github.com/spf13/cobra"
 )
@@ -55,6 +56,18 @@ const (
 	// outside the range the platform uses.
 	intelMissingExit = 127
 
+	// intelUnusableExit is the shell's code for a file that was found and could
+	// not be executed, which is exactly the case a wrong-architecture download,
+	// a truncated bundle or a stale STRUKTLY_INTEL produces. It is not 1: that
+	// is an ordinary failure of this CLI, and the platform uses it for "the
+	// daemon refused".
+	intelUnusableExit = 126
+
+	// intelSignalledExitBase is the shell's convention for "killed by signal N":
+	// 128+N. Only the subprocess handover can observe this; on unix the child
+	// has replaced this process and the signal is its own.
+	intelSignalledExitBase = 128
+
 	intelMissingMessage = "Struktly's desktop platform is not installed on this machine, so `struktly intel` has nothing to drive. Install Struktly, or set " + intelEnvVar + " to its intel binary."
 )
 
@@ -63,7 +76,9 @@ const (
 // and the real help cannot be shown. It deliberately does not enumerate the
 // platform's subcommands: an earlier version did, and was wrong within a day of
 // the platform gaining one.
-const intelBridgeHelp = `struktly intel drives the headless entrypoint of the Struktly desktop app.
+var intelBridgeHelp = fmt.Sprintf(intelBridgeHelpTemplate, intelMissingExit)
+
+const intelBridgeHelpTemplate = `struktly intel drives the headless entrypoint of the Struktly desktop app.
 
 This CLI implements none of it. Every argument and the whole environment are
 passed through to the installed platform's ` + intelBinaryName + ` binary, and its exit code is
@@ -77,8 +92,8 @@ this text.
 
 The binary is resolved as ` + intelEnvVar + `, then ` + intelBinaryName + ` beside this executable
 (the app bundle ships struktly, struktly-server, llama-server and ` + intelBinaryName + ` in one
-directory), then ` + intelBinaryName + ` on PATH, then the app's install location. When none of
-those exist, this command exits 127.
+directory), then the app's install location, then ` + intelBinaryName + ` on PATH. When none of
+those exist, this command exits %d.
 
 `
 
@@ -118,14 +133,14 @@ func runIntel(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	}
-	if len(args) == 0 {
-		// Bare `struktly intel` is a request to see what is available, which
-		// only the platform can answer completely.
-		args = []string{"-h"}
-	}
-
 	path, found := resolveIntelBinary()
 	if !found {
+		if intelHelpRequested(args) {
+			// The help was the whole request and it has been answered as well
+			// as this machine can answer it. Failing here would make
+			// `--help` exit nonzero, which no caller expects.
+			return nil
+		}
 		return exitCodeError{code: intelMissingExit, message: intelMissingMessage}
 	}
 	return runIntelBinary(path, args, cmd.InOrStdin(), cmd.OutOrStdout(), cmd.ErrOrStderr())
@@ -142,7 +157,9 @@ var executablePath = os.Executable
 
 // resolveIntelBinary answers where the platform's intel binary is, in the order
 // an explicit instruction beats an installed app and an installed app beats a
-// loose PATH entry. An explicit STRUKTLY_INTEL that does not resolve is a
+// loose PATH entry — the more certain the evidence that a file really is the
+// platform, the earlier it is tried. An explicit STRUKTLY_INTEL that does not
+// resolve is a
 // failure rather than a reason to keep looking: silently ignoring it would send
 // the caller's arguments to a binary they did not name.
 func resolveIntelBinary() (string, bool) {
@@ -166,19 +183,26 @@ func resolveIntelBinary() (string, bool) {
 		}
 	}
 
-	if onPath, err := exec.LookPath(intelBinaryName); err == nil {
-		return onPath, true
-	}
-
 	// A `struktly` installed on its own — Homebrew, `go install`, a release
-	// archive — is not beside the app's binaries and the app bundle is not
-	// on anyone's PATH. The platform's install location is known, so look
-	// there last rather than asking every such user to export a variable.
+	// archive — is not beside the app's binaries and the app bundle is not on
+	// anyone's PATH. The platform's install location is known, so look there
+	// rather than asking every such user to export a variable.
+	//
+	// This is deliberately tried before PATH. A file at the install location is
+	// the platform by construction; a file named `intel` on PATH is only
+	// evidence that something on this machine is called `intel`, and handing it
+	// the caller's whole argv and environment on that basis would be wrong.
 	for _, dir := range knownInstallDirs() {
 		candidate := filepath.Join(dir, intelBinaryName+intelExecutableSuffix)
 		if isExecutableFile(candidate) {
 			return candidate, true
 		}
+	}
+
+	// PATH is the last resort, and on an operating system where no install
+	// location is known it is the only one an ordinary installation has.
+	if onPath, err := exec.LookPath(intelBinaryName); err == nil {
+		return onPath, true
 	}
 	return "", false
 }
@@ -228,8 +252,17 @@ func runIntelProcess(path string, args []string, stdin io.Reader, stdout, stderr
 	if errors.As(err, &exitErr) {
 		code := exitErr.ExitCode()
 		if code < 0 {
-			// The child was signalled; there is no code of its own to return.
-			code = 1
+			// The child was signalled, so it has no code of its own. 128+signal
+			// is the shell's convention; 1 would be indistinguishable from the
+			// platform's own "the daemon refused".
+			code = intelSignalledExitBase
+			var status syscall.WaitStatus
+			if s, ok := exitErr.Sys().(syscall.WaitStatus); ok {
+				status = s
+			}
+			if status.Signaled() {
+				code = intelSignalledExitBase + int(status.Signal())
+			}
 		}
 		return exitCodeError{code: code}
 	}

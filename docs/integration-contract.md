@@ -189,15 +189,20 @@ Consequences a caller should rely on:
   `intel` every argument is the platform's, including `--json` and `-h`.
 - **Exit 127 means the platform is absent.** The binary is resolved as
   `$STRUKTLY_INTEL`, then `intel` beside the running `struktly` executable, then
-  `intel` on `PATH`, then the platform's known install location (on macOS,
-  `/Applications/Struktly.app/Contents/MacOS`). If none resolves, one sentence is written to stderr — never
+  the platform's known install location (on macOS,
+  `/Applications/Struktly.app/Contents/MacOS`), then `intel` on `PATH` — an
+  ambiguous source last, because the resolved binary receives the caller's
+  arguments and environment. If none resolves, one sentence is written to stderr — never
   a `struktly/error/v1` document, even when `--json` appears in the arguments —
   and the command exits 127 without running anything. Any other exit code came
   from the platform, whose ladder is documented with the binary itself — the
   package comment of `cmd/intel/main.go` in the platform repository — and is
   deliberately not restated here, because a copy of a contract this repository
-  does not own would rot against the product it describes. 127 is chosen so it
-  cannot collide with any platform build, present or past.
+  does not own would rot against the product it describes. 127 is chosen because
+  it is outside the 0-4 ladder the platform documents, and because it is the
+  shell's own code for a command that does not exist. A resolved binary that
+  cannot be executed exits 126 and names the path; neither case produces a
+  `struktly/error/v1` document.
 
 This command does not weaken the boundary the rest of this document describes:
 the CLI still calls no model, links no platform code, and speaks to no platform

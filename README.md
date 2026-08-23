@@ -80,8 +80,9 @@ What comes back is a Markdown packet. Abridged, on this repository:
 
 Nobody told it that `make test` runs this repository's tests or that
 `docs/integration-contract.md` is worth reading — it asked Git what is tracked,
-matched the request against symbols and declarations, and applied the
-repository's own configuration. `--json` gives the same selection with the
+matched the request against symbols and declarations, and applied its selection
+rules — the built-in ones here, plus whatever `.struktly/config.json` adds in a
+repository that has one. `--json` gives the same selection with the
 reason recorded per file (`symbol_match`, `task_match`, `selection_rule`)
 alongside the exclusions that applied and any truncation the limits caused.
 
@@ -199,19 +200,19 @@ platform. This page does not list its subcommands, because a copy of them here
 would be wrong the first time the platform grew one — run `struktly intel` with
 no arguments and the installed app answers for itself.
 
-The app does not have to be running: `intel` starts and addresses its own
-daemon. It does have to be installed, and one thing still depends on having
-opened it. A provider Struktly reaches by proxying a CLI you already logged into
-— `claude`, `codex` — needs nothing from the desktop, because those credentials
-are that tool's own. A provider reached by API key does: the terminal can push a
-session-only key, but durable storage of one is the desktop's keychain, so on a
-machine that has never opened the app an API-key provider is configured through
-its environment variable instead.
+What that path needs on the machine is the platform's to state, not this
+page's, and it is stated by `struktly intel` itself. Two things are this
+repository's business and are true here: the desktop application does not have
+to be open, and no window appears. Whether a given provider can be reached from
+a terminal alone depends on where its credentials live, which the platform
+documents.
 
 The binary is resolved as `$STRUKTLY_INTEL`, then `intel` beside this executable,
-then `intel` on `PATH`, then the desktop app's install location (on macOS,
+then the desktop app's install location (on macOS,
 `/Applications/Struktly.app/Contents/MacOS/`), so a `struktly` installed on its
-own still finds the app. Without the desktop app, the command prints one sentence on stderr and
+own still finds the app, and only then `intel` on `PATH`. A file at the install
+location is the platform by construction; a file named `intel` on `PATH` is not,
+and it would be handed your arguments and environment. Without the desktop app, the command prints one sentence on stderr and
 exits 127, so a script can tell "not installed" apart from any answer the
 platform itself gives.
 
