@@ -3,9 +3,10 @@ type: task
 schema: struktly/task/v1
 id: readme-says-what-it-does
 title: "Make the README explain what this tool is for"
-status: ready
+status: done
 priority: high
 created: 2026-08-03
+updated: 2026-08-23
 ---
 
 # Make the README explain what this tool is for

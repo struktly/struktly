@@ -47,6 +47,50 @@ Run it against a repository you know well and read what it selected:
 struktly context --stdout "add request timeout middleware"
 ```
 
+What comes back is a Markdown packet. Abridged, on this repository:
+
+```markdown
+## Packet details
+
+- Packet hash: `sha256:...`
+- HEAD revision: `...`
+- Scope: `whole repository`
+
+## Suggested checks
+
+- `go test ./...`
+- `make lint`
+- `make test`
+
+## Relevant documentation
+
+- `README.md`
+- `docs/integration-contract.md`
+
+## Files to inspect
+
+- `.github/pull_request_template.md`
+- `README.md`
+
+## Included files
+
+### `README.md`
+...
+```
+
+Nobody told it that `make test` runs this repository's tests or that
+`docs/integration-contract.md` is worth reading — it asked Git what is tracked,
+matched the request against symbols and declarations, and applied its selection
+rules — the built-in ones here, plus whatever `.struktly/config.json` adds in a
+repository that has one. `--json` gives the same selection with the
+reason recorded per file (`symbol_match`, `task_match`, `selection_rule`)
+alongside the exclusions that applied and any truncation the limits caused.
+
+That is the difference from pasting paths yourself: not that the files are
+better chosen, but that the choice is written down and re-checkable. The same
+request on the same revision produces the same `packet_hash`, so two runs that
+disagree disagree about the repository and not about the tool.
+
 The packet is a plain artifact. `context` writes a Markdown file and a
 `struktly/packet/v2` JSON file under `.struktly/context-packets/`. Use `--json`
 for the structured packet, and `--json --no-write` when nothing may be written to
@@ -83,16 +127,21 @@ its permissions and execution behavior.
 | `tasks` | Emit safely readable repository task declarations and per-file invalid results. |
 | `tasks complete <id>` | Set a task's status to `done`, file it under `tasks/archive/`, and repair links, in one atomic transition. |
 | `tasks archive` | File already-finished tasks under `tasks/archive/`; `--check` gates CI on the location invariant. |
-| `status` | Report repository, configuration, and portable-file state. |
-| `explain <path>` | Diagnose why one path would be included or excluded. |
+| `status` | Report repository, configuration, and portable-file state. *(experimental)* |
+| `explain <path>` | Diagnose why one path would be included or excluded. *(experimental)* |
 | `diff <before> <after>` | Report what changed between two context packets. |
-| `validate` | Validate configuration and portable task files. |
-| `doctor` | Check the repository and local CLI setup; exits 1 if a check fails. |
+| `validate` | Validate configuration and portable task files. *(experimental)* |
+| `doctor` | Check the repository and local CLI setup; exits 1 if a check fails. *(experimental)* |
 | `capabilities` | Report supported schemas and machine-interface features. |
 | `suggest-instructions` | Draft agent instruction files for human review. |
+| `verify <bundle>` | Check that an exported Struktly Record is intact, without Struktly. |
+| `version` | Print version and build metadata. |
 | `mcp` | Expose repository scanning and request-specific context over MCP stdio. |
+| `intel` | Pass a command through to the installed Struktly desktop app; exits 127 when it is absent. |
 
-Run `struktly <command> --help` for flags.
+Run `struktly <command> --help` for flags. Commands marked experimental print
+that word in their own help; their output may change without the compatibility
+guarantees in [`docs/compatibility.md`](docs/compatibility.md).
 
 ## What enters a packet
 
@@ -131,6 +180,41 @@ needs them; they are not dependencies of this CLI.
 
 The desktop app—not this CLI—owns chats, executions, provider sessions, working
 copies, checks, evidence, memory, and review history.
+
+## Driving the desktop platform headlessly
+
+If the Struktly desktop app is installed, `struktly intel` runs its headless
+entrypoint:
+
+```sh
+struktly intel plan "add request timeout middleware"
+struktly intel status --json
+```
+
+This is a bridge and nothing else. The CLI imports no platform code, opens no
+connection to a platform process, and still calls no model. It finds the `intel`
+binary the app ships beside `struktly-server`, hands the process over to it with
+every argument and the environment unchanged, and returns its exit code. What
+`intel` accepts and prints is the platform's contract, documented by the
+platform. This page does not list its subcommands, because a copy of them here
+would be wrong the first time the platform grew one — run `struktly intel` with
+no arguments and the installed app answers for itself.
+
+What that path needs on the machine is the platform's to state, not this
+page's, and it is stated by `struktly intel` itself. Two things are this
+repository's business and are true here: the desktop application does not have
+to be open, and no window appears. Whether a given provider can be reached from
+a terminal alone depends on where its credentials live, which the platform
+documents.
+
+The binary is resolved as `$STRUKTLY_INTEL`, then `intel` beside this executable,
+then the desktop app's install location (on macOS,
+`/Applications/Struktly.app/Contents/MacOS/`), so a `struktly` installed on its
+own still finds the app, and only then `intel` on `PATH`. A file at the install
+location is the platform by construction; a file named `intel` on `PATH` is not,
+and it would be handed your arguments and environment. Without the desktop app, the command prints one sentence on stderr and
+exits 127, so a script can tell "not installed" apart from any answer the
+platform itself gives.
 
 ## Machine interfaces
 

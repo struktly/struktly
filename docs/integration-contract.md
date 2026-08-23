@@ -156,6 +156,7 @@ people; automation must branch on `error.code` and the process exit code.
 | 0 | Operation completed; inspect structured diagnostic statuses where applicable. |
 | 1 | Repository, configuration, filesystem, Git, or other operational failure. |
 | 2 | Invalid command, flag, argument count, or mutually exclusive flags. |
+| 127 | `intel` only: the Struktly desktop platform is not installed, so there was nothing to drive. |
 | 130 | Operation canceled through the command context or process signal. |
 
 SIGINT and SIGTERM cancel the root command context. Cancellation is cooperative:
@@ -167,6 +168,45 @@ The experimental MCP server currently accepts cancellation notifications but
 does not interrupt an in-flight tool call. A request longer than 4 MiB is
 answered with a JSON-RPC `-32600` error and a null id; the server keeps serving
 subsequent requests.
+
+## Driving the desktop platform
+
+`struktly intel [arguments...]` is a pass-through to the headless entrypoint of
+the installed Struktly desktop app, and is the one command in this CLI whose
+output is not this CLI's. Arguments are not parsed, interpreted, or defaulted:
+the resolved `intel` binary is given them verbatim along with the process
+environment, and its exit code is returned unchanged. On unix the process is
+replaced with `exec(2)`, so nothing sits between the caller and the platform.
+
+Consequences a caller should rely on:
+
+- **The output contract belongs to the platform.** Its subcommands, its JSON,
+  its schema identifiers, and its exit codes are versioned by the desktop
+  product and documented there. Nothing under `schemas/` describes them, and
+  `capabilities --json` does not advertise `intel`, because this CLI cannot
+  make promises about a program it does not contain.
+- **`--root` and `--json-errors` do not apply.** They are the CLI's flags; after
+  `intel` every argument is the platform's, including `--json` and `-h`.
+- **Exit 127 means the platform is absent.** The binary is resolved as
+  `$STRUKTLY_INTEL`, then `intel` beside the running `struktly` executable, then
+  the platform's known install location (on macOS,
+  `/Applications/Struktly.app/Contents/MacOS`), then `intel` on `PATH` — an
+  ambiguous source last, because the resolved binary receives the caller's
+  arguments and environment. If none resolves, one sentence is written to stderr — never
+  a `struktly/error/v1` document, even when `--json` appears in the arguments —
+  and the command exits 127 without running anything. Any other exit code came
+  from the platform, whose ladder is documented with the binary itself — the
+  package comment of `cmd/intel/main.go` in the platform repository — and is
+  deliberately not restated here, because a copy of a contract this repository
+  does not own would rot against the product it describes. 127 is chosen because
+  it is outside the 0-4 ladder the platform documents, and because it is the
+  shell's own code for a command that does not exist. A resolved binary that
+  cannot be executed exits 126 and names the path; neither case produces a
+  `struktly/error/v1` document.
+
+This command does not weaken the boundary the rest of this document describes:
+the CLI still calls no model, links no platform code, and speaks to no platform
+process. It locates a binary and gets out of the way.
 
 ## Packet determinism and versioning
 

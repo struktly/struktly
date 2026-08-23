@@ -46,6 +46,16 @@ func runCLI(ctx stdcontext.Context, args []string, stdin io.Reader, stdout, stde
 	if err == nil {
 		return 0
 	}
+	// A pass-through owns its own exit code and has already said whatever it had
+	// to say, so it is settled before this CLI's classification and before its
+	// structured error document: neither of those describes another program.
+	var exitErr exitCodeError
+	if errors.As(err, &exitErr) {
+		if exitErr.message != "" {
+			_, _ = fmt.Fprintln(stderr, exitErr.message)
+		}
+		return exitErr.code
+	}
 	exitCode, code := classifyError(err)
 	if jsonErrorRequested(args) {
 		_ = json.NewEncoder(stderr).Encode(errorDocument{
@@ -190,6 +200,7 @@ func newRootCmd() *cobra.Command {
 	cmd.AddCommand(newValidateCmd(&repoRoot))
 	cmd.AddCommand(newDoctorCmd(&repoRoot))
 	cmd.AddCommand(newMCPCmd(&repoRoot))
+	cmd.AddCommand(newIntelCmd())
 	cmd.AddCommand(newVerifyCmd())
 	cmd.AddCommand(newVersionCmd())
 	cmd.AddCommand(newCapabilitiesCmd())
