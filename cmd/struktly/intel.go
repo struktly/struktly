@@ -45,14 +45,14 @@ const (
 	// command was well formed and nothing was attempted. A caller can branch on
 	// it to decide whether to prompt for an install.
 	//
-	// 127 rather than a low number because this CLI cannot know which build of
-	// the platform is installed beside it. Shipped builds used 3 for "no daemon
-	// at -addr"; later ones moved that to 5. A caller that could not tell
-	// "Struktly is not on this machine" from "Struktly is here and not running"
-	// would have no use for either answer, and picking any code the platform
-	// has ever used makes that distinction depend on the user's app version.
-	// 127 is the shell's own code for a command that does not exist, which is
-	// exactly this condition, and no platform build returns it.
+	// 127 rather than a low number because the platform's ladder is 0-4 and 3
+	// there means "no daemon at -addr". A caller that could not tell "Struktly
+	// is not on this machine" from "Struktly is here and not running" would
+	// have no use for either answer. Reserving a low code for this would also
+	// make the distinction depend on which build of the app sits beside a CLI
+	// that is installed separately from it. 127 is the shell's own code for a
+	// command that does not exist, which is exactly this condition, and it is
+	// outside the range the platform uses.
 	intelMissingExit = 127
 
 	intelMissingMessage = "Struktly's desktop platform is not installed on this machine, so `struktly intel` has nothing to drive. Install Struktly, or set " + intelEnvVar + " to its intel binary."
