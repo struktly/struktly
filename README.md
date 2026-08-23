@@ -174,10 +174,18 @@ connection to a platform process, and still calls no model. It finds the `intel`
 binary the app ships beside `struktly-server`, hands the process over to it with
 every argument and the environment unchanged, and returns its exit code. What
 `intel` accepts and prints is the platform's contract, documented by the
-platform — `up`, `status`, `plan`, `approve`, `graph`, `run`, `allow`,
-`decisions`, `evidence`, `keep`, `secret`, `task`, `turn` and `record` at the
-time of writing. Run `struktly intel` with no arguments to see the installed
-platform's own help.
+platform. This page does not list its subcommands, because a copy of them here
+would be wrong the first time the platform grew one — run `struktly intel` with
+no arguments and the installed app answers for itself.
+
+The app does not have to be running: `intel` starts and addresses its own
+daemon. It does have to be installed, and one thing still depends on having
+opened it. A provider Struktly reaches by proxying a CLI you already logged into
+— `claude`, `codex` — needs nothing from the desktop, because those credentials
+are that tool's own. A provider reached by API key does: the terminal can push a
+session-only key, but durable storage of one is the desktop's keychain, so on a
+machine that has never opened the app an API-key provider is configured through
+its environment variable instead.
 
 The binary is resolved as `$STRUKTLY_INTEL`, then `intel` beside this executable,
 then `intel` on `PATH`, then the desktop app's install location (on macOS,

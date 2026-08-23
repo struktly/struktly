@@ -176,9 +176,17 @@ func TestIntelHelpNamesTheBridgeThenAsksThePlatform(t *testing.T) {
 		t.Fatalf("exit code = %d, want 0; stderr=%s", exitCode, &stderr)
 	}
 	out := stdout.String()
-	for _, subcommand := range []string{"plan", "approve", "graph", "run", "decisions", "evidence", "record"} {
-		if !strings.Contains(out, subcommand) {
-			t.Fatalf("bridge help does not name %q:\n%s", subcommand, out)
+	// What the bridge says is its own boundary, never a copy of the platform's
+	// command surface: a list here would go stale the first time the platform
+	// gained a subcommand, which is what happened.
+	for _, ownWords := range []string{"implements none of it", "exit code is\nreturned unchanged", "127"} {
+		if !strings.Contains(out, ownWords) {
+			t.Fatalf("bridge help does not state %q:\n%s", ownWords, out)
+		}
+	}
+	for _, platformWord := range []string{"approve", "decisions", "evidence", "keep"} {
+		if strings.Contains(out, platformWord) {
+			t.Fatalf("bridge help enumerates the platform's subcommand %q; it must not:\n%s", platformWord, out)
 		}
 	}
 	if !strings.HasSuffix(out, "platform help: -h\n") {

@@ -58,9 +58,11 @@ const (
 	intelMissingMessage = "Struktly's desktop platform is not installed on this machine, so `struktly intel` has nothing to drive. Install Struktly, or set " + intelEnvVar + " to its intel binary."
 )
 
-// intelBridgeHelp says what this repository is responsible for and lists what
-// the platform provides, so `struktly intel -h` is useful even on a machine
-// where the platform is absent and the real help cannot be shown.
+// intelBridgeHelp says what this repository is responsible for, so
+// `struktly intel -h` is useful even on a machine where the platform is absent
+// and the real help cannot be shown. It deliberately does not enumerate the
+// platform's subcommands: an earlier version did, and was wrong within a day of
+// the platform gaining one.
 const intelBridgeHelp = `struktly intel drives the headless entrypoint of the Struktly desktop app.
 
 This CLI implements none of it. Every argument and the whole environment are
@@ -68,15 +70,15 @@ passed through to the installed platform's ` + intelBinaryName + ` binary, and i
 returned unchanged. Its output belongs to the platform, not to this CLI's
 versioned JSON contract.
 
-Subcommands the platform's intel provides:
-  up         status     plan       approve    graph      run
-  allow      decisions  evidence   keep       secret     task
-  turn       record
+What it accepts is the platform's to say, and this help does not list it: a
+copy of another program's command surface here would be wrong the first time
+that program grew one. When the platform is installed, its own help follows
+this text.
 
 The binary is resolved as ` + intelEnvVar + `, then ` + intelBinaryName + ` beside this executable
 (the app bundle ships struktly, struktly-server, llama-server and ` + intelBinaryName + ` in one
-directory), then ` + intelBinaryName + ` on PATH. When none of those exist, this command
-exits 3.
+directory), then ` + intelBinaryName + ` on PATH, then the app's install location. When none of
+those exist, this command exits 127.
 
 `
 
