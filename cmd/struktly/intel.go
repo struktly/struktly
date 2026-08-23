@@ -157,7 +157,31 @@ func resolveIntelBinary() (string, bool) {
 	if onPath, err := exec.LookPath(intelBinaryName); err == nil {
 		return onPath, true
 	}
+
+	// A `struktly` installed on its own — Homebrew, `go install`, a release
+	// archive — is not beside the app's binaries and the app bundle is not
+	// on anyone's PATH. The platform's install location is known, so look
+	// there last rather than asking every such user to export a variable.
+	for _, dir := range knownInstallDirs() {
+		candidate := filepath.Join(dir, intelBinaryName+intelExecutableSuffix)
+		if isExecutableFile(candidate) {
+			return candidate, true
+		}
+	}
 	return "", false
+}
+
+// knownInstallDirs lists where the installed desktop platform keeps its
+// binaries on this operating system. It is a variable so a test can replace
+// the list with a fixture directory; the running test binary cannot install
+// an application bundle.
+var knownInstallDirs = func() []string {
+	switch runtime.GOOS {
+	case "darwin":
+		return []string{"/Applications/Struktly.app/Contents/MacOS"}
+	default:
+		return nil
+	}
 }
 
 func isExecutableFile(path string) bool {

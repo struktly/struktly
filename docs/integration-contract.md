@@ -189,7 +189,8 @@ Consequences a caller should rely on:
   `intel` every argument is the platform's, including `--json` and `-h`.
 - **Exit 3 means the platform is absent.** The binary is resolved as
   `$STRUKTLY_INTEL`, then `intel` beside the running `struktly` executable, then
-  `intel` on `PATH`. If none resolves, one sentence is written to stderr — never
+  `intel` on `PATH`, then the platform's known install location (on macOS,
+  `/Applications/Struktly.app/Contents/MacOS`). If none resolves, one sentence is written to stderr — never
   a `struktly/error/v1` document, even when `--json` appears in the arguments —
   and the command exits 3 without running anything. Any other exit code came
   from the platform.

@@ -51,6 +51,8 @@ func TestIntelResolutionOrder(t *testing.T) {
 	explicitDir := t.TempDir()
 	besideDir := t.TempDir()
 	pathDir := t.TempDir()
+	installDir := t.TempDir()
+	pretendPlatformInstalledIn(t, installDir)
 
 	explicit := writeFakeIntel(t, explicitDir, "explicit-intel", "exit 0\n")
 	beside := writeFakeIntel(t, besideDir, "intel", "exit 0\n")
@@ -71,8 +73,23 @@ func TestIntelResolutionOrder(t *testing.T) {
 
 	pretendExecutableLivesIn(t, t.TempDir())
 	if resolved, found := resolveIntelBinary(); !found || resolved != onPath {
-		t.Fatalf("PATH should be the last resort: got %q found=%v", resolved, found)
+		t.Fatalf("PATH should win over the install location: got %q found=%v", resolved, found)
 	}
+
+	t.Setenv("PATH", t.TempDir())
+	installed := writeFakeIntel(t, installDir, "intel", "exit 0\n")
+	if resolved, found := resolveIntelBinary(); !found || resolved != installed {
+		t.Fatalf("the platform's install location should be the last resort: got %q found=%v", resolved, found)
+	}
+}
+
+// pretendPlatformInstalledIn makes the platform's known install location mean
+// a fixture directory. The running test binary cannot install Struktly.app.
+func pretendPlatformInstalledIn(t *testing.T, dir string) {
+	t.Helper()
+	original := knownInstallDirs
+	knownInstallDirs = func() []string { return []string{dir} }
+	t.Cleanup(func() { knownInstallDirs = original })
 }
 
 func TestIntelExplicitPathIsNotSecondGuessed(t *testing.T) {
@@ -126,6 +143,7 @@ func TestIntelPropagatesExitCode(t *testing.T) {
 
 func TestIntelWithoutPlatformExitsThree(t *testing.T) {
 	pretendExecutableLivesIn(t, t.TempDir())
+	pretendPlatformInstalledIn(t, t.TempDir())
 	t.Setenv(intelEnvVar, "")
 	t.Setenv("PATH", t.TempDir())
 

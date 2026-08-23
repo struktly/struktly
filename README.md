@@ -153,9 +153,10 @@ platform — `up`, `status`, `plan`, `approve`, `graph`, `run`, `allow`,
 time of writing. Run `struktly intel` with no arguments to see the installed
 platform's own help.
 
-The binary is resolved as `$STRUKTLY_INTEL`, then `intel` beside this executable
-(on macOS, `/Applications/Struktly.app/Contents/MacOS/`), then `intel` on
-`PATH`. Without the desktop app, the command prints one sentence on stderr and
+The binary is resolved as `$STRUKTLY_INTEL`, then `intel` beside this executable,
+then `intel` on `PATH`, then the desktop app's install location (on macOS,
+`/Applications/Struktly.app/Contents/MacOS/`), so a `struktly` installed on its
+own still finds the app. Without the desktop app, the command prints one sentence on stderr and
 exits 3, so a script can tell "not installed" apart from a failed operation.
 
 ## Machine interfaces
