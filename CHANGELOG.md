@@ -2,6 +2,13 @@
 
 Notable changes will be recorded here.
 
+## [0.7.0](https://github.com/struktly/struktly/compare/v0.6.0...v0.7.0) (2026-08-23)
+
+
+### Features
+
+* **cli:** drive the installed desktop platform with `struktly intel` ([0b4458a](https://github.com/struktly/struktly/commit/0b4458ad83505737c758b7b4b2fb94c938264235))
+
 ## [0.6.0](https://github.com/struktly/struktly/compare/v0.5.2...v0.6.0) (2026-08-14)
 
 
