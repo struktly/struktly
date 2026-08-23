@@ -141,7 +141,7 @@ func TestIntelPropagatesExitCode(t *testing.T) {
 	}
 }
 
-func TestIntelWithoutPlatformExitsThree(t *testing.T) {
+func TestIntelWithoutPlatformExitsDistinctlyFromThePlatform(t *testing.T) {
 	pretendExecutableLivesIn(t, t.TempDir())
 	pretendPlatformInstalledIn(t, t.TempDir())
 	t.Setenv(intelEnvVar, "")

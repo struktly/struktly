@@ -156,7 +156,7 @@ people; automation must branch on `error.code` and the process exit code.
 | 0 | Operation completed; inspect structured diagnostic statuses where applicable. |
 | 1 | Repository, configuration, filesystem, Git, or other operational failure. |
 | 2 | Invalid command, flag, argument count, or mutually exclusive flags. |
-| 3 | `intel` only: the Struktly desktop platform is not installed, so there was nothing to drive. |
+| 127 | `intel` only: the Struktly desktop platform is not installed, so there was nothing to drive. |
 | 130 | Operation canceled through the command context or process signal. |
 
 SIGINT and SIGTERM cancel the root command context. Cancellation is cooperative:
@@ -187,13 +187,17 @@ Consequences a caller should rely on:
   make promises about a program it does not contain.
 - **`--root` and `--json-errors` do not apply.** They are the CLI's flags; after
   `intel` every argument is the platform's, including `--json` and `-h`.
-- **Exit 3 means the platform is absent.** The binary is resolved as
+- **Exit 127 means the platform is absent.** The binary is resolved as
   `$STRUKTLY_INTEL`, then `intel` beside the running `struktly` executable, then
   `intel` on `PATH`, then the platform's known install location (on macOS,
   `/Applications/Struktly.app/Contents/MacOS`). If none resolves, one sentence is written to stderr — never
   a `struktly/error/v1` document, even when `--json` appears in the arguments —
-  and the command exits 3 without running anything. Any other exit code came
-  from the platform.
+  and the command exits 127 without running anything. Any other exit code came
+  from the platform, whose ladder is documented with the binary itself — the
+  package comment of `cmd/intel/main.go` in the platform repository — and is
+  deliberately not restated here, because a copy of a contract this repository
+  does not own would rot against the product it describes. 127 is chosen so it
+  cannot collide with any platform build, present or past.
 
 This command does not weaken the boundary the rest of this document describes:
 the CLI still calls no model, links no platform code, and speaks to no platform

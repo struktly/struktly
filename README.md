@@ -47,6 +47,28 @@ Run it against a repository you know well and read what it selected:
 struktly context --stdout "add request timeout middleware"
 ```
 
+What comes back is a list of files with the reason each one is in it — run on
+this repository, that is eight files out of several hundred:
+
+```
+internal/context/selection.go          symbol_match
+internal/context/testdata/.../logger.go  task_match
+Makefile                               selection_rule
+go.mod                                  selection_rule
+...
+```
+
+`symbol_match` means the request's words matched a symbol defined in that file,
+`task_match` a portable task declaration, `selection_rule` a rule in
+`.struktly/config.json`. The packet also carries the repository's declared check
+commands, the exclusions that applied, any truncation the limits caused, and a
+`packet_hash` over the whole selection.
+
+That is the difference from pasting paths yourself: not that the files are
+better chosen, but that the choice is written down and re-checkable. The same
+request on the same revision produces the same hash, so two runs that disagree
+disagree about the repository and not about the tool.
+
 The packet is a plain artifact. `context` writes a Markdown file and a
 `struktly/packet/v2` JSON file under `.struktly/context-packets/`. Use `--json`
 for the structured packet, and `--json --no-write` when nothing may be written to
@@ -83,17 +105,21 @@ its permissions and execution behavior.
 | `tasks` | Emit safely readable repository task declarations and per-file invalid results. |
 | `tasks complete <id>` | Set a task's status to `done`, file it under `tasks/archive/`, and repair links, in one atomic transition. |
 | `tasks archive` | File already-finished tasks under `tasks/archive/`; `--check` gates CI on the location invariant. |
-| `status` | Report repository, configuration, and portable-file state. |
-| `explain <path>` | Diagnose why one path would be included or excluded. |
+| `status` | Report repository, configuration, and portable-file state. *(experimental)* |
+| `explain <path>` | Diagnose why one path would be included or excluded. *(experimental)* |
 | `diff <before> <after>` | Report what changed between two context packets. |
-| `validate` | Validate configuration and portable task files. |
-| `doctor` | Check the repository and local CLI setup; exits 1 if a check fails. |
+| `validate` | Validate configuration and portable task files. *(experimental)* |
+| `doctor` | Check the repository and local CLI setup; exits 1 if a check fails. *(experimental)* |
 | `capabilities` | Report supported schemas and machine-interface features. |
 | `suggest-instructions` | Draft agent instruction files for human review. |
+| `verify <bundle>` | Check that an exported Struktly Record is intact, without Struktly. |
+| `version` | Print version and build metadata. |
 | `mcp` | Expose repository scanning and request-specific context over MCP stdio. |
-| `intel` | Pass a command through to the installed Struktly desktop app; exits 3 when it is absent. |
+| `intel` | Pass a command through to the installed Struktly desktop app; exits 127 when it is absent. |
 
-Run `struktly <command> --help` for flags.
+Run `struktly <command> --help` for flags. Commands marked experimental print
+that word in their own help; their output may change without the compatibility
+guarantees in [`docs/compatibility.md`](docs/compatibility.md).
 
 ## What enters a packet
 
@@ -157,7 +183,8 @@ The binary is resolved as `$STRUKTLY_INTEL`, then `intel` beside this executable
 then `intel` on `PATH`, then the desktop app's install location (on macOS,
 `/Applications/Struktly.app/Contents/MacOS/`), so a `struktly` installed on its
 own still finds the app. Without the desktop app, the command prints one sentence on stderr and
-exits 3, so a script can tell "not installed" apart from a failed operation.
+exits 127, so a script can tell "not installed" apart from any answer the
+platform itself gives.
 
 ## Machine interfaces
 

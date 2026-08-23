@@ -44,7 +44,16 @@ const (
 	// invocation) because "the platform is not installed" is neither: the
 	// command was well formed and nothing was attempted. A caller can branch on
 	// it to decide whether to prompt for an install.
-	intelMissingExit = 3
+	//
+	// 127 rather than a low number because this CLI cannot know which build of
+	// the platform is installed beside it. Shipped builds used 3 for "no daemon
+	// at -addr"; later ones moved that to 5. A caller that could not tell
+	// "Struktly is not on this machine" from "Struktly is here and not running"
+	// would have no use for either answer, and picking any code the platform
+	// has ever used makes that distinction depend on the user's app version.
+	// 127 is the shell's own code for a command that does not exist, which is
+	// exactly this condition, and no platform build returns it.
+	intelMissingExit = 127
 
 	intelMissingMessage = "Struktly's desktop platform is not installed on this machine, so `struktly intel` has nothing to drive. Install Struktly, or set " + intelEnvVar + " to its intel binary."
 )
