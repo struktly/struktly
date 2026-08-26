@@ -22,14 +22,18 @@ func bundleFor(t *testing.T, sealed string, digest string) string {
 	document := map[string]any{
 		"schema": "struktly/record-bundle/v1",
 		"manifest": map[string]any{
-			"execution_id":      "run_abc",
-			"provenance_id":     "provenance_1",
-			"revision":          2,
-			"disposition":       "completed",
-			"payload_schema":    "struktly/provenance/v1",
-			"payload_sha256":    digest,
-			"sealed_at":         "2026-08-13T10:00:00Z",
-			"evidence_sha256":   "e0e0",
+			"execution_id":   "run_abc",
+			"provenance_id":  "provenance_1",
+			"revision":       2,
+			"disposition":    "completed",
+			"payload_schema": "struktly/provenance/v1",
+			"payload_sha256": digest,
+			"sealed_at":      "2026-08-13T10:00:00Z",
+			// A real evidence digest, not a stub: schemas/record-bundle.v1.json
+			// requires 64 lowercase hex characters because that is what a
+			// sha256 of the evidence snapshot is, and a fixture shorter than
+			// the contract tests a bundle the platform cannot produce.
+			"evidence_sha256":   "e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0",
 			"evidence_embedded": false,
 		},
 		"sealed":      json.RawMessage(sealed),
