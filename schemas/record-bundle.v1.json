@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "struktly/record-bundle/v1",
+  "title": "Struktly Record bundle",
+  "description": "One sealed Struktly Record, exported so that somebody who does not run Struktly can check it. The manifest describes the sealed bytes; `sealed` carries those bytes verbatim. This document is the compatibility contract between whatever produced the bundle and whatever verifies it: a producer must emit exactly this shape, and a verifier may rely on it.",
+  "type": "object",
+  "properties": {
+    "schema": { "const": "struktly/record-bundle/v1" },
+    "manifest": { "$ref": "#/$defs/manifest" },
+    "sealed": {
+      "description": "The sealed payload exactly as it was sealed, carried raw. A verifier hashes these bytes and compares the result with manifest.payload_sha256, so re-encoding this value — reordering keys, changing whitespace — breaks verification even though the meaning is unchanged.",
+      "type": "object"
+    },
+    "exported_at": {
+      "description": "When the bundle was made. Deliberately outside the hashed payload: exporting a Record must not change it, so two bundles of one Record differ here and verify identically.",
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["schema", "manifest", "sealed"],
+  "additionalProperties": true,
+  "$defs": {
+    "manifest": {
+      "type": "object",
+      "description": "What a verifier checks the payload against.",
+      "properties": {
+        "execution_id": { "type": "string", "minLength": 1 },
+        "provenance_id": { "type": "string", "minLength": 1 },
+        "revision": {
+          "description": "Which sealed revision this is. Revisions start at 1; a superseded revision remains exportable and verifiable after a later one exists.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "disposition": {
+          "description": "What the Record says became of the work.",
+          "type": "string",
+          "minLength": 1
+        },
+        "payload_schema": { "type": "string", "minLength": 1 },
+        "payload_sha256": {
+          "description": "SHA-256 of the sealed bytes, lowercase hexadecimal. This is the whole of what a verifier can check by arithmetic.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "sealed_at": { "type": "string" },
+        "evidence_sha256": {
+          "description": "Digest of the evidence snapshot taken at seal time, where one exists. Optional, and the absence is meaningful rather than an omission: an execution with no evidence document, or one whose evidence could not be read when the Record was captured, seals without this field and records the reason as a capture limitation inside the payload. A verifier must therefore treat a missing key as 'no evidence snapshot was hashed', never as an invalid bundle.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "evidence_embedded": {
+          "description": "Whether the evidence snapshot's contents travel in this bundle. Always present, because a bundle that carries only a hash must say so — an omission a reader has to interpret is the thing this field exists to prevent.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "execution_id",
+        "provenance_id",
+        "revision",
+        "disposition",
+        "payload_schema",
+        "payload_sha256",
+        "sealed_at",
+        "evidence_embedded"
+      ],
+      "additionalProperties": true
+    }
+  }
+}
