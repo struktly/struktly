@@ -10,6 +10,9 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
+	"github.com/struktly/struktly/internal/schema"
+	"github.com/struktly/struktly/schemas"
 )
 
 // Verifying a Struktly Record without Struktly.
@@ -142,6 +145,30 @@ func verifyRecordBundle(path string) (verificationReport, error) {
 		report.Checks = append(report.Checks, verificationCheck{
 			Name: "schema", Status: "fail",
 			Message: fmt.Sprintf("bundle declares %q, this build verifies %q", bundle.Schema, recordBundleSchema),
+		})
+	}
+
+	// The shape, against the published contract rather than against a second
+	// description of it in this file. schemas/record-bundle.v1.json is what a
+	// producer is held to and what a third party reads; validating the document
+	// against that exact file is what stops the two from drifting.
+	//
+	// Separate from the digest check below, and deliberately so: "this is not a
+	// Record bundle" and "this is a Record bundle somebody altered" are
+	// different answers, and a reader who cannot tell them apart cannot act on
+	// either. A malformed document fails here and never reaches the arithmetic.
+	if contract, err := schemas.Bytes("record-bundle.v1.json"); err != nil {
+		report.Checks = append(report.Checks, verificationCheck{
+			Name: "contract", Status: "fail",
+			Message: "this build carries no published schema to check the bundle against: " + err.Error(),
+		})
+	} else if err := schema.ValidateJSON(contract, raw); err != nil {
+		report.Checks = append(report.Checks, verificationCheck{
+			Name: "contract", Status: "fail", Message: err.Error(),
+		})
+	} else {
+		report.Checks = append(report.Checks, verificationCheck{
+			Name: "contract", Status: "pass", Message: "struktly/record-bundle/v1",
 		})
 	}
 
