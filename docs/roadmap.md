@@ -6,7 +6,17 @@ repository state into a deterministic, inspectable context packet.
 
 The CLI does not own chats, provider sessions, working copies, approvals,
 checks, evidence, memory, request intelligence, routing, or review history.
-Those are Platform concerns.
+
+Most of those are Platform concerns. Request intelligence and routing are not,
+any more: the deterministic decision engine that classifies a request, admits
+capabilities and chooses a rung is now its own component, consumed by Platform
+rather than owned by it. The CLI still does not own it — but "not ours" and
+"Platform's" have stopped being the same statement, and where that component
+ends up is a separate decision that has not been taken.
+
+What has not changed is this repository's boundary. `struktly intel` remains a
+handoff to the installed desktop platform, and none of that implementation is
+duplicated here.
 
 ## Command model
 
