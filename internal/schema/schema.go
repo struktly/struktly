@@ -119,14 +119,28 @@ func (v validator) checkType(path string, schema map[string]any, value any) erro
 	if !ok {
 		return nil
 	}
-	name, ok := declared.(string)
-	if !ok {
-		return at(path, fmt.Errorf("type must be a string, got %T", declared))
+	switch typed := declared.(type) {
+	case string:
+		if matchesType(typed, value) {
+			return nil
+		}
+		return at(path, fmt.Errorf("expected %s, got %s", typed, jsonType(value)))
+	case []any:
+		names := make([]string, 0, len(typed))
+		for _, candidate := range typed {
+			name, ok := candidate.(string)
+			if !ok {
+				return at(path, fmt.Errorf("type entries must be strings, got %T", candidate))
+			}
+			names = append(names, name)
+			if matchesType(name, value) {
+				return nil
+			}
+		}
+		return at(path, fmt.Errorf("expected one of %s, got %s", strings.Join(names, ", "), jsonType(value)))
+	default:
+		return at(path, fmt.Errorf("type must be a string or array of strings, got %T", declared))
 	}
-	if matchesType(name, value) {
-		return nil
-	}
-	return at(path, fmt.Errorf("expected %s, got %s", name, jsonType(value)))
 }
 
 func matchesType(name string, value any) bool {
