@@ -2,6 +2,18 @@
 
 Notable changes will be recorded here.
 
+## [0.8.0](https://github.com/struktly/struktly/compare/v0.7.0...v0.8.0) (2026-08-27)
+
+
+### Features
+
+* **verify:** publish record-bundle/v1 and hold bundles to it ([5dea7f2](https://github.com/struktly/struktly/commit/5dea7f2e7d15c22f77dd3989d873b201967594f9))
+
+
+### Documentation
+
+* **roadmap:** intelligence is its own component now, not Platform's ([8002e52](https://github.com/struktly/struktly/commit/8002e52984356bb04e98e302fc8d92737a7701dd))
+
 ## [0.7.0](https://github.com/struktly/struktly/compare/v0.6.0...v0.7.0) (2026-08-23)
 
 
