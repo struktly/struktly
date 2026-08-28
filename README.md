@@ -15,7 +15,7 @@ repository guidance selected for one coding request, with a record of what was
 selected, what was excluded, and why.
 
 This repository is public so that decision can be audited. The
-[Struktly desktop app](https://struktly.io/) is a separate, closed product that
+[Struktly desktop app](https://struktly.app/) is a separate, closed product that
 runs and reviews agent work; it uses this CLI as its context layer. What you can
 read here is what the app uses to build context — so the selection behavior, the
 exclusions, and the limits are checkable by anyone, not taken on trust.
