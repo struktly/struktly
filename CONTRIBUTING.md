@@ -50,6 +50,8 @@ public Ubuntu runner. When hosted Actions cannot start, an authenticated
 maintainer runs `scripts/release-local.sh all`; it executes the same gates,
 creates the release-please tag and draft, builds all three deterministic
 targets locally, verifies the six-asset set, and only then publishes it.
+The laptop path pins `release-please@17.6.0`, matching the pinned v5 Action,
+rather than resolving a different release algorithm at execution time.
 
 The current version lives in
 [`.release-please-manifest.json`](.release-please-manifest.json) rather than

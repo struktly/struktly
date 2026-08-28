@@ -12,6 +12,7 @@ trap cleanup EXIT INT TERM
 
 grep -q '"draft": true' release-please-config.json
 grep -q '"force-tag-creation": true' release-please-config.json
+grep -q '^release_please=release-please@17.6.0$' scripts/release-local.sh
 grep -q 'isDraft --jq .isDraft)" = true' .github/workflows/release-assets.yml
 upload_line=$(grep -n 'gh release upload' .github/workflows/release-assets.yml | cut -d: -f1)
 publish_line=$(grep -n 'gh release edit.*--draft=false' .github/workflows/release-assets.yml | cut -d: -f1)
