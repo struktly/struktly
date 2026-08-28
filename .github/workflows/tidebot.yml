@@ -31,6 +31,6 @@ jobs:
     if: >-
       (github.event_name != 'pull_request' ||
        github.event.pull_request.head.repo.full_name == github.repository)
-    uses: fridthjof-labs/tidebot/.github/workflows/run.yml@2146374cf8560a802b41cc2aa938bb1c5fd2e2e5 # v0.1.2
+    uses: fridthjof-labs/tidebot/.github/workflows/run.yml@f790f18e306f6a1a23a28a7c18a5af10369df092 # v0.1.4
     with:
-      ref: 2146374cf8560a802b41cc2aa938bb1c5fd2e2e5 # v0.1.2
+      ref: f790f18e306f6a1a23a28a7c18a5af10369df092 # v0.1.4
