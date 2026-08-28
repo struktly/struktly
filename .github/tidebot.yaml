@@ -1,0 +1,5 @@
+# Repository-specific checks required before Tidebot may merge.
+tide:
+  requiredContexts:
+    - required checks
+
