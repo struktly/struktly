@@ -1,0 +1,36 @@
+# Tidebot runs inside this repository as github-actions[bot].
+name: Tidebot
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review, labeled, unlabeled]
+  issue_comment:
+    types: [created, edited]
+  pull_request_review:
+    types: [submitted]
+  check_suite:
+    types: [completed]
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  checks: read
+  statuses: read
+  actions: write
+  deployments: read
+
+concurrency:
+  group: tidebot-${{ github.event.pull_request.number || github.event.issue.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  tidebot:
+    if: >-
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.head.repo.full_name == github.repository)
+    uses: fridthjof-labs/tidebot/.github/workflows/run.yml@2146374cf8560a802b41cc2aa938bb1c5fd2e2e5 # v0.1.2
+    with:
+      ref: 2146374cf8560a802b41cc2aa938bb1c5fd2e2e5 # v0.1.2
