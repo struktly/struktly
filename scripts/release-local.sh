@@ -234,6 +234,10 @@ cmd_assets() {
 }
 
 cmd_all() {
+  require_clean_main
+  log_step "syncing main before the release gate"
+  git fetch origin main
+  git reset --hard origin/main
   cmd_check
   cmd_prepare
   [ -z "$prepared_tag" ] || cmd_assets "$prepared_tag"
