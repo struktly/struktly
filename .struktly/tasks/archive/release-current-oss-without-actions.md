@@ -3,7 +3,7 @@ type: task
 schema: struktly/task/v1
 id: release-current-oss-without-actions
 title: "Publish current OSS release assets without hosted Actions"
-status: in-progress
+status: done
 lane: release
 priority: critical
 created: 2026-08-28
@@ -59,3 +59,18 @@ Platform to pin.
 - `sh -n scripts/release-local.sh`
 - `shellcheck scripts/release-local.sh scripts/package-release-binary.sh scripts/test-release-binaries.sh`
 - `git diff --check`
+
+## Evidence
+
+- Local release asset publication merged through PR #37 as `b34b213f`; the
+  stale-main release gate followed through PR #38 as `2a2723ce`.
+- `v0.9.0` was published from exact commit
+  `576b772a3ac2cdce663cb4272fe534fe99ad68e4` after the complete release gate.
+- The release contains exactly three deterministic binaries and their three
+  checksum manifests. The binaries report `v0.9.0` and the exact release
+  revision.
+- Platform downloaded and verified all three published hashes before pinning
+  `v0.9.0`, then embedded that exact CLI in invite-ready Platform `v0.1.35`.
+- Pinned local release-please execution followed through PR #39 as `492a1be`.
+- Release binary contracts, full tests, race tests, lint, shell syntax,
+  ShellCheck and repository validation passed.
