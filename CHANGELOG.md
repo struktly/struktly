@@ -2,6 +2,24 @@
 
 Notable changes will be recorded here.
 
+## [0.9.0](https://github.com/struktly/struktly/compare/v0.8.0...v0.9.0) (2026-08-28)
+
+
+### Features
+
+* **verify:** report sealed record judgements ([#33](https://github.com/struktly/struktly/issues/33)) ([3889579](https://github.com/struktly/struktly/commit/3889579126831092a8a128e6a03cfd81046595fb))
+
+
+### Bug Fixes
+
+* **release:** publish OSS assets from the local runner ([#37](https://github.com/struktly/struktly/issues/37)) ([b34b213](https://github.com/struktly/struktly/commit/b34b213f8c47ef26bb47f05539d9e2e097363897))
+* **release:** sync main before local gates ([#38](https://github.com/struktly/struktly/issues/38)) ([2a2723c](https://github.com/struktly/struktly/commit/2a2723ce271d4fd571b964ffaf0447b51abb9c2b))
+
+
+### Documentation
+
+* link to struktly.app ([#35](https://github.com/struktly/struktly/issues/35)) ([1c8fd37](https://github.com/struktly/struktly/commit/1c8fd378bbe571933880871650cb6cd0f477582b))
+
 ## [0.8.0](https://github.com/struktly/struktly/compare/v0.7.0...v0.8.0) (2026-08-27)
 
 
