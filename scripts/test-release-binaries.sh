@@ -19,6 +19,17 @@ test -n "$upload_line"
 test -n "$publish_line"
 test "$upload_line" -lt "$publish_line"
 
+grep -q 'assets)  shift; cmd_assets' scripts/release-local.sh
+# The single quotes are intentional: assert the literal shell variables remain
+# in the release implementation rather than expanding in this contract test.
+# shellcheck disable=SC2016
+grep -q 'package-release-binary.sh.*"$tag".*"$target"' scripts/release-local.sh
+local_upload_line=$(grep -n 'gh release upload.*--clobber' scripts/release-local.sh | cut -d: -f1)
+local_publish_line=$(grep -n 'gh release edit.*--draft=false' scripts/release-local.sh | cut -d: -f1)
+test -n "$local_upload_line"
+test -n "$local_publish_line"
+test "$local_upload_line" -lt "$local_publish_line"
+
 tag=$(git -C "$root" tag --points-at HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
 if [ -z "$tag" ]; then
 	tag=v0.0.0

@@ -20,18 +20,15 @@ set -eu
 #             install smoke test in a clean repository. Same as ci.yml's
 #             `test` and `release-readiness` jobs. Changes nothing.
 #   prepare   release-please release-pr -> you review -> merge -> release-please
-#             github-release. Produces the version bump commit, the tag, and
-#             the published GitHub release. Same as release.yml.
-#   all       check, then prepare. What you want for "just cut the release".
-#
-# There is nothing to build and attach. Struktly is installed with
-# `go install github.com/struktly/struktly/cmd/struktly@vX.Y.Z`, so the tag is
-# the release: the module proxy serves it and `struktly version` reports it
-# from the build information Go records at install time.
+#             github-release. Produces the version bump commit, tag, and draft.
+#   assets    build all three deterministic binaries for an existing draft,
+#             upload them, verify the set, and publish the release.
+#   all       check, then prepare, then assets. What you want for "just cut the
+#             release" while hosted Actions are unavailable.
 #
 # Requires: gh (authenticated, with write access to struktly/struktly), git,
 # jq, bun, and go.
-root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+root=$(unset CDPATH; cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$root"
 
 owner=struktly
@@ -40,6 +37,7 @@ repo_url="https://github.com/$owner/$repo"
 # The module path kept zricethezav after the project moved to the gitleaks
 # organization, so the import path and the repository URL disagree.
 gitleaks_module=github.com/zricethezav/gitleaks/v8@v8.30.1
+prepared_tag=
 
 if [ -t 1 ]; then
   C_RESET='\033[0m'; C_DIM='\033[2m'; C_BOLD='\033[1m'
@@ -161,14 +159,16 @@ cmd_prepare() {
   read -r ans
   case "$ans" in
     y|Y|yes|YES) ;;
-    *) log_info "left #$pr_number open; merge it yourself, then re-run 'prepare' to tag and publish"; return 0 ;;
+    *) log_info "left #$pr_number open; merge it yourself, then re-run 'prepare' to create the tag and draft"; return 0 ;;
   esac
 
   log_step "merging #$pr_number"
   # Squash, to match the workflow and keep main's linear-history rule.
-  gh pr merge "$pr_number" -R "$owner/$repo" --squash --delete-branch
+  merge_admin=
+  case "${STRUKTLY_RELEASE_ADMIN_MERGE:-}" in 1|true|TRUE|yes|YES) merge_admin=--admin ;; esac
+  gh pr merge "$pr_number" -R "$owner/$repo" --squash --delete-branch ${merge_admin:+"$merge_admin"}
 
-  log_step "tagging and publishing the GitHub release"
+  log_step "tagging and creating the draft GitHub release"
   # Reads the merged manifest, so the tag is whatever was actually merged
   # rather than whatever this shell computed a minute ago.
   bunx release-please github-release \
@@ -181,13 +181,62 @@ cmd_prepare() {
   git fetch origin main --tags
   git reset --hard origin/main
   tag=$(git describe --tags --abbrev=0)
-  log_ok "released $tag"
+  prepared_tag=$tag
+  log_ok "prepared $tag as a draft"
+}
+
+cmd_assets() {
+  tag=${1:?usage: scripts/release-local.sh assets TAG}
+  require_tools git gh go
+  require_clean_main
+
+  log_step "verifying the draft release"
+  git fetch origin "refs/tags/$tag:refs/tags/$tag"
+  revision=$(git rev-list -n 1 "$tag")
+  [ -n "$revision" ] || fail "tag does not exist: $tag"
+  [ "$(gh release view "$tag" -R "$owner/$repo" --json isDraft --jq .isDraft)" = true ] ||
+    fail "$tag is not a draft release"
+  [ "$(gh release view "$tag" -R "$owner/$repo" --json isPrerelease --jq .isPrerelease)" = false ] ||
+    fail "$tag is unexpectedly a prerelease"
+  [ "$(gh release view "$tag" -R "$owner/$repo" --json targetCommitish --jq .targetCommitish)" = "$revision" ] ||
+    fail "$tag release target does not match its tag"
+
+  assets_root=$(mktemp -d)
+  assets_checkout="$assets_root/repository"
+  assets_dist="$assets_root/dist"
+  cleanup_assets() {
+    git -C "$root" worktree remove "$assets_checkout" >/dev/null 2>&1 || true
+    rm -rf "$assets_root"
+  }
+  trap cleanup_assets EXIT INT TERM
+  git worktree add --detach "$assets_checkout" "$tag" >/dev/null
+  mkdir "$assets_dist"
+
+  log_step "building deterministic release binaries"
+  for target in aarch64-apple-darwin x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu; do
+    "$assets_checkout/scripts/package-release-binary.sh" "$tag" "$target" "$assets_dist"
+  done
+
+  log_step "uploading and publishing $tag"
+  gh release upload "$tag" -R "$owner/$repo" --clobber "$assets_dist"/*
+  expected=$(find "$assets_dist" -maxdepth 1 -type f | wc -l | tr -d ' ')
+  actual=$(gh release view "$tag" -R "$owner/$repo" --json assets --jq '.assets | length')
+  [ "$expected" = 6 ] || fail "built $expected assets, expected 6"
+  [ "$actual" = "$expected" ] || fail "uploaded $actual assets, expected $expected"
+  gh release edit "$tag" -R "$owner/$repo" --draft=false --prerelease=false --latest
+  [ "$(gh release view "$tag" -R "$owner/$repo" --json isDraft --jq .isDraft)" = false ] ||
+    fail "$tag remained a draft after publication"
+
+  cleanup_assets
+  trap - EXIT INT TERM
+  log_ok "released $tag with $actual verified assets"
   log_info "install it with: go install github.com/$owner/$repo/cmd/struktly@$tag"
 }
 
 cmd_all() {
   cmd_check
   cmd_prepare
+  [ -z "$prepared_tag" ] || cmd_assets "$prepared_tag"
 }
 
 usage() {
@@ -195,16 +244,20 @@ usage() {
 usage: scripts/release-local.sh <command>
 
   check     run every gate CI runs, and change nothing
-  prepare   open/update the release PR, merge it, tag and publish
-  all       check, then prepare
+  prepare   open/update the release PR, merge it, tag and leave a draft
+  assets    build, upload, verify and publish an existing draft tag
+  all       check, prepare, build assets and publish
 
-Runs the same stages as .github/workflows/, with your own gh auth.
+Runs the same stages as .github/workflows/, with your own gh auth. Set
+STRUKTLY_RELEASE_ADMIN_MERGE=1 only when hosted checks cannot start and the
+complete local check has passed in this run.
 USAGE
 }
 
 case "${1:-}" in
   check)   shift; cmd_check "$@" ;;
   prepare) shift; cmd_prepare "$@" ;;
+  assets)  shift; cmd_assets "$@" ;;
   all)     shift; cmd_all "$@" ;;
   ""|-h|--help|help) usage ;;
   *) usage; exit 1 ;;
