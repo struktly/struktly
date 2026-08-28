@@ -30,6 +30,13 @@ test -n "$local_upload_line"
 test -n "$local_publish_line"
 test "$local_upload_line" -lt "$local_publish_line"
 
+all_block=$(sed -n '/^cmd_all()/,/^}/p' scripts/release-local.sh)
+sync_line=$(printf '%s\n' "$all_block" | grep -n 'git reset --hard origin/main' | cut -d: -f1)
+check_line=$(printf '%s\n' "$all_block" | grep -n 'cmd_check' | cut -d: -f1)
+test -n "$sync_line"
+test -n "$check_line"
+test "$sync_line" -lt "$check_line"
+
 tag=$(git -C "$root" tag --points-at HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
 if [ -z "$tag" ]; then
 	tag=v0.0.0
