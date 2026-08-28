@@ -37,6 +37,7 @@ repo_url="https://github.com/$owner/$repo"
 # The module path kept zricethezav after the project moved to the gitleaks
 # organization, so the import path and the repository URL disagree.
 gitleaks_module=github.com/zricethezav/gitleaks/v8@v8.30.1
+release_please=release-please@17.6.0
 prepared_tag=
 
 if [ -t 1 ]; then
@@ -126,7 +127,7 @@ cmd_check() {
 # --- prepare: version bump, tag, GitHub release (release.yml) ---
 
 cmd_prepare() {
-  require_tools git gh jq bun go
+  require_tools git gh jq npx go
   require_clean_main
   log_step "syncing main"
   git fetch origin main
@@ -138,7 +139,7 @@ cmd_prepare() {
   # The same config the workflow uses, so the version this computes locally is
   # the version CI would have computed. A local run that used different rules
   # would be a second release process wearing the first one's name.
-  bunx release-please release-pr \
+  npx --yes "$release_please" release-pr \
     --repo-url="$repo_url" \
     --token="$token" \
     --config-file=release-please-config.json \
@@ -171,7 +172,7 @@ cmd_prepare() {
   log_step "tagging and creating the draft GitHub release"
   # Reads the merged manifest, so the tag is whatever was actually merged
   # rather than whatever this shell computed a minute ago.
-  bunx release-please github-release \
+  npx --yes "$release_please" github-release \
     --repo-url="$repo_url" \
     --token="$token" \
     --config-file=release-please-config.json \
