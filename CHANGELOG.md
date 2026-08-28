@@ -2,6 +2,18 @@
 
 Notable changes will be recorded here.
 
+## [0.9.1](https://github.com/struktly/struktly/compare/v0.9.0...v0.9.1) (2026-08-28)
+
+
+### Bug Fixes
+
+* **release:** pin the local release-please version ([#39](https://github.com/struktly/struktly/issues/39)) ([492a1be](https://github.com/struktly/struktly/commit/492a1be503e3c2f97c20e0422978448e050c6db0))
+
+
+### Documentation
+
+* **tasks:** archive local OSS release task ([#41](https://github.com/struktly/struktly/issues/41)) ([55cf488](https://github.com/struktly/struktly/commit/55cf4881f35f7fa10d421279ba8c3366489623fc))
+
 ## [0.9.0](https://github.com/struktly/struktly/compare/v0.8.0...v0.9.0) (2026-08-28)
 
 
