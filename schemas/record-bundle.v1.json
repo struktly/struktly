@@ -9,7 +9,11 @@
     "manifest": { "$ref": "#/$defs/manifest" },
     "sealed": {
       "description": "The sealed payload exactly as it was sealed, carried raw. A verifier hashes these bytes and compares the result with manifest.payload_sha256, so re-encoding this value — reordering keys, changing whitespace — breaks verification even though the meaning is unchanged.",
-      "type": "object"
+      "type": "object",
+      "properties": {
+        "judgements": { "$ref": "#/$defs/judgements" }
+      },
+      "additionalProperties": true
     },
     "exported_at": {
       "description": "When the bundle was made. Deliberately outside the hashed payload: exporting a Record must not change it, so two bundles of one Record differ here and verify identically.",
@@ -63,6 +67,117 @@
         "sealed_at",
         "evidence_embedded"
       ],
+      "additionalProperties": true
+    },
+    "judgements": {
+      "description": "Conclusions carried inside the sealed bytes. The property is optional only for v1 Records sealed before judgement snapshots existed. When this object is present, empty arrays mean the producer evaluated that category and found none; they are not unknown.",
+      "type": "object",
+      "properties": {
+        "compliance": {
+          "description": "The recorded compliance verdict, or null when no compliance verdict was recorded.",
+          "$ref": "#/$defs/compliance"
+        },
+        "decisions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/decision" }
+        },
+        "escalations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/escalation" }
+        },
+        "limitations": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "required": ["compliance", "decisions", "escalations", "limitations"],
+      "additionalProperties": true
+    },
+    "compliance": {
+      "type": ["object", "null"],
+      "properties": {
+        "decision_id": { "type": "string", "minLength": 1 },
+        "outcome": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string" },
+        "actor": { "type": "string", "minLength": 1 },
+        "decided_at": { "type": "string", "minLength": 1 },
+        "observed": { "type": "boolean" },
+        "unobserved": { "type": "string", "minLength": 1 },
+        "satisfied": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "unchecked": { "type": "integer", "minimum": 0 },
+        "judgement": { "type": "integer", "minimum": 0 },
+        "complete": { "type": "boolean" },
+        "verdicts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/verdict" }
+        }
+      },
+      "required": [
+        "decision_id",
+        "outcome",
+        "actor",
+        "decided_at",
+        "observed",
+        "satisfied",
+        "failed",
+        "unchecked",
+        "judgement",
+        "complete",
+        "verdicts"
+      ],
+      "additionalProperties": true
+    },
+    "verdict": {
+      "type": "object",
+      "properties": {
+        "statement_id": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string" },
+        "text": { "type": "string", "minLength": 1 },
+        "verdict": { "type": "string", "minLength": 1 },
+        "command": { "type": "string" },
+        "reason": { "type": "string" },
+        "path": { "type": "string" },
+        "revision": { "type": "string" },
+        "line": { "type": "integer", "minimum": 1 },
+        "status": { "type": "string" }
+      },
+      "required": ["statement_id", "text", "verdict"],
+      "additionalProperties": true
+    },
+    "decision": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "minLength": 1 },
+        "outcome": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string" },
+        "actor": { "type": "string", "minLength": 1 },
+        "decided_at": { "type": "string", "minLength": 1 },
+        "evidence_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "evidence_embedded": { "type": "boolean" },
+        "evidence_unavailable": { "type": "string", "minLength": 1 }
+      },
+      "required": ["id", "kind", "outcome", "actor", "decided_at", "evidence_embedded"],
+      "additionalProperties": true
+    },
+    "escalation": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "minLength": 1 },
+        "question": { "type": "string", "minLength": 1 },
+        "answered": { "type": "boolean" },
+        "answer": { "type": "string", "minLength": 1 },
+        "answered_by": { "type": "string", "minLength": 1 },
+        "answered_at": { "type": "string", "minLength": 1 },
+        "raised_by": { "type": "string", "minLength": 1 },
+        "raised_at": { "type": "string", "minLength": 1 },
+        "fingerprint": { "type": "string" },
+        "evidence_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "evidence_embedded": { "type": "boolean" }
+      },
+      "required": ["id", "kind", "question", "answered", "raised_by", "raised_at", "evidence_embedded"],
       "additionalProperties": true
     }
   }

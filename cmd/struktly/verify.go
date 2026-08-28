@@ -61,6 +61,74 @@ type verificationCheck struct {
 	Message string `json:"message,omitempty"`
 }
 
+// verificationJudgements is what the intact sealed payload carried, not a new
+// judgement made by this verifier. Available separates a new Record whose
+// lists were read and empty from an older v1 payload with no judgements section.
+type verificationJudgements struct {
+	Available   bool                     `json:"available"`
+	Unavailable string                   `json:"unavailable,omitempty"`
+	Compliance  *verificationCompliance  `json:"compliance"`
+	Decisions   []verificationDecision   `json:"decisions"`
+	Escalations []verificationEscalation `json:"escalations"`
+	Limitations []string                 `json:"limitations"`
+}
+
+type verificationCompliance struct {
+	DecisionID string                `json:"decision_id"`
+	Outcome    string                `json:"outcome"`
+	Reason     string                `json:"reason,omitempty"`
+	Actor      string                `json:"actor"`
+	DecidedAt  string                `json:"decided_at"`
+	Observed   bool                  `json:"observed"`
+	Unobserved string                `json:"unobserved,omitempty"`
+	Satisfied  int                   `json:"satisfied"`
+	Failed     int                   `json:"failed"`
+	Unchecked  int                   `json:"unchecked"`
+	Judgement  int                   `json:"judgement"`
+	Complete   bool                  `json:"complete"`
+	Verdicts   []verificationVerdict `json:"verdicts"`
+}
+
+type verificationVerdict struct {
+	StatementID string `json:"statement_id"`
+	Kind        string `json:"kind,omitempty"`
+	Text        string `json:"text"`
+	Verdict     string `json:"verdict"`
+	Command     string `json:"command,omitempty"`
+	Reason      string `json:"reason,omitempty"`
+	Path        string `json:"path,omitempty"`
+	Revision    string `json:"revision,omitempty"`
+	Line        int    `json:"line,omitempty"`
+	Status      string `json:"status,omitempty"`
+}
+
+type verificationDecision struct {
+	ID                  string `json:"id"`
+	Kind                string `json:"kind"`
+	Outcome             string `json:"outcome"`
+	Reason              string `json:"reason,omitempty"`
+	Actor               string `json:"actor"`
+	DecidedAt           string `json:"decided_at"`
+	EvidenceSHA256      string `json:"evidence_sha256,omitempty"`
+	EvidenceEmbedded    bool   `json:"evidence_embedded"`
+	EvidenceUnavailable string `json:"evidence_unavailable,omitempty"`
+}
+
+type verificationEscalation struct {
+	ID               string `json:"id"`
+	Kind             string `json:"kind"`
+	Question         string `json:"question"`
+	Answered         bool   `json:"answered"`
+	Answer           string `json:"answer,omitempty"`
+	AnsweredBy       string `json:"answered_by,omitempty"`
+	AnsweredAt       string `json:"answered_at,omitempty"`
+	RaisedBy         string `json:"raised_by"`
+	RaisedAt         string `json:"raised_at"`
+	Fingerprint      string `json:"fingerprint,omitempty"`
+	EvidenceSHA256   string `json:"evidence_sha256,omitempty"`
+	EvidenceEmbedded bool   `json:"evidence_embedded"`
+}
+
 type verificationReport struct {
 	Schema string              `json:"schema"`
 	Path   string              `json:"path"`
@@ -74,6 +142,9 @@ type verificationReport struct {
 		Disposition string `json:"disposition"`
 		SealedAt    string `json:"sealed_at,omitempty"`
 	} `json:"record"`
+	// Judgements reports only values carried inside an intact sealed payload.
+	// It never evaluates whether those conclusions were correct.
+	Judgements verificationJudgements `json:"judgements"`
 	// Unverifiable states what this bundle does not let anybody check, so an
 	// intact result is not read as a broader guarantee than it is.
 	Unverifiable []string `json:"unverifiable"`
@@ -119,7 +190,12 @@ func newVerifyCmd() *cobra.Command {
 }
 
 func verifyRecordBundle(path string) (verificationReport, error) {
-	report := verificationReport{Schema: recordVerificationSchema, Path: path, Checks: []verificationCheck{}}
+	report := verificationReport{
+		Schema: recordVerificationSchema, Path: path, Checks: []verificationCheck{},
+		Judgements: verificationJudgements{
+			Unavailable: "not reported because the bundle did not verify as intact",
+		},
+	}
 	file, err := os.Open(path)
 	if err != nil {
 		return verificationReport{}, invalidInvocation(fmt.Errorf("read bundle: %w", err))
@@ -235,7 +311,29 @@ func verifyRecordBundle(path string) (verificationReport, error) {
 		report.Unverifiable = append(report.Unverifiable, note)
 	}
 	report.Intact = !report.failed()
+	if report.Intact {
+		report.Judgements = readVerifiedJudgements(bundle.Sealed)
+	}
 	return report, nil
+}
+
+func readVerifiedJudgements(sealed json.RawMessage) verificationJudgements {
+	var payload map[string]json.RawMessage
+	if err := json.Unmarshal(sealed, &payload); err != nil {
+		return verificationJudgements{Unavailable: "the verified payload could not be read"}
+	}
+	raw, present := payload["judgements"]
+	if !present {
+		return verificationJudgements{
+			Unavailable: "this v1 Record was sealed before judgement snapshots were carried",
+		}
+	}
+	var report verificationJudgements
+	if err := json.Unmarshal(raw, &report); err != nil {
+		return verificationJudgements{Unavailable: "the verified judgement snapshot could not be read"}
+	}
+	report.Available = true
+	return report
 }
 
 func writeVerificationReport(w io.Writer, report verificationReport) error {
@@ -256,10 +354,118 @@ func writeVerificationReport(w io.Writer, report verificationReport) error {
 		verdict, report.Record.ExecutionID, report.Record.Revision); err != nil {
 		return err
 	}
+	if err := writeVerificationJudgements(w, report.Judgements); err != nil {
+		return err
+	}
 	for _, note := range report.Unverifiable {
 		if _, err := fmt.Fprintf(w, "not checked: %s\n", note); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func writeVerificationJudgements(w io.Writer, judgements verificationJudgements) error {
+	if !judgements.Available {
+		_, err := fmt.Fprintf(w, "judgements: unavailable — %s\n", judgements.Unavailable)
+		return err
+	}
+	if _, err := fmt.Fprintln(w,
+		"judgements: carried inside the verified payload — integrity and consistency only; correctness not checked"); err != nil {
+		return err
+	}
+	if judgements.Compliance == nil {
+		if _, err := fmt.Fprintln(w, "compliance: no recorded verdict"); err != nil {
+			return err
+		}
+	} else {
+		compliance := judgements.Compliance
+		line := fmt.Sprintf("compliance: %s by %s at %s", compliance.Outcome, compliance.Actor, compliance.DecidedAt)
+		if compliance.Reason != "" {
+			line += " — " + compliance.Reason
+		}
+		if _, err := fmt.Fprintln(w, line); err != nil {
+			return err
+		}
+		if compliance.Observed {
+			if _, err := fmt.Fprintf(w, "rules: %d satisfied, %d failed, %d unchecked, %d judgement\n",
+				compliance.Satisfied, compliance.Failed, compliance.Unchecked, compliance.Judgement); err != nil {
+				return err
+			}
+		} else if compliance.Unobserved != "" {
+			if _, err := fmt.Fprintln(w, "compliance observation: unavailable — "+compliance.Unobserved); err != nil {
+				return err
+			}
+		}
+		for _, rule := range compliance.Verdicts {
+			line := fmt.Sprintf("rule %s [%s]: %s", rule.StatementID, rule.Verdict, rule.Text)
+			if source := verificationRuleSource(rule); source != "" {
+				line += " — " + source
+			}
+			if rule.Reason != "" {
+				line += " — " + rule.Reason
+			}
+			if _, err := fmt.Fprintln(w, line); err != nil {
+				return err
+			}
+		}
+	}
+	if len(judgements.Decisions) == 0 {
+		if _, err := fmt.Fprintln(w, "decisions: none"); err != nil {
+			return err
+		}
+	} else {
+		for _, decision := range judgements.Decisions {
+			line := fmt.Sprintf("decision %s [%s]: %s by %s at %s",
+				decision.ID, decision.Kind, decision.Outcome, decision.Actor, decision.DecidedAt)
+			if decision.Reason != "" {
+				line += " — " + decision.Reason
+			}
+			if _, err := fmt.Fprintln(w, line); err != nil {
+				return err
+			}
+		}
+	}
+	if len(judgements.Escalations) == 0 {
+		if _, err := fmt.Fprintln(w, "escalations: none"); err != nil {
+			return err
+		}
+	} else {
+		for _, escalation := range judgements.Escalations {
+			state := "open"
+			if escalation.Answered {
+				state = "answered"
+			}
+			if _, err := fmt.Fprintf(w, "escalation %s [%s] raised by %s at %s: %s\n",
+				escalation.ID, state, escalation.RaisedBy, escalation.RaisedAt, escalation.Question); err != nil {
+				return err
+			}
+			if escalation.Answered {
+				if _, err := fmt.Fprintf(w, "answer by %s at %s: %s\n",
+					escalation.AnsweredBy, escalation.AnsweredAt, escalation.Answer); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	for _, limitation := range judgements.Limitations {
+		if _, err := fmt.Fprintln(w, "judgement limitation: "+limitation); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func verificationRuleSource(rule verificationVerdict) string {
+	source := rule.Path
+	if rule.Revision != "" {
+		if source != "" {
+			source += "@"
+		}
+		source += rule.Revision
+	}
+	if rule.Line > 0 {
+		source += fmt.Sprintf(":%d", rule.Line)
+	}
+	return source
 }

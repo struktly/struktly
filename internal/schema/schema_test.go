@@ -63,6 +63,20 @@ func TestValidateResolvesLocalRefs(t *testing.T) {
 	}
 }
 
+func TestValidateAcceptsMultipleTypes(t *testing.T) {
+	const schema = `{"type":["object","null"],"required":["id"],"properties":{"id":{"type":"string"}}}`
+	for _, doc := range []string{`null`, `{"id":"x"}`} {
+		if err := ValidateJSON([]byte(schema), []byte(doc)); err != nil {
+			t.Fatalf("valid document %s rejected: %v", doc, err)
+		}
+	}
+	for _, doc := range []string{`"x"`, `{}`} {
+		if err := ValidateJSON([]byte(schema), []byte(doc)); err == nil {
+			t.Fatalf("invalid document %s accepted", doc)
+		}
+	}
+}
+
 func TestValidateRejectsRemoteRefs(t *testing.T) {
 	const schema = `{"type":"object","properties":{"a":{"$ref":"https://example.invalid/s.json"}}}`
 	err := ValidateJSON([]byte(schema), []byte(`{"a":1}`))
