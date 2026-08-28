@@ -44,8 +44,12 @@ pre-1.0 a `!` breaking change bumps the minor rather than the major.
 Struktly remains installable with
 `go install github.com/struktly/struktly/cmd/struktly@vX.Y.Z`. Each stable
 release also carries checksum-manifested binaries for the targets consumed by
-Struktly Platform. They are built from the release tag on public Ubuntu runners
-with the exact version and revision embedded, and are never overwritten.
+Struktly Platform. They are built from the release tag with the exact version
+and revision embedded, and are never overwritten. The normal path uses the
+public Ubuntu runner. When hosted Actions cannot start, an authenticated
+maintainer runs `scripts/release-local.sh all`; it executes the same gates,
+creates the release-please tag and draft, builds all three deterministic
+targets locally, verifies the six-asset set, and only then publishes it.
 
 The current version lives in
 [`.release-please-manifest.json`](.release-please-manifest.json) rather than
