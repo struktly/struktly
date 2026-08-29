@@ -1,7 +1,17 @@
 name: Release
 
+# Tidebot merges as github-actions[bot], and GitHub does not let a
+# GITHUB_TOKEN-authenticated push trigger another workflow's `push` event. A
+# Tidebot-merged release PR therefore leaves the tag uncut until the next human
+# push to main. Running again after Tidebot finishes on main closes that gap;
+# release-please is idempotent, and release-assets stays gated on
+# release-created, so a run with nothing to release builds nothing.
 on:
   push:
+    branches: [main]
+  workflow_run:
+    workflows: [Tidebot]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
