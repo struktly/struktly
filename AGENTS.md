@@ -1,8 +1,9 @@
 # Working in this repository
 
-`struktly` decides what a coding agent is given: it reads a local Git repository
-and produces a context packet recording what was selected, what was excluded,
-and why. The repository is public so that decision can be audited by anyone.
+`struktly` is the part of Struktly that can be checked from outside. It decides
+what a coding agent is given — a context packet recording what was selected,
+what was excluded, and why — and it verifies that an exported Record is the one
+that was sealed. The repository is public so both can be audited by anyone.
 
 ## Read before changing anything
 
@@ -22,7 +23,7 @@ documents above are the reasoning behind it.
 
 ## What must stay true
 
-`boundary_test.go` holds the first two. The rest are held by review.
+A test holds each of these; the one held only by review says so.
 
 - **No network.** The CLI reads a repository and writes a file. It does not call
   a model, upload source, or fetch anything.
@@ -37,10 +38,13 @@ documents above are the reasoning behind it.
 - **Opinions come from the repository, not from Go.** Direction and constraints
   are read from `.struktly/direction.md`, `constraints.md`, and `decisions.md`.
   Never compile one repository's opinions into a string literal that every other
-  repository would then inherit.
-- **Machine surfaces are versioned.** A new command, schema, or feature is
-  advertised by `capabilities`; removing one that a consumer negotiates is a
-  breaking change and fails a test.
+  repository would then inherit. Held by review.
+- **Machine surfaces are versioned, and `capabilities` describes this binary.**
+  An advertised command must resolve in the command tree, an advertised schema
+  must be a published file, and removing anything a consumer negotiates is a
+  breaking change; each fails a test. The feature list is not yet held this
+  way — [`.struktly/tasks/bind-features-to-proof.md`](.struktly/tasks/bind-features-to-proof.md)
+  is that work.
 - **Writes stay under `.struktly/`,** and `--no-write` means nothing is written
   at all. Product state — chats, executions, approvals, evidence, memory — is
   the desktop product's, not this repository's.

@@ -63,7 +63,7 @@ window, because from that point the guarantee is real.
 - **CLI surface**: versioned machine commands and flags change only with an explicit schema or capability update.
 - **Command language**: `context` is the primary name for request-scoped packet generation. `brief` remains a compatibility alias.
 - **`intel` is outside this policy.** `struktly intel` passes its arguments to the desktop platform's own binary; its subcommands, output, and exit codes are versioned by that product, not here. The only part this repository guarantees is the handover itself: arguments and environment unchanged, the platform's exit code returned, exit 127 when the platform is not installed, and exit 126 when the binary found for it cannot be run. See [integration-contract.md](integration-contract.md).
-- **MCP wire names** (tools, resource URIs) are a compatibility surface once released; renames follow the breaking-change rule.
+- **MCP tool names** (`context_scan`, `context_brief`) are a compatibility surface; renames follow the breaking-change rule.
 
 ## The negotiated contract
 
@@ -74,6 +74,17 @@ that covers is held by a test rather than by this document:
 [`cmd/struktly/main_test.go`](../cmd/struktly/main_test.go) names every command,
 schema, and feature a consumer is entitled to find. Removing one fails here, at
 the change that removed it, instead of in somebody else's build weeks later.
+
+The advertised lists are also held to the binary rather than to themselves.
+`TestAdvertisedCommandsExistInCobraTree` requires every advertised command to
+resolve in the command tree, and every command in the tree to be advertised or
+named as outside the contract. `TestAdvertisedSchemasExistAndAreEnforceable`
+requires every advertised schema to be a file in `schemas/` or a declared
+Markdown-only identifier, and every file to be advertised or declared
+input-only. Both are in [`cmd/struktly/contract_test.go`](../cmd/struktly/contract_test.go).
+The feature list is still maintained by hand;
+[`.struktly/tasks/bind-features-to-proof.md`](../.struktly/tasks/bind-features-to-proof.md)
+is the work that changes that.
 
 The list is deliberately not repeated in this file. A contract written down
 twice eventually disagrees with itself, and the copy without the test is the one
@@ -100,7 +111,7 @@ Markdown. `metadata.absolute_git_root` is always `.` in portable output.
 
 ## Repository and runtime layout
 
-`.struktly/` contains portable declarations, approved knowledge, and explicit
+`.struktly/` contains portable declarations, user-owned guidance, and explicit
 export artifacts:
 
 ```
