@@ -2,6 +2,18 @@
 
 Notable changes will be recorded here.
 
+## [0.9.2](https://github.com/struktly/struktly/compare/v0.9.1...v0.9.2) (2026-09-01)
+
+
+### Bug Fixes
+
+* **ci:** cut the release tag after a Tidebot merge ([#44](https://github.com/struktly/struktly/issues/44)) ([6b13d4e](https://github.com/struktly/struktly/commit/6b13d4eab9373572cfcf29cda1b15e12a2d877b4))
+
+
+### Documentation
+
+* align the repository's prose with the binary it describes ([#47](https://github.com/struktly/struktly/issues/47)) ([c91e203](https://github.com/struktly/struktly/commit/c91e203f8d84377f3f2ebe83543d2c8052864f6d))
+
 ## [0.9.1](https://github.com/struktly/struktly/compare/v0.9.0...v0.9.1) (2026-08-28)
 
 
