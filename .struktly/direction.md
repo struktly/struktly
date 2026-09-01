@@ -1,9 +1,11 @@
 # Direction
 
-`struktly` is the part of Struktly that decides what a coding agent is given. It
-reads a local Git repository and returns the files and repository guidance
-selected for one coding request, with the reason recorded per file and every
-exclusion and truncation stated.
+`struktly` is the part of Struktly that can be checked from outside. Before work
+it decides what a coding agent is given: it reads a local Git repository and
+returns the files and repository guidance selected for one coding request, with
+the reason recorded per file and every exclusion and truncation stated. After
+work, `verify` checks that an exported Record is the one that was sealed.
+`intel` is a handover to the desktop product and nothing more.
 
 The repository is public so that decision is auditable. The value is not that
 the files are better chosen than the ones a person would have pasted, but that

@@ -1,8 +1,10 @@
 # CLI scope and roadmap
 
-Struktly CLI is the open-source context engine shared by developers, coding
-agents, and the Struktly desktop app. It turns a coding request plus live Git
-repository state into a deterministic, inspectable context packet.
+Struktly CLI is the open-source, checkable edge of Struktly, shared by
+developers, coding agents, and the Struktly desktop app. Before work it turns a
+coding request plus live Git repository state into a deterministic, inspectable
+context packet; after work it verifies that an exported Record is intact.
+Context is the primary product and the subject of this roadmap.
 
 The CLI does not own chats, provider sessions, working copies, approvals,
 checks, evidence, memory, request intelligence, routing, or review history.
@@ -32,6 +34,8 @@ an import of an unpublished sibling rather than leaving it for whoever next runs
 - `tasks` returns repository-owned task declarations as `struktly/tasks/v1`.
 - `explain <path>` diagnoses the selector's decision for one file. It does not
   create context or change configuration.
+- `verify <bundle>` checks an exported Record without Struktly and returns
+  `struktly/record-verification/v1`.
 
 ## Current foundation
 
@@ -40,6 +44,9 @@ an import of an unpublished sibling rather than leaving it for whoever next runs
   network, no dependency brings one in unrecorded, and the installed command
   links cobra and what cobra brings.
 - Deterministic packet identity and versioned JSON schemas.
+- A capabilities document held to the binary: advertised commands resolve in
+  the command tree and advertised schemas are published files, in both
+  directions.
 - Explicit provenance, exclusions, truncation, and content hashes.
 - Secret, binary, ignored-file, symlink, and size protections.
 - Side-effect-free machine invocation and structured errors.
