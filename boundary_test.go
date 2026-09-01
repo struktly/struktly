@@ -1,54 +1,42 @@
 package struktly_test
 
 import (
-	"go/build"
+	"bytes"
+	"encoding/json"
+	"errors"
+	"go/parser"
+	"go/token"
+	"io"
 	"io/fs"
+	"maps"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 )
 
-// The rules that keep this binary installable and offline.
-//
-// README.md says the CLI runs locally and does not call a model or upload
-// source code. CONTRIBUTING.md says not to add a dependency the standard
-// library or an existing one already covers. docs/roadmap.md says no roadmap
-// item requires a network call. All three were prose until this file existed,
-// and prose is enforced by whoever happens to remember it at the moment a
-// convenient import arrives.
-//
-// Here that costs more than it does in a private module. This is the
-// repository people install from, so an import that resolves on a maintainer's
-// machine and nowhere else breaks `go install` for everyone, and nothing else
-// in this repository would notice.
+// This is the repository people install from, and README.md, CONTRIBUTING.md
+// and docs/roadmap.md all promise the same two things about it: it reaches no
+// network, and it carries almost nothing. These tests hold it to them.
 
-// moduleImportPrefix is this module's own path. Its packages import each other
-// freely: that is not a dependency anybody inherits.
-const moduleImportPrefix = "github.com/struktly/struktly/"
+const modulePath = "github.com/struktly/struktly"
 
-// allowedDependencies is the whole of what installing this command pulls in
-// beyond the standard library. cobra brings pflag, and both are named because
-// both appear in an import graph.
-//
-// Adding an entry here is a deliberate act with a cost attached: every
-// consumer inherits it, including the ones that read this repository precisely
-// because they intend to audit what reaches their source. Prefer the standard
-// library, and prefer doing without.
+// allowedDependencies is every module compiled into the installed command.
+// mousetrap arrives with cobra and is linked on Windows. Adding an entry is a
+// deliberate act with a cost attached: every consumer inherits it, including
+// the ones that read this repository precisely because they intend to audit
+// what reaches their source.
 var allowedDependencies = []string{
+	"github.com/inconshreveable/mousetrap",
 	"github.com/spf13/cobra",
 	"github.com/spf13/pflag",
 }
 
-// networkPackages are the standard library's routes off this machine.
-//
-// The claim this defends is the one the README leads with, and it is the
-// reason the repository is public at all: what the CLI selects can be checked
-// by reading it, which is only worth anything while the CLI cannot also send
-// it somewhere. A packet is a local file, and every consumer transports it
-// itself.
-//
-// net/url is deliberately absent. Parsing a URL is not reaching one.
+// networkPackages are the standard library's routes off this machine. net/url
+// is deliberately absent: parsing a URL is not reaching one.
 var networkPackages = map[string]string{
 	"net":        "opening a socket",
 	"net/http":   "making a request",
@@ -57,28 +45,37 @@ var networkPackages = map[string]string{
 	"crypto/tls": "establishing a transport nothing here should need",
 }
 
-// packageDirectories lists every directory in this module that holds Go
-// source.
+// inheritedNetworkPackages are network packages an allowed dependency already
+// links, against the dependency answerable for each. pflag imports net for its
+// IP flag types; no code path in this module reaches them.
+var inheritedNetworkPackages = map[string]string{
+	"net": "github.com/spf13/pflag",
+}
+
+// buildTargets are the platforms CI tests and releases publish for.
+var buildTargets = []string{"darwin", "linux", "windows"}
+
+// packageDirectories lists every directory in this module that holds Go source.
 //
 // testdata is skipped for the reason the Go tool skips it: those are fixture
-// repositories, sample sources this CLI reads and selects from, not code it
-// compiles. A fixture is allowed to import net/http, and one does.
+// repositories this CLI reads and selects from, and one of them imports
+// net/http.
 func packageDirectories(t *testing.T) []string {
 	t.Helper()
-	var dirs []string
+	dirs := map[string]struct{}{}
 	err := filepath.WalkDir(".", func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
-		if !entry.IsDir() {
+		name := entry.Name()
+		if entry.IsDir() {
+			if path != "." && (strings.HasPrefix(name, ".") || name == "testdata") {
+				return filepath.SkipDir
+			}
 			return nil
 		}
-		name := entry.Name()
-		if path != "." && (strings.HasPrefix(name, ".") || name == "testdata") {
-			return filepath.SkipDir
-		}
-		if matches, _ := filepath.Glob(filepath.Join(path, "*.go")); len(matches) > 0 {
-			dirs = append(dirs, path)
+		if strings.HasSuffix(name, ".go") {
+			dirs[filepath.Dir(path)] = struct{}{}
 		}
 		return nil
 	})
@@ -88,42 +85,130 @@ func packageDirectories(t *testing.T) []string {
 	if len(dirs) == 0 {
 		t.Fatal("no Go packages were found, so this test proved nothing")
 	}
-	return dirs
+	return slices.Sorted(maps.Keys(dirs))
 }
 
-// imports returns every path a directory's package reaches for, including from
-// its tests.
+// imports returns every path the Go files in dir reach for, tests included.
 //
-// Test imports are included rather than exempted. A test that reaches the
-// network reaches it from somebody's CI, and a test that needs a new module
-// still writes that module into go.mod, where the next reader takes it for a
-// dependency of the tool.
+// The files are parsed rather than resolved through go/build, so a build
+// constraint cannot hide an import from this check by not applying to whatever
+// platform the suite happens to be running on.
 func imports(t *testing.T, dir string) []string {
 	t.Helper()
-	pkg, err := build.ImportDir(dir, 0)
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		t.Fatalf("reading %s: %v", dir, err)
 	}
-	all := append([]string{}, pkg.Imports...)
-	all = append(all, pkg.TestImports...)
-	return append(all, pkg.XTestImports...)
+	fileSet := token.NewFileSet()
+	var paths []string
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
+			continue
+		}
+		name := filepath.Join(dir, entry.Name())
+		file, err := parser.ParseFile(fileSet, name, nil, parser.ImportsOnly)
+		if err != nil {
+			t.Fatalf("parsing %s: %v", name, err)
+		}
+		for _, spec := range file.Imports {
+			path, err := strconv.Unquote(spec.Path.Value)
+			if err != nil {
+				t.Fatalf("%s: unquoting import %s: %v", name, spec.Path.Value, err)
+			}
+			paths = append(paths, path)
+		}
+	}
+	return paths
+}
+
+// listedPackage is the part of `go list -json` these tests read.
+type listedPackage struct {
+	ImportPath string
+	Module     *struct{ Path string }
+	Imports    []string
+}
+
+// linkedPackages returns every package compiled into the command for goos.
+// Imports alone cannot answer this: what a consumer inherits is the whole
+// graph, and most of it is reached through a dependency rather than named here.
+func linkedPackages(t *testing.T, goos string) []listedPackage {
+	t.Helper()
+	command := exec.Command("go", "list", "-deps", "-json=ImportPath,Module,Imports", "./cmd/struktly")
+	command.Env = append(os.Environ(), "GOOS="+goos, "CGO_ENABLED=0")
+	var stderr bytes.Buffer
+	command.Stderr = &stderr
+	out, err := command.Output()
+	if err != nil {
+		t.Fatalf("go list for %s: %v\n%s", goos, err, stderr.String())
+	}
+	var packages []listedPackage
+	decoder := json.NewDecoder(bytes.NewReader(out))
+	for {
+		var pkg listedPackage
+		err := decoder.Decode(&pkg)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			t.Fatalf("decoding go list output for %s: %v", goos, err)
+		}
+		packages = append(packages, pkg)
+	}
+	return packages
 }
 
 // external reports whether an import path leaves the standard library. A
-// standard-library path has no dot in its first segment, which is the same
-// test the module system makes.
+// standard-library path has no dot in its first segment, which is the same test
+// the module system makes.
 func external(path string) bool {
 	first, _, _ := strings.Cut(path, "/")
 	return strings.Contains(first, ".")
 }
 
-func TestTheModuleCarriesOneDependency(t *testing.T) {
+// fromModule reports whether an import path belongs to module.
+func fromModule(path, module string) bool {
+	return path == module || strings.HasPrefix(path, module+"/")
+}
+
+func TestTheInstalledCommandLinksOnlyAllowedModules(t *testing.T) {
+	linked := map[string]string{}
+	for _, goos := range buildTargets {
+		for _, pkg := range linkedPackages(t, goos) {
+			if pkg.Module == nil || pkg.Module.Path == modulePath {
+				continue
+			}
+			if _, seen := linked[pkg.Module.Path]; !seen {
+				linked[pkg.Module.Path] = goos
+			}
+		}
+	}
+	for _, module := range slices.Sorted(maps.Keys(linked)) {
+		if !slices.Contains(allowedDependencies, module) {
+			t.Errorf("the %s build links %q, which is not an allowed dependency.\n"+
+				"Every consumer of this CLI inherits it. If it is genuinely worth "+
+				"that, add it to allowedDependencies with the reason, and say so in "+
+				"the pull request rather than in a go.mod diff.", linked[module], module)
+		}
+	}
+	for _, module := range allowedDependencies {
+		if _, ok := linked[module]; !ok {
+			t.Errorf("allowedDependencies names %q, which no build links any more.\n"+
+				"Remove it: the list is only worth reading while it is exact.", module)
+		}
+	}
+}
+
+// Imports of a sibling under github.com/struktly/ are held separately from the
+// linked graph above, because a test-only import of one never reaches it and
+// still breaks the build for everyone.
+func TestNoPackageImportsAnUnpublishedSibling(t *testing.T) {
 	for _, dir := range packageDirectories(t) {
 		for _, path := range imports(t, dir) {
 			switch {
-			case !external(path):
-			case strings.HasPrefix(path, moduleImportPrefix):
-			case slices.Contains(allowedDependencies, path):
+			case !external(path), fromModule(path, modulePath):
+			case slices.ContainsFunc(allowedDependencies, func(module string) bool {
+				return fromModule(path, module)
+			}):
 			case strings.HasPrefix(path, "github.com/struktly/"):
 				t.Errorf("%s imports %q.\n"+
 					"Modules under github.com/struktly/ other than this one are not "+
@@ -133,10 +218,7 @@ func TestTheModuleCarriesOneDependency(t *testing.T) {
 					"lines this needs here.", dir, path)
 			default:
 				t.Errorf("%s imports %q, which is neither the standard library nor an "+
-					"allowed dependency.\n"+
-					"Every consumer of this CLI inherits it. If it is genuinely worth "+
-					"that, add it to allowedDependencies with the reason, and say so in "+
-					"the pull request rather than in a go.mod diff.", dir, path)
+					"allowed dependency.", dir, path)
 			}
 		}
 	}
@@ -148,9 +230,35 @@ func TestNothingReachesTheNetwork(t *testing.T) {
 			if why, forbidden := networkPackages[path]; forbidden {
 				t.Errorf("%s imports %q: %s.\n"+
 					"This CLI reads a repository and writes a file. It does not call a "+
-					"model, upload source, or fetch anything, and that is checkable here "+
-					"rather than promised in the README. Whatever needs the network is "+
-					"the caller's, and the packet is how it gets there.", dir, path, why)
+					"model, upload source, or fetch anything. Whatever needs the network "+
+					"is the caller's, and the packet is how it gets there.", dir, path, why)
+			}
+		}
+	}
+
+	// What the dependencies bring, which no import in this repository shows.
+	// Each edge is held against inheritedNetworkPackages, so an allowance that
+	// stops being true fails here rather than widening quietly.
+	for _, goos := range buildTargets {
+		importers := map[string][]string{}
+		for _, pkg := range linkedPackages(t, goos) {
+			for _, imported := range pkg.Imports {
+				if _, forbidden := networkPackages[imported]; forbidden {
+					importers[imported] = append(importers[imported], pkg.ImportPath)
+				}
+			}
+		}
+		for _, imported := range slices.Sorted(maps.Keys(importers)) {
+			source, inherited := inheritedNetworkPackages[imported]
+			for _, importer := range importers[imported] {
+				if inherited && fromModule(importer, source) {
+					continue
+				}
+				t.Errorf("the %s build links %q (%s), imported by %q.\n"+
+					"A dependency that reaches the network reaches it from every machine "+
+					"this is installed on. Drop the dependency, or record the package in "+
+					"inheritedNetworkPackages with the reason it cannot be called.",
+					goos, imported, networkPackages[imported], importer)
 			}
 		}
 	}

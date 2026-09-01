@@ -36,8 +36,9 @@ an import of an unpublished sibling rather than leaving it for whoever next runs
 ## Current foundation
 
 - Git-native repository identity and revision pinning.
-- A boundary held by tests rather than by prose: no network import anywhere
-  in the module, and one dependency.
+- A boundary held by tests rather than by prose: no package here imports the
+  network, no dependency brings one in unrecorded, and the installed command
+  links cobra and what cobra brings.
 - Deterministic packet identity and versioned JSON schemas.
 - Explicit provenance, exclusions, truncation, and content hashes.
 - Secret, binary, ignored-file, symlink, and size protections.

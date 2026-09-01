@@ -26,8 +26,8 @@ documents above are the reasoning behind it.
 
 - **No network.** The CLI reads a repository and writes a file. It does not call
   a model, upload source, or fetch anything.
-- **One dependency.** cobra, and the pflag it brings. Prefer the standard
-  library, and prefer doing without.
+- **One dependency.** cobra, and the pflag and mousetrap it brings. Prefer the
+  standard library, and prefer doing without.
 - **Deterministic output.** The same request on the same revision produces the
   same `packet_hash`. Nothing may depend on wall-clock time, map iteration
   order, or the order a filesystem happens to return entries in.
