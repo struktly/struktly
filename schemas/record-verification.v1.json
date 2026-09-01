@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "struktly/record-verification/v1",
+  "title": "Struktly Record verification report",
+  "description": "What `struktly verify --json` says about one exported Record bundle: whether the bytes are the ones the manifest describes, what was checked, what the intact payload carried, and what this bundle does not let anybody check.",
+  "type": "object",
+  "properties": {
+    "schema": { "const": "struktly/record-verification/v1" },
+    "path": { "type": "string" },
+    "intact": {
+      "description": "True only when every check passed. The exit code follows this field.",
+      "type": "boolean"
+    },
+    "checks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/check" }
+    },
+    "record": { "$ref": "#/$defs/record" },
+    "judgements": { "$ref": "#/$defs/judgements" },
+    "unverifiable": {
+      "description": "What an intact result does not establish. Never empty: at minimum, whether the work was correct.",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "required": ["schema", "path", "intact", "checks", "record", "judgements", "unverifiable"],
+  "additionalProperties": true,
+  "$defs": {
+    "check": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["pass", "fail"] },
+        "message": { "type": "string" }
+      },
+      "required": ["name", "status"],
+      "additionalProperties": true
+    },
+    "record": {
+      "description": "Identity copied from the manifest so a reader can tell two reports apart without the bundles. Empty values mean the manifest did not carry them, which the checks will already have failed.",
+      "type": "object",
+      "properties": {
+        "execution_id": { "type": "string" },
+        "revision": { "type": "integer" },
+        "disposition": { "type": "string" },
+        "sealed_at": { "type": "string" }
+      },
+      "required": ["execution_id", "revision", "disposition"],
+      "additionalProperties": true
+    },
+    "judgements": {
+      "description": "Conclusions carried inside an intact sealed payload, reported and never re-evaluated. Three states are kept apart: a list that is null was not available (`available` is false and `unavailable` says why); a list that is empty was read and found empty; a list with entries is what the payload carried.",
+      "type": "object",
+      "properties": {
+        "available": { "type": "boolean" },
+        "unavailable": { "type": "string", "minLength": 1 },
+        "compliance": { "$ref": "#/$defs/compliance" },
+        "decisions": {
+          "type": ["array", "null"],
+          "items": { "$ref": "#/$defs/decision" }
+        },
+        "escalations": {
+          "type": ["array", "null"],
+          "items": { "$ref": "#/$defs/escalation" }
+        },
+        "limitations": {
+          "type": ["array", "null"],
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "required": ["available", "compliance", "decisions", "escalations", "limitations"],
+      "additionalProperties": true
+    },
+    "compliance": {
+      "type": ["object", "null"],
+      "properties": {
+        "decision_id": { "type": "string", "minLength": 1 },
+        "outcome": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string" },
+        "actor": { "type": "string", "minLength": 1 },
+        "decided_at": { "type": "string", "minLength": 1 },
+        "observed": { "type": "boolean" },
+        "unobserved": { "type": "string", "minLength": 1 },
+        "satisfied": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "unchecked": { "type": "integer", "minimum": 0 },
+        "judgement": { "type": "integer", "minimum": 0 },
+        "complete": { "type": "boolean" },
+        "verdicts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/verdict" }
+        }
+      },
+      "required": [
+        "decision_id",
+        "outcome",
+        "actor",
+        "decided_at",
+        "observed",
+        "satisfied",
+        "failed",
+        "unchecked",
+        "judgement",
+        "complete",
+        "verdicts"
+      ],
+      "additionalProperties": true
+    },
+    "verdict": {
+      "type": "object",
+      "properties": {
+        "statement_id": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string" },
+        "text": { "type": "string", "minLength": 1 },
+        "verdict": { "type": "string", "minLength": 1 },
+        "command": { "type": "string" },
+        "reason": { "type": "string" },
+        "path": { "type": "string" },
+        "revision": { "type": "string" },
+        "line": { "type": "integer", "minimum": 1 },
+        "status": { "type": "string" }
+      },
+      "required": ["statement_id", "text", "verdict"],
+      "additionalProperties": true
+    },
+    "decision": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "minLength": 1 },
+        "outcome": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string" },
+        "actor": { "type": "string", "minLength": 1 },
+        "decided_at": { "type": "string", "minLength": 1 },
+        "evidence_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "evidence_embedded": { "type": "boolean" },
+        "evidence_unavailable": { "type": "string", "minLength": 1 }
+      },
+      "required": ["id", "kind", "outcome", "actor", "decided_at", "evidence_embedded"],
+      "additionalProperties": true
+    },
+    "escalation": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "minLength": 1 },
+        "question": { "type": "string", "minLength": 1 },
+        "answered": { "type": "boolean" },
+        "answer": { "type": "string", "minLength": 1 },
+        "answered_by": { "type": "string", "minLength": 1 },
+        "answered_at": { "type": "string", "minLength": 1 },
+        "raised_by": { "type": "string", "minLength": 1 },
+        "raised_at": { "type": "string", "minLength": 1 },
+        "fingerprint": { "type": "string" },
+        "evidence_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "evidence_embedded": { "type": "boolean" }
+      },
+      "required": ["id", "kind", "question", "answered", "raised_by", "raised_at", "evidence_embedded"],
+      "additionalProperties": true
+    }
+  }
+}

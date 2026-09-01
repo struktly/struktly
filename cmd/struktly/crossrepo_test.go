@@ -186,6 +186,9 @@ func TestVerifiedJudgementsKeepKnownEmptyApartFromUnavailable(t *testing.T) {
 		!strings.Contains(string(oldJSON), `"decisions":null`) {
 		t.Fatalf("machine report collapsed known-empty and unavailable:\nknown %s\nold %s", knownJSON, oldJSON)
 	}
+	// The published schema has to admit both states, or it would flatten them.
+	assertDocumentConforms(t, "record-verification.v1.json", knownJSON)
+	assertDocumentConforms(t, "record-verification.v1.json", oldJSON)
 
 	var knownHuman, oldHuman strings.Builder
 	if err := writeVerificationReport(&knownHuman, known); err != nil {
