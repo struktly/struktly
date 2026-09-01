@@ -13,10 +13,24 @@ package schemas
 import (
 	"embed"
 	"fmt"
+	"io/fs"
 )
 
 //go:embed *.json
 var files embed.FS
+
+// Names lists every published schema file.
+func Names() ([]string, error) {
+	entries, err := fs.ReadDir(files, ".")
+	if err != nil {
+		return nil, fmt.Errorf("list schemas: %w", err)
+	}
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		names = append(names, entry.Name())
+	}
+	return names, nil
+}
 
 // Bytes returns one published schema by file name, e.g. "record-bundle.v1.json".
 func Bytes(name string) ([]byte, error) {
