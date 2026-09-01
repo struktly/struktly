@@ -60,6 +60,29 @@ window, because from that point the guarantee is real.
 - **`intel` is outside this policy.** `struktly intel` passes its arguments to the desktop platform's own binary; its subcommands, output, and exit codes are versioned by that product, not here. The only part this repository guarantees is the handover itself: arguments and environment unchanged, the platform's exit code returned, exit 127 when the platform is not installed, and exit 126 when the binary found for it cannot be run. See [integration-contract.md](integration-contract.md).
 - **MCP wire names** (tools, resource URIs) are a compatibility surface once released; renames follow the breaking-change rule.
 
+## The negotiated contract
+
+A consumer that drives this binary as a component runs `capabilities --json`
+first and refuses to start when something it needs is absent. Which entries
+that covers is held by a test rather than by this document:
+`TestCapabilitiesCommandReportsContextContract` in
+[`cmd/struktly/main_test.go`](../cmd/struktly/main_test.go) names every command,
+schema, and feature a consumer is entitled to find. Removing one fails here, at
+the change that removed it, instead of in somebody else's build weeks later.
+
+The list is deliberately not repeated in this file. A contract written down
+twice eventually disagrees with itself, and the copy without the test is the one
+that goes stale.
+
+A consumer does not have to restate that set to check it. `capabilities
+--require <path>` takes a `struktly/capability-requirements/v1` document — the
+consumer's own list, which this CLI never supplies a default for — and answers
+with an exit code, naming every entry it cannot serve. See
+[integration-contract.md](integration-contract.md).
+
+Everything else `capabilities` reports is additive surface that may still move
+pre-1.0. Ask `capabilities`; do not infer support from a version number.
+
 ## Context-packet identity
 
 `struktly/packet/v2` contains repository context only. It removed the experimental

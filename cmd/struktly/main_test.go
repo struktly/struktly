@@ -114,6 +114,24 @@ func TestVersionCommandReportsBuildMetadata(t *testing.T) {
 	}
 }
 
+// The contract a consumer negotiates before it invokes this CLI.
+//
+// A caller that drives this binary as a component asks `capabilities` first and
+// refuses to run when something it needs is absent. That is the right
+// behaviour, and it means a removal here surfaces as a failure over there,
+// in a build that has nothing to do with the commit that caused it. This test
+// is the other half of that arrangement: what is listed below is what a
+// consumer is entitled to find, so dropping one fails in this repository, at
+// the change that dropped it, with the reason attached.
+//
+// It is deliberately the negotiated set rather than everything `capabilities`
+// advertises. A published contract is worth holding still; the rest of the
+// surface is free to move while the project is pre-1.0, and asserting all of it
+// would only teach people that this list is something you update to make the
+// build pass.
+//
+// docs/compatibility.md points at this test instead of restating the list, for
+// the reason any contract written down twice eventually disagrees with itself.
 func TestCapabilitiesCommandReportsContextContract(t *testing.T) {
 	stdout, stderr, err := executeTestCommand("capabilities", "--json")
 	if err != nil {
@@ -126,33 +144,69 @@ func TestCapabilitiesCommandReportsContextContract(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &document); err != nil {
 		t.Fatalf("capabilities output is not JSON: %v\n%s", err, stdout)
 	}
-	if document.Schema != capabilitiesSchema || !slices.Contains(document.Features, "context.no_write") || !slices.Contains(document.Features, "context.expect_base_revision") {
-		t.Fatalf("unexpected capabilities: %+v", document)
+	if document.Schema != capabilitiesSchema {
+		t.Fatalf("capabilities schema = %q, want %q", document.Schema, capabilitiesSchema)
 	}
-	if !slices.Contains(document.Features, "context.limits") {
-		t.Fatalf("capabilities missing context.limits: %+v", document)
-	}
-	if !slices.Contains(document.Commands, "tasks") || !slices.Contains(document.Schemas, repoctx.TasksSchema) || !slices.Contains(document.Features, "tasks.partial_results") {
-		t.Fatalf("capabilities do not advertise tasks contract: %+v", document)
-	}
-	if !slices.Contains(document.Schemas, "struktly/init-result/v1") || !slices.Contains(document.Schemas, "struktly/instruction-suggestions/v1") {
-		t.Fatalf("capabilities do not advertise init/instruction-suggestions schemas: %+v", document)
-	}
-	for _, command := range []string{"tasks archive", "tasks complete"} {
-		if !slices.Contains(document.Commands, command) {
-			t.Fatalf("capabilities do not advertise %q: %+v", command, document)
+
+	for _, group := range []struct {
+		kind       string
+		advertised []string
+		negotiated []string
+	}{
+		{
+			kind:       "command",
+			advertised: document.Commands,
+			negotiated: []string{
+				"context", "diff", "doctor", "explain", "status",
+				"tasks", "tasks archive", "tasks complete", "validate",
+			},
+		},
+		{
+			kind:       "schema",
+			advertised: document.Schemas,
+			negotiated: []string{
+				repoctx.PacketSchema,
+				repoctx.PacketDiffSchema,
+				repoctx.TasksSchema,
+				repoctx.TaskArchiveSchema,
+				repoctx.TaskTransitionSchema,
+				"struktly/doctor/v1",
+				"struktly/error/v1",
+				"struktly/explanation/v1",
+				"struktly/init-result/v1",
+				"struktly/instruction-suggestions/v1",
+				"struktly/status/v1",
+				"struktly/validation/v1",
+			},
+		},
+		{
+			kind:       "feature",
+			advertised: document.Features,
+			negotiated: []string{
+				"context.cancellation",
+				"context.expect_base_revision",
+				"context.limits",
+				"context.no_write",
+				"structured_errors",
+				"tasks.archive",
+				"tasks.complete",
+				"tasks.partial_results",
+			},
+		},
+	} {
+		for _, name := range group.negotiated {
+			if !slices.Contains(group.advertised, name) {
+				t.Errorf("capabilities omit the %s %q, which a consumer negotiates before it invokes this binary", group.kind, name)
+			}
 		}
 	}
-	if !slices.Contains(document.Schemas, repoctx.TaskArchiveSchema) || !slices.Contains(document.Schemas, repoctx.TaskTransitionSchema) ||
-		!slices.Contains(document.Features, "tasks.archive") || !slices.Contains(document.Features, "tasks.complete") {
-		t.Fatalf("capabilities do not advertise the task lifecycle contract: %+v", document)
-	}
+
 	if slices.Contains(document.Schemas, "struktly/packet/v1") {
-		t.Fatalf("capabilities advertise historical packet generation: %+v", document)
+		t.Errorf("capabilities advertise historical packet generation: %+v", document)
 	}
 	for _, command := range []string{"evidence", "memory", "run"} {
 		if slices.Contains(document.Commands, command) {
-			t.Fatalf("capabilities advertise removed command %q: %+v", command, document)
+			t.Errorf("capabilities advertise removed command %q: %+v", command, document)
 		}
 	}
 }
