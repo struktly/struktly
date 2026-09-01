@@ -7,16 +7,21 @@ repository state into a deterministic, inspectable context packet.
 The CLI does not own chats, provider sessions, working copies, approvals,
 checks, evidence, memory, request intelligence, routing, or review history.
 
-Most of those are Platform concerns. Request intelligence and routing are not,
-any more: the deterministic decision engine that classifies a request, admits
-capabilities and chooses a rung is now its own component, consumed by Platform
-rather than owned by it. The CLI still does not own it — but "not ours" and
-"Platform's" have stopped being the same statement, and where that component
-ends up is a separate decision that has not been taken.
+Most of those are Platform concerns. Several are no longer anybody's single
+product: the deterministic decision engine that classifies a request, admits
+capabilities and chooses a rung is now its own component, and so is the local
+inference runtime that owns model placement, supervision and prefix reuse. Both
+are separate closed components that Platform consumes rather than owns. Whether
+either is ever published is an open question, and a different one from the
+extraction that has already happened.
 
-What has not changed is this repository's boundary. `struktly intel` remains a
-handoff to the installed desktop platform, and none of that implementation is
-duplicated here.
+None of that moves this repository's boundary, and one part of it is worth
+saying plainly now that there are more components nearby to reach for: this is
+the only published module in the set, so it depends on none of the others.
+`struktly intel` remains a process handover to the installed desktop platform,
+no implementation is duplicated here, and `boundary_test.go` fails the build on
+an import of an unpublished sibling rather than leaving it for whoever next runs
+`go install`.
 
 ## Command model
 
@@ -31,6 +36,9 @@ duplicated here.
 ## Current foundation
 
 - Git-native repository identity and revision pinning.
+- A boundary held by tests rather than by prose: no package here imports the
+  network, no dependency brings one in unrecorded, and the installed command
+  links cobra and what cobra brings.
 - Deterministic packet identity and versioned JSON schemas.
 - Explicit provenance, exclusions, truncation, and content hashes.
 - Secret, binary, ignored-file, symlink, and size protections.

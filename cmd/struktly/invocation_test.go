@@ -303,6 +303,23 @@ func TestCommandDocumentsConformToTheirSchemas(t *testing.T) {
 			strings.NewReader(""), io.Discard, &stderr)
 		assertDocumentConforms(t, "error.v1.json", stderr.Bytes())
 	})
+
+	// Both outcomes, because the report is written either way and the shape
+	// must not depend on which one it carries.
+	t.Run("verify", func(t *testing.T) {
+		sealed := `{"schema":"struktly/provenance/v1","execution_id":"run_abc","revision":2}`
+		for name, digest := range map[string]string{
+			"intact":   sha256Hex(sealed),
+			"tampered": strings.Repeat("0", 64),
+		} {
+			t.Run(name, func(t *testing.T) {
+				var stdout bytes.Buffer
+				runCLI(stdcontext.Background(), []string{"verify", bundleFor(t, sealed, digest), "--json"},
+					strings.NewReader(""), &stdout, io.Discard)
+				assertDocumentConforms(t, "record-verification.v1.json", stdout.Bytes())
+			})
+		}
+	})
 }
 
 func assertDocumentConforms(t *testing.T, schemaName string, document []byte) {

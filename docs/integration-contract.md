@@ -49,10 +49,46 @@ Other default modes write plain text for developers.
 `.struktly/tasks/*.md`.
 
 Programs should inspect `capabilities --json` before depending on additive CLI
-features. The current stable feature identifiers are
-`context.cancellation`, `context.expect_base_revision`, `context.limits`,
-`context.no_write`, `scan.no_write`, `structured_errors`, `tasks.archive`,
-`tasks.complete`, and `tasks.partial_results`.
+features. The document that command emits is the authoritative list of them. It
+used to be repeated here as prose and had already fallen behind the binary,
+which is the failure mode this whole section exists to prevent.
+
+### Requiring capabilities
+
+A consumer that gates on this CLI — refusing to ship against a build that
+cannot serve it — states what it needs once, as data, and lets the binary
+answer:
+
+```sh
+struktly capabilities --require required.json
+```
+
+`required.json` is a `struktly/capability-requirements/v1` document, written by
+the consumer and never emitted by this CLI:
+
+```json
+{
+  "schema": "struktly/capability-requirements/v1",
+  "commands": ["context", "tasks"],
+  "schemas": ["struktly/packet/v2", "struktly/tasks/v1"],
+  "features": ["context.no_write", "structured_errors"]
+}
+```
+
+Each of the three categories is optional and unknown keys are refused. A
+document that requires nothing is an invalid invocation rather than a pass,
+because it would be satisfied by any build.
+
+| Exit | Meaning |
+|---:|---|
+| 0 | Every required entry is advertised. |
+| 1 | `capabilities_unsatisfied`, and the message names every missing entry rather than the first. |
+| 2 | The flag was given without a path, or the requirements file is unreadable, malformed, or empty. Nothing was checked and nothing is written to stdout. |
+
+The capabilities document is written on exit 0 and exit 1 alike, so a gate that
+fails still records what it was given. A build advertises
+`capabilities.require` when it supports being asked, so the mechanism is
+detectable through the mechanism it replaces.
 
 For side-effect-free packet generation, invoke:
 
@@ -147,8 +183,8 @@ document on stderr for a failed invocation:
 
 Stable error codes currently include `not_git_repository`, `repository_changed`,
 `invalid_config`, `invalid_task`, `invalid_packet`, `invalid_invocation`,
-`diagnostic_failed`, `tasks_unarchived`, `task_not_found`,
-`task_already_archived`, `canceled`, and `operation_failed`. Messages are for
+`diagnostic_failed`, `capabilities_unsatisfied`, `tasks_unarchived`,
+`task_not_found`, `task_already_archived`, `canceled`, and `operation_failed`. Messages are for
 people; automation must branch on `error.code` and the process exit code.
 
 | Exit | Meaning |

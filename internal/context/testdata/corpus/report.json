@@ -1,4 +1,34 @@
 {
+  "agents-only / cap the retry backoff": {
+    "items": 3,
+    "packet_bytes": 2644,
+    "reasons": [
+      "selection_rule",
+      "task_match"
+    ],
+    "exclusions": 0,
+    "truncations": 0
+  },
+  "ambiguous-symbol / close the store client cleanly": {
+    "items": 5,
+    "packet_bytes": 3656,
+    "reasons": [
+      "selection_rule",
+      "task_match"
+    ],
+    "exclusions": 0,
+    "truncations": 0
+  },
+  "ambiguous-symbol / rename the Client type everywhere it is declared": {
+    "items": 5,
+    "packet_bytes": 3647,
+    "reasons": [
+      "selection_rule",
+      "task_match"
+    ],
+    "exclusions": 0,
+    "truncations": 0
+  },
   "flat-package / fix the config parser": {
     "items": 4,
     "packet_bytes": 2883,
@@ -18,6 +48,26 @@
       "task_match"
     ],
     "exclusions": 0,
+    "truncations": 0
+  },
+  "go-service / add request timeout middleware +file-bytes=220 +total-bytes=3000": {
+    "items": 8,
+    "packet_bytes": 6427,
+    "reasons": [
+      "import_neighbor",
+      "selection_rule",
+      "task_match"
+    ],
+    "exclusions": 0,
+    "truncations": 4
+  },
+  "go-service / add request timeout middleware +items=4": {
+    "items": 4,
+    "packet_bytes": 3812,
+    "reasons": [
+      "selection_rule"
+    ],
+    "exclusions": 1,
     "truncations": 0
   },
   "go-service / add request timeout middleware @middleware": {
@@ -51,9 +101,29 @@
     "exclusions": 0,
     "truncations": 0
   },
+  "nested-modules / record telemetry from the api checkout handler": {
+    "items": 5,
+    "packet_bytes": 3554,
+    "reasons": [
+      "selection_rule",
+      "task_match"
+    ],
+    "exclusions": 0,
+    "truncations": 0
+  },
   "noisy-legacy / update the current documentation": {
     "items": 4,
     "packet_bytes": 2692,
+    "reasons": [
+      "selection_rule",
+      "task_match"
+    ],
+    "exclusions": 0,
+    "truncations": 0
+  },
+  "python-service / round invoice totals correctly": {
+    "items": 3,
+    "packet_bytes": 2514,
     "reasons": [
       "selection_rule",
       "task_match"

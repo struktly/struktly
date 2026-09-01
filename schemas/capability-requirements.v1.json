@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "struktly/capability-requirements/v1",
+  "title": "Struktly capability requirements",
+  "description": "What a consumer requires of one Struktly binary before it will drive it. An input declaration written by the consumer, never emitted by this CLI.",
+  "type": "object",
+  "properties": {
+    "schema": { "const": "struktly/capability-requirements/v1" },
+    "commands": { "$ref": "#/$defs/names", "description": "Stable machine commands the consumer invokes." },
+    "schemas": { "$ref": "#/$defs/names", "description": "Schema identifiers the consumer reads or writes." },
+    "features": { "$ref": "#/$defs/names", "description": "Additive feature identifiers the consumer depends on." }
+  },
+  "required": ["schema"],
+  "additionalProperties": false,
+  "$defs": {
+    "names": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}

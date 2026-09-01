@@ -1,0 +1,29 @@
+# The Go this repository is developed against.
+#
+# It is the version go.mod declares rather than the newest release, and that is
+# the point. This module is installed with `go install` by people whose
+# toolchain nobody here controls, so the floor is what development should build
+# against; a newer local toolchain quietly accepts code that the declared
+# minimum would refuse. CI resolves the same floor for lint through
+# go-version-file and runs the test matrix on stable as well, so both ends stay
+# covered.
+[tools]
+go = "1.25.0"
+
+# The Makefile stays the entry point, so these names survive a toolchain change
+# and there is one definition of what each check actually runs.
+[tasks.lint]
+description = "Run the golangci-lint pinned in tools/go.mod."
+run = "make lint"
+
+[tasks.test]
+description = "Run the full test suite."
+run = "make test"
+
+[tasks.build]
+description = "Build every package."
+run = "make build"
+
+[tasks.fmt]
+description = "Apply gofumpt formatting."
+run = "make fmt"
