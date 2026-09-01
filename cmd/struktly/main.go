@@ -137,6 +137,9 @@ func classifyError(err error) (int, string) {
 	if errors.Is(err, errVerificationFailed) {
 		return 1, "verification_failed"
 	}
+	if errors.Is(err, errCapabilitiesUnsatisfied) {
+		return 1, "capabilities_unsatisfied"
+	}
 	if errors.Is(err, errTasksUnarchived) {
 		return 1, "tasks_unarchived"
 	}
@@ -247,6 +250,7 @@ func currentCapabilities() capabilitiesDocument {
 			"struktly/doctor/v1",
 			"struktly/error/v1",
 			"struktly/explanation/v1",
+			capabilityRequirementsSchema,
 			initResultSchema,
 			instructionSuggestionsSchema,
 			recordBundleSchema,
@@ -262,6 +266,7 @@ func currentCapabilities() capabilitiesDocument {
 			versionSchema,
 		},
 		Features: []string{
+			"capabilities.require",
 			"context.cancellation",
 			"context.declaration_rendering",
 			"context.scope",
@@ -416,24 +421,53 @@ func newTasksCompleteCmd(repoRoot *string) *cobra.Command {
 
 func newCapabilitiesCmd() *cobra.Command {
 	var toJSON bool
+	var requirePath string
 	cmd := &cobra.Command{
 		Use:   "capabilities",
 		Short: "Report supported machine interfaces",
 		Args:  invalidInvocationArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			capabilities := currentCapabilities()
+
+			// Read the requirements before writing anything. A malformed
+			// requirements file is a question this binary was never properly
+			// asked, and answering it with a capabilities document is how a
+			// gate comes to believe it checked something.
+			var missing []string
+			if requirePath != "" {
+				required, err := loadCapabilityRequirements(requirePath)
+				if err != nil {
+					return err
+				}
+				missing = unsatisfiedCapabilities(required, capabilities)
+			}
+
 			if toJSON {
-				return writeJSON(cmd.OutOrStdout(), capabilities)
+				if err := writeJSON(cmd.OutOrStdout(), capabilities); err != nil {
+					return err
+				}
+			} else {
+				out := newProse(cmd.OutOrStdout())
+				out.printf("struktly %s\n", capabilities.Build.Version)
+				for _, feature := range capabilities.Features {
+					out.printf("%s\n", feature)
+				}
+				if out.err != nil {
+					return out.err
+				}
 			}
-			out := newProse(cmd.OutOrStdout())
-			out.printf("struktly %s\n", capabilities.Build.Version)
-			for _, feature := range capabilities.Features {
-				out.printf("%s\n", feature)
+
+			// The document is the payload and is always written, as doctor
+			// writes its report; the exit code then tells a caller branching on
+			// it whether the build it holds is one it can drive.
+			if len(missing) > 0 {
+				return fmt.Errorf("%w: %s", errCapabilitiesUnsatisfied, strings.Join(missing, ", "))
 			}
-			return out.err
+			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&toJSON, "json", false, "Print the versioned capabilities document")
+	cmd.Flags().StringVar(&requirePath, "require", "", "Fail unless this build satisfies the "+capabilityRequirementsSchema+" document at this path")
 	return cmd
 }
 
