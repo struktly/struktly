@@ -83,7 +83,7 @@ because it would be satisfied by any build.
 |---:|---|
 | 0 | Every required entry is advertised. |
 | 1 | `capabilities_unsatisfied`, and the message names every missing entry rather than the first. |
-| 2 | The requirements file itself is unreadable, malformed, or empty. Nothing was checked and nothing is written to stdout. |
+| 2 | The flag was given without a path, or the requirements file is unreadable, malformed, or empty. Nothing was checked and nothing is written to stdout. |
 
 The capabilities document is written on exit 0 and exit 1 alike, so a gate that
 fails still records what it was given. A build advertises

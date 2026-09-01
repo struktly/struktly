@@ -429,12 +429,12 @@ func newCapabilitiesCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			capabilities := currentCapabilities()
 
-			// Read the requirements before writing anything. A malformed
-			// requirements file is a question this binary was never properly
-			// asked, and answering it with a capabilities document is how a
-			// gate comes to believe it checked something.
+			// Read the requirements before writing anything: a malformed file
+			// must not come back looking like an answer. Keyed on whether the
+			// flag was given, so `--require=""` is a failed check rather than
+			// a silently skipped one.
 			var missing []string
-			if requirePath != "" {
+			if cmd.Flags().Changed("require") {
 				required, err := loadCapabilityRequirements(requirePath)
 				if err != nil {
 					return err

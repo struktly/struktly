@@ -123,6 +123,18 @@ func TestCapabilitiesRequireRefusesAMalformedRequirement(t *testing.T) {
 	}
 }
 
+// A gate reads its path from a variable, and an unset one must not look like a
+// build that passed.
+func TestCapabilitiesRequireRefusesAnEmptyPath(t *testing.T) {
+	exitCode, stdout, document := runRequire(t, "", "--json-errors")
+	if exitCode != 2 || document.Error.Code != "invalid_invocation" {
+		t.Fatalf("exit = %d, code = %q; want 2 and invalid_invocation", exitCode, document.Error.Code)
+	}
+	if stdout != "" {
+		t.Fatalf("an empty --require produced output: %s", stdout)
+	}
+}
+
 func TestCapabilitiesRequireRefusesAMissingFile(t *testing.T) {
 	exitCode, stdout, document := runRequire(t, filepath.Join(t.TempDir(), "absent.json"), "--json-errors")
 	if exitCode != 2 || document.Error.Code != "invalid_invocation" {

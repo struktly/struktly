@@ -60,6 +60,10 @@ type capabilityRequirements struct {
 // produce a capabilities document — answering a question that was not asked
 // properly is how a gate comes to believe it checked something.
 func loadCapabilityRequirements(path string) (capabilityRequirements, error) {
+	if path == "" {
+		return capabilityRequirements{}, invalidInvocation(fmt.Errorf(
+			"--require needs the path to a %s document", capabilityRequirementsSchema))
+	}
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return capabilityRequirements{}, invalidInvocation(fmt.Errorf("read --require: %w", err))
