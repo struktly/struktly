@@ -157,8 +157,8 @@ func TestCapabilitiesCommandReportsContextContract(t *testing.T) {
 			kind:       "command",
 			advertised: document.Commands,
 			negotiated: []string{
-				"context", "diff", "doctor", "explain", "status",
-				"tasks", "tasks archive", "tasks complete", "validate",
+				"capabilities", "context", "diff", "doctor", "explain", "scan",
+				"status", "tasks", "tasks archive", "tasks complete", "validate",
 			},
 		},
 		{
@@ -187,6 +187,7 @@ func TestCapabilitiesCommandReportsContextContract(t *testing.T) {
 				"context.expect_base_revision",
 				"context.limits",
 				"context.no_write",
+				"scan.no_write",
 				"structured_errors",
 				"tasks.archive",
 				"tasks.complete",

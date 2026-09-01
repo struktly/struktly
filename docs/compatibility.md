@@ -14,9 +14,14 @@ frontmatter and required body sections are defined in
 [task-format.md](task-format.md). Task discovery uses the separate
 `struktly/tasks/v1` JSON document.
 
-JSON Schema definitions live in [`schemas/`](../schemas/). Current schemas are
-`struktly/packet/v2`, `struktly/tasks/v1`, and
-`struktly/{snapshot,config,error,status,validation,doctor,explanation,capabilities,version,init-result,instruction-suggestions,task-archive,task-transition}/v1`.
+JSON Schema definitions live in [`schemas/`](../schemas/), one file per
+identifier; that directory is the list. It was repeated here as prose and had
+already fallen behind.
+
+Not all of them are emitted. `struktly/config/v1` and
+`struktly/capability-requirements/v1` are input declarations a consumer writes
+and this CLI only reads, so they are published and validated but are not
+reported by `capabilities --json`.
 
 Two identifiers are Markdown-only and have no JSON Schema file, because the
 documents they name are presentation rather than a machine surface:

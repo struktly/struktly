@@ -250,7 +250,6 @@ func currentCapabilities() capabilitiesDocument {
 			"struktly/doctor/v1",
 			"struktly/error/v1",
 			"struktly/explanation/v1",
-			capabilityRequirementsSchema,
 			initResultSchema,
 			instructionSuggestionsSchema,
 			recordBundleSchema,
