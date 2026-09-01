@@ -13,6 +13,12 @@ make test
 make build
 ```
 
+`go.mod` is the authoritative statement of that floor. `mise.toml` pins it, so
+`mise install` gives you the toolchain this repository is developed against;
+mise is optional and the `Makefile` is the entry point with or without it. The
+badge, the sentence above and the mise pin all follow `go.mod`, and a test fails
+when one of them is edited alone.
+
 `make lint` builds the golangci-lint pinned in `tools/go.mod` into `.bin/` the
 first time it is needed, so there is nothing to install beforehand and CI runs
 that same binary against that same configuration. Formatting is gofumpt and is
