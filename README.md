@@ -9,19 +9,24 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2ea44f" alt="MIT license"></a>
 </p>
 
-`struktly` is the part of Struktly that decides what a coding agent is given.
-It reads a local Git repository and produces a context packet: the files and
-repository guidance selected for one coding request, with a record of what was
-selected, what was excluded, and why.
+`struktly` is the part of Struktly that can be checked from outside. Before
+work, it decides what a coding agent is given: it reads a local Git repository
+and produces a context packet — the files and repository guidance selected for
+one coding request, with a record of what was selected, what was excluded, and
+why. After work, `verify` checks that an exported Struktly Record is the one
+that was sealed, by arithmetic rather than by trusting whoever sent it. Between
+the two, `capabilities` states what a build supports, and that statement is
+held to the binary by test.
 
-This repository is public so that decision can be audited. The
+This repository is public so those decisions can be audited. The
 [Struktly desktop app](https://struktly.app/) is a separate, closed product that
-runs and reviews agent work; it uses this CLI as its context layer. What you can
-read here is what the app uses to build context — so the selection behavior, the
-exclusions, and the limits are checkable by anyone, not taken on trust.
+runs and reviews agent work; it uses this CLI as its context layer, and anyone
+it hands a Record to can run `verify` without it. What you can read here is what
+the app uses to build context — so the selection behavior, the exclusions, and
+the limits are checkable by anyone, not taken on trust.
 
 The CLI runs locally. It does not call a model, upload source code, or start a
-coding agent.
+coding agent, and a test holds the installed binary to that.
 
 ## Verify it yourself
 
@@ -132,7 +137,7 @@ its permissions and execution behavior.
 | `diff <before> <after>` | Report what changed between two context packets. |
 | `validate` | Validate configuration and portable task files. *(experimental)* |
 | `doctor` | Check the repository and local CLI setup; exits 1 if a check fails. *(experimental)* |
-| `capabilities` | Report supported schemas and machine-interface features. |
+| `capabilities` | Report supported commands, schemas and machine-interface features; `--require <file>` fails unless a consumer's list is satisfied. |
 | `suggest-instructions` | Draft agent instruction files for human review. |
 | `verify <bundle>` | Check that an exported Struktly Record is intact, without Struktly. |
 | `version` | Print version and build metadata. |

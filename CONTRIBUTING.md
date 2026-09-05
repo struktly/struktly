@@ -25,7 +25,9 @@ that same binary against that same configuration. Formatting is gofumpt and is
 reported by the same run; `make fmt` applies it.
 
 Keep changes small and include tests for behavior changes. Do not add a runtime
-dependency when the standard library or an existing dependency is sufficient.
+dependency when the standard library or an existing dependency is sufficient;
+`boundary_test.go` holds the installed binary to cobra and what cobra brings,
+so a new one fails until it is named there with its reason.
 
 ## Compatibility
 

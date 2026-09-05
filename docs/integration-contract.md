@@ -11,9 +11,9 @@ positional arguments they do not define. `--root` inside a Git working tree
 resolves to the repository top level for every command, including `init`,
 `scan` and `suggest-instructions`, so the files one command writes are the files
 another reads. Outside Git, `--root` is used literally. `context`, `status`,
-`explain`, and `validate` require a Git repository. `diff` requires none: a
-packet is self-describing, so comparing two of them is a pure function of the
-two documents and works wherever they can be read. `doctor` runs anywhere and
+`explain`, and `validate` require a Git repository. `diff` and `verify` require
+none: a packet and a Record bundle are self-describing, so each command is a
+pure function of the documents it reads and works wherever they can be read. `doctor` runs anywhere and
 reports what it found: it writes its report, then exits 1 if any check has
 status `fail`, so a missing repository or an invalid configuration is visible
 both in the document and in the exit code. `context` also
@@ -37,6 +37,7 @@ Machine modes write one JSON document to stdout:
 | `doctor --json` | `struktly/doctor/v1` |
 | `capabilities --json` | `struktly/capabilities/v1` |
 | `diff --json <before> <after>` | `struktly/packet-diff/v1` |
+| `verify --json <bundle>` | `struktly/record-verification/v1` |
 | `version --json` | `struktly/version/v1` |
 
 In machine mode, successful diagnostics such as a generated packet path go to
@@ -183,15 +184,17 @@ document on stderr for a failed invocation:
 
 Stable error codes currently include `not_git_repository`, `repository_changed`,
 `invalid_config`, `invalid_task`, `invalid_packet`, `invalid_invocation`,
-`diagnostic_failed`, `capabilities_unsatisfied`, `tasks_unarchived`,
-`task_not_found`, `task_already_archived`, `canceled`, and `operation_failed`. Messages are for
-people; automation must branch on `error.code` and the process exit code.
+`diagnostic_failed`, `verification_failed`, `capabilities_unsatisfied`,
+`tasks_unarchived`, `task_not_found`, `task_already_archived`, `canceled`, and
+`operation_failed`. Messages are for people; automation must branch on
+`error.code` and the process exit code.
 
 | Exit | Meaning |
 |---:|---|
 | 0 | Operation completed; inspect structured diagnostic statuses where applicable. |
 | 1 | Repository, configuration, filesystem, Git, or other operational failure. |
 | 2 | Invalid command, flag, argument count, or mutually exclusive flags. |
+| 126 | `intel` only: a binary was found for the platform but cannot be run. |
 | 127 | `intel` only: the Struktly desktop platform is not installed, so there was nothing to drive. |
 | 130 | Operation canceled through the command context or process signal. |
 
@@ -200,8 +203,8 @@ Git-backed packet selection observes it, while an in-process filesystem scan
 finishes its current operation before returning. A signal received during a file
 replacement can leave an already-written generated artifact; callers may safely
 rerun the command. `--no-write` avoids this artifact case.
-The experimental MCP server currently accepts cancellation notifications but
-does not interrupt an in-flight tool call. A request longer than 4 MiB is
+The MCP server currently accepts cancellation notifications but does not
+interrupt an in-flight tool call. A request longer than 4 MiB is
 answered with a JSON-RPC `-32600` error and a null id; the server keeps serving
 subsequent requests.
 
@@ -370,6 +373,28 @@ The diff names what was selected and why and never reproduces file content, so
 comparing two packets cannot disclose what reading either of them would not.
 Both inputs must declare `struktly/packet/v2`; anything else fails with
 `invalid_packet`.
+
+## Verifying a Record
+
+`verify <bundle.json>` checks an exported `struktly/record-bundle/v1` document
+without any other Struktly component. It validates the bundle against the
+published schema, re-derives the SHA-256 of the sealed bytes and compares it
+with the digest recorded when they were sealed, and confirms the manifest and
+the sealed Record describe the same revision. `--json` emits
+`struktly/record-verification/v1`.
+
+The report is written whether or not the bundle verifies; the exit code then
+says what it found. Exit 0 means every check passed. Exit 1 with
+`verification_failed` means a check failed, and the report names which. Exit 2
+means the bundle could not be read or is not JSON, and nothing was checked.
+
+What an intact result proves is exact and narrow — the bytes are the ones the
+digest describes — and the report's `unverifiable` list says what it does not:
+never whether the work was correct, and never anything the Record itself
+states it could not capture. Judgements carried inside an intact payload are
+reported, not re-evaluated, and three states stay apart: a list that is `null`
+was not available, an empty list was read and found empty, and a list with
+entries is what the payload carried.
 
 ## Portable and runtime state
 
