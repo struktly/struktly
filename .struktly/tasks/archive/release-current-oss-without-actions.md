@@ -24,7 +24,7 @@ Platform consumes when hosted GitHub Actions cannot start.
 - Owner: lane 13 OSS CLI / Integrations
 - Base: OSS `origin/main` at `1c8fd378`
 - Branch/worktree: `fix/local-release-assets` in
-  `/Users/sdf/code/.struktly-worktrees/oss-local-release-assets`
+  `<worktree>`
 - Dependencies: accepted portable Record producer/consumer tranche; working
   maintainer GitHub authentication
 - Merge order: merge this release-flow correction after Platform's independent
